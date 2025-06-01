@@ -1,4 +1,4 @@
-<!-- filepath: g:\My Drive\Projects\Toy Projects\Spruki-Like-Game\docs\Units\animation\animation-editor-class.mdmd -->
+<!-- filepath: docs/Units/animation/animation-editor-class.mdmd -->
 ```{unit} Animation Editor Class
 id: animation-editor-class
 source-ref: ../../src/animation/AnimationEditor.js

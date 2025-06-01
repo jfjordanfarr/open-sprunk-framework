@@ -1,4 +1,4 @@
-<!-- filepath: g:\My Drive\Projects\Toy Projects\Spruki-Like-Game\docs\Units\stage\character-renderer-class.mdmd -->
+<!-- filepath: docs/Units/stage/character-renderer-class.mdmd -->
 ```{unit} Character Renderer Class
 id: character-renderer-class
 source-ref: ../../src/stage/CharacterRenderer.js

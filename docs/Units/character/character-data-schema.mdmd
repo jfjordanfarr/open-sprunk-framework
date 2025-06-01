@@ -1,4 +1,4 @@
-<!-- filepath: g:\My Drive\Projects\Toy Projects\Spruki-Like-Game\docs\Units\character\character-data-schema.mdmd -->
+<!-- filepath: docs/Units/character/character-data-schema.mdmd -->
 ::: {unit}
 id: "character-data-schema"
 unit-type: "json-schema-definition"

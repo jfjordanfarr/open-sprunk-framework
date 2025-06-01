@@ -1,4 +1,4 @@
-<!-- filepath: g:\My Drive\Projects\Toy Projects\Spruki-Like-Game\docs\Units\music\music-data-schema.mdmd -->
+<!-- filepath: docs/Units/music/music-data-schema.mdmd -->
 ```{unit} Music Data Schema
 id: music-data-schema
 source-ref: ../../src/music/MusicData.js

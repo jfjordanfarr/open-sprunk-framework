@@ -1,3 +1,4 @@
+<!-- filepath: docs/REPLACEME_EARLY_MDMD_SPECIFIED_VERSION.md -->
 ::: {composition}  
 id: "sprunki-game-overall-project"  
 composition-type: "project-definition"  

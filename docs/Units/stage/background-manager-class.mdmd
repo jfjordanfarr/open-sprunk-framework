@@ -1,4 +1,4 @@
-<!-- filepath: g:\My Drive\Projects\Toy Projects\Spruki-Like-Game\docs\Units\stage\background-manager-class.mdmd -->
+<!-- filepath: docs/Units/stage/background-manager-class.mdmd -->
 ```{unit} Background Manager Class
 id: background-manager-class
 source-ref: ../../src/stage/BackgroundManager.js

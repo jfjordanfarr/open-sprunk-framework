@@ -1,4 +1,4 @@
-<!-- filepath: g:\My Drive\Projects\Toy Projects\Spruki-Like-Game\docs\Units\animation\property-editor-class.mdmd -->
+<!-- filepath: docs/Units/animation/property-editor-class.mdmd -->
 ```{unit} Property Editor Class
 id: property-editor-class
 source-ref: ../../src/animation/PropertyEditor.js

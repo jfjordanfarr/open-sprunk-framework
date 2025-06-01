@@ -1,4 +1,4 @@
-<!-- filepath: g:\My Drive\Projects\Toy Projects\Spruki-Like-Game\docs\Units\data\local-storage-class.mdmd -->
+<!-- filepath: docs/Units/data/local-storage-class.mdmd -->
 ```{unit} Local Storage Class
 id: local-storage-class
 source-ref: ../../src/data/LocalStorage.js

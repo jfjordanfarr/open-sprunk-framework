@@ -1,4 +1,4 @@
-<!-- filepath: g:\My Drive\Projects\Toy Projects\Spruki-Like-Game\docs\Units\animation\timeline-class.mdmd -->
+<!-- filepath: docs/Units/animation/timeline-class.mdmd -->
 ```{unit} Timeline Class
 id: timeline-class
 source-ref: ../../src/animation/Timeline.js

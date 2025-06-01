@@ -1,4 +1,4 @@
-<!-- filepath: g:\My Drive\Projects\Toy Projects\Spruki-Like-Game\docs\Units\data\data-manager-class.mdmd -->
+<!-- filepath: docs/Units/data/data-manager-class.mdmd -->
 ```{unit} Data Manager Class
 id: data-manager-class
 source-ref: ../../src/data/DataManager.js

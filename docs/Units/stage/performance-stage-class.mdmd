@@ -1,4 +1,4 @@
-<!-- filepath: g:\My Drive\Projects\Toy Projects\Spruki-Like-Game\docs\Units\stage\performance-stage-class.mdmd -->
+<!-- filepath: docs/Units/stage/performance-stage-class.mdmd -->
 ```{unit} Performance Stage Class
 id: performance-stage-class
 source-ref: ../../src/stage/PerformanceStage.js

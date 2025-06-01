@@ -1,4 +1,4 @@
-<!-- filepath: g:\My Drive\Projects\Toy Projects\Spruki-Like-Game\docs\Units\animation\animation-data-schema.mdmd -->
+<!-- filepath: docs/Units/animation/animation-data-schema.mdmd -->
 ```{unit} Animation Data Schema
 id: animation-data-schema
 source-ref: ../../src/animation/AnimationData.js

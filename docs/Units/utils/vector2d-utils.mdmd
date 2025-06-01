@@ -1,4 +1,4 @@
-<!-- filepath: g:\My Drive\Projects\Toy Projects\Spruki-Like-Game\docs\Units\utils\vector2d-utils.mdmd -->
+<!-- filepath: docs/Units/utils/vector2d-utils.mdmd -->
 ```{unit} Vector2D Utils
 id: vector2d-utils
 source-ref: ../../src/utils/Vector2D.js

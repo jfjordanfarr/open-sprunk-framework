@@ -1,4 +1,4 @@
-<!-- filepath: g:\My Drive\Projects\Toy Projects\Spruki-Like-Game\docs\Units\utils\file-utils.mdmd -->
+<!-- filepath: docs/Units/utils/file-utils.mdmd -->
 ```{unit} File Utils
 id: file-utils
 source-ref: ../../src/utils/FileUtils.js
