@@ -1,0 +1,9 @@
+<!-- filepath: g:\My Drive\Projects\Toy Projects\Spruki-Like-Game\docs\Units\data\local-storage-class.mdmd -->
+```{unit} Local Storage Class
+id: local-storage-class
+source-ref: ../../src/data/LocalStorage.js
+source-type: javascript-class
+spec-version: 0.1.0
+---
+Manages saving and loading data to browser local storage.
+```

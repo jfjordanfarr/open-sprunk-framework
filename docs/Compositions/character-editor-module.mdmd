@@ -1,0 +1,15 @@
+::: {composition}
+id: "character-editor-module"
+composition-type: "software-module-definition"
+status: "draft"
+version: "0.2"
+brief: "Module for character creation and customization using vector graphics."
+see-also: ["[[sprunki-core-architecture]]", "[[drawing-canvas-class]]", "[[texture-manager-class]]", "[[character-data-schema]]"]
+
+The Character Editor module allows users to:
+
+- **Draw & Edit Shapes**: Using a Fabric.js based canvas [[drawing-canvas-class]]
+- **Manage Textures**: Apply and manage textures/images [[texture-manager-class]]
+- **Define Body Parts**: Structure character as a hierarchy of editable parts
+- **Save/Load Characters**: Persist character designs [[character-data-schema]]
+:::

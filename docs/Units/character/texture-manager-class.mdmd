@@ -1,0 +1,112 @@
+<!-- filepath: g:\My Drive\Projects\Toy Projects\Spruki-Like-Game\docs\Units\character\texture-manager-class.mdmd -->
+::: {unit}
+id: "texture-manager-class"
+unit-type: "javascript-class-definition"
+language: "javascript"
+status: "draft"
+version: "0.2"
+brief: "Manages loading, storing, and applying textures for characters."
+source-ref: "../../src/character/TextureManager.js"
+
+Handles image loading and management for use as textures within the Character Editor (e.g., on Fabric.js objects).
+
+```javascript
+export class TextureManager {
+    constructor(eventBus) {
+        this.eventBus = eventBus;
+        this.textures = new Map(); // Stores loaded fabric.Image objects by name/URL
+        this.isLoading = new Set(); // Tracks URLs currently being loaded
+    }
+
+    async init() {
+        // Preload common textures or setup listeners if needed
+        console.log('TextureManager initialized');
+    }
+
+    async loadTexture(name, url) {
+        if (this.textures.has(name)) {
+            return this.textures.get(name);
+        }
+        if (this.isLoading.has(url)) {
+            // Wait for existing load to complete
+            return new Promise((resolve, reject) => {
+                const checkInterval = setInterval(() => {
+                    if (!this.isLoading.has(url)) {
+                        clearInterval(checkInterval);
+                        if (this.textures.has(name)) {
+                            resolve(this.textures.get(name));
+                        } else {
+                            // Should have been loaded or failed
+                            reject(new Error(`Texture ${name} failed to load after waiting.`)); 
+                        }
+                    }
+                }, 100);
+            });
+        }
+
+        this.isLoading.add(url);
+        this.eventBus.emit('texture:loading:started', { name, url });
+
+        return new Promise((resolve, reject) => {
+            fabric.Image.fromURL(url, (img) => {
+                if (img) {
+                    this.textures.set(name, img);
+                    this.isLoading.delete(url);
+                    this.eventBus.emit('texture:loading:succeeded', { name, url, texture: img });
+                    resolve(img);
+                } else {
+                    this.isLoading.delete(url);
+                    this.eventBus.emit('texture:loading:failed', { name, url });
+                    reject(new Error(`Failed to load texture: ${name} from ${url}`));
+                }
+            }, {
+                // Fabric.js image options (e.g., crossOrigin)
+                crossOrigin: 'anonymous' 
+            });
+        });
+    }
+
+    getTexture(name) {
+        return this.textures.get(name) || null;
+    }
+
+    applyTextureToObject(fabricObject, textureName, options = {}) {
+        const texture = this.getTexture(textureName);
+        if (fabricObject && texture) {
+            // Example: apply as a pattern fill
+            fabricObject.setPatternFill({
+                source: texture.getElement(), // Get the <img> element
+                repeat: options.repeat || 'repeat', // 'repeat', 'repeat-x', 'repeat-y', 'no-repeat'
+                ...options
+            }, () => {
+                fabricObject.canvas.renderAll();
+            });
+            this.eventBus.emit('texture:applied', { objectId: fabricObject.id, textureName });
+        } else {
+            console.warn(`Cannot apply texture: Object or texture '${textureName}' not found.`);
+        }
+    }
+
+    removeTexture(name) {
+        if (this.textures.has(name)) {
+            // fabric.Image objects don't have a dispose method themselves.
+            // Cleanup is mostly about removing references.
+            this.textures.delete(name);
+            this.eventBus.emit('texture:removed', { name });
+            return true;
+        }
+        return false;
+    }
+
+    listTextures() {
+        return Array.from(this.textures.keys());
+    }
+    
+    dispose() {
+        this.textures.clear();
+        this.isLoading.clear();
+        console.log('TextureManager disposed');
+    }
+}
+```
+:::

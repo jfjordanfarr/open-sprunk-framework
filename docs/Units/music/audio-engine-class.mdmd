@@ -1,0 +1,163 @@
+<!-- filepath: g:\My Drive\Projects\Toy Projects\Spruki-Like-Game\docs\Units\music\audio-engine-class.mdmd -->
+::: {unit}
+id: "audio-engine-class"
+unit-type: "javascript-class-definition"
+language: "javascript"
+status: "draft"
+version: "0.2"
+brief: "Wrapper for Tone.js library to handle sound generation and playback."
+source-ref: "../../src/music/AudioEngine.js"
+
+This class encapsulates Tone.js functionalities for sound synthesis, sequencing, and effects.
+
+```javascript
+// Assumes Tone.js is loaded globally or imported
+// import * as Tone from 'tone'; // If using npm package
+
+export class AudioEngine {
+    constructor(eventBus) {
+        this.eventBus = eventBus;
+        this.instrument = null;
+        this.currentSequence = null;
+        this.isToneStarted = false;
+        this.defaultInstrumentType = 'Synth';
+        this.defaultInstrumentConfig = { oscillator: { type: 'triangle' }, envelope: { attack: 0.01, decay: 0.1, sustain: 0.5, release: 0.8 } };
+    }
+
+    async init() {
+        if (typeof Tone === 'undefined') {
+            console.error('Tone.js is not loaded!');
+            // Optionally load Tone.js dynamically
+            return;
+        }
+        // Initialize Tone.js context (often done on first user interaction)
+        // await Tone.start(); 
+        // console.log("AudioContext started");
+        this.setInstrument('synth', this.defaultInstrumentConfig, this.defaultInstrumentType); // Default instrument
+        
+        this.eventBus.on('instrument:selected', (instrumentId, instrumentData) => {
+            if (instrumentData && instrumentData.config) {
+                this.setInstrument(instrumentId, instrumentData.config, instrumentData.type || 'Synth');
+            } else {
+                 this.setInstrument(instrumentId, this.defaultInstrumentConfig, this.defaultInstrumentType);
+            }
+        });
+
+        // Signal that engine is ready (or part of it)
+        this.eventBus.emit('audioengine:ready', this);
+        console.log('AudioEngine initialized with Tone.js');
+    }
+
+    async _startTone() {
+        if (!this.isToneStarted && Tone && Tone.context.state !== 'running') {
+            await Tone.start();
+            this.isToneStarted = true;
+            console.log('Tone.js AudioContext started.');
+        }
+    }
+
+    setInstrument(instrumentId, config, type = 'Synth') {
+        if (this.instrument && typeof this.instrument.dispose === 'function') {
+            this.instrument.dispose();
+        }
+
+        const instrumentType = type || 'Synth'; // Default to Tone.Synth
+        if (Tone[instrumentType]) {
+            this.instrument = new Tone[instrumentType](config).toDestination();
+        } else {
+            console.warn(`Tone.${instrumentType} not found. Defaulting to Synth.`);
+            this.instrument = new Tone.Synth(config).toDestination();
+        }
+        console.log(`Instrument set to ${instrumentId} (Type: ${instrumentType})`);
+    }
+
+    playNote(note, duration = '8n', time = Tone.now()) {
+        this._startTone(); // Ensure context is running
+        if (this.instrument) {
+            // For MembraneSynth (like kick) or NoiseSynth, triggerAttackRelease takes velocity as 3rd arg
+            if (this.instrument instanceof Tone.MembraneSynth || this.instrument instanceof Tone.NoiseSynth) {
+                 this.instrument.triggerAttackRelease(note.velocity || 0.8, duration, time);
+            } else { // For regular synths, pitch is the first arg
+                 this.instrument.triggerAttackRelease(Tone.Frequency(note.pitch, "midi").toNote(), duration, time, note.velocity || 0.8);
+            }
+        }
+    }
+
+    loadSequence(musicData) {
+        this._startTone();
+        if (!musicData || !musicData.notes || musicData.notes.length === 0) {
+            if (this.currentSequence) {
+                this.currentSequence.clear();
+            }
+            return;
+        }
+
+        if (this.currentSequence) {
+            this.currentSequence.clear();
+            this.currentSequence.dispose();
+        }
+
+        const events = musicData.notes.map(note => {
+            return [note.time, note]; // Tone.Part expects [time, value]
+        });
+
+        this.currentSequence = new Tone.Part((time, note) => {
+            // Convert MIDI pitch to note name if instrument expects it
+            const noteName = Tone.Frequency(note.pitch, "midi").toNote();
+            const durationInBeats = note.duration || (1 / (musicData.stepsPerBeat || 4));
+            const durationNotation = `${durationInBeats * (musicData.beats || 4)}n`; // e.g. 4n, 8n, 16n
+            
+            if (this.instrument instanceof Tone.MembraneSynth || this.instrument instanceof Tone.NoiseSynth) {
+                this.instrument.triggerAttackRelease(note.velocity || 0.8, `${durationInBeats}b`, time); // duration in beats
+            } else {
+                this.instrument.triggerAttackRelease(noteName, `${durationInBeats}b`, time, note.velocity || 0.8);
+            }
+
+        }, events);
+
+        this.currentSequence.loop = true;
+        this.currentSequence.loopEnd = musicData.beats || 4; // Loop length in measures/beats
+        Tone.Transport.bpm.value = musicData.tempo || 120;
+    }
+
+    playSequence(musicData) {
+        this._startTone();
+        if (musicData) {
+            this.loadSequence(musicData);
+        }
+        if (this.currentSequence && this.currentSequence.length > 0) {
+            Tone.Transport.start();
+            this.currentSequence.start(0);
+            this.eventBus.emit('playback:started');
+        } else {
+            console.warn('No sequence loaded or sequence is empty.');
+        }
+    }
+
+    stop() {
+        Tone.Transport.stop();
+        if (this.currentSequence) {
+            this.currentSequence.stop(0);
+        }
+        this.eventBus.emit('playback:stopped');
+    }
+
+    setTempo(bpm) {
+        Tone.Transport.bpm.value = bpm;
+        this.eventBus.emit('tempo:changed', bpm);
+    }
+
+    dispose() {
+        this.stop();
+        if (this.instrument) {
+            this.instrument.dispose();
+        }
+        if (this.currentSequence) {
+            this.currentSequence.dispose();
+        }
+        // Tone.Transport.dispose(); // Careful with global dispose
+        console.log('AudioEngine disposed');
+    }
+}
+```
+:::

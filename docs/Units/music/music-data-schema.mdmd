@@ -1,0 +1,9 @@
+<!-- filepath: g:\My Drive\Projects\Toy Projects\Spruki-Like-Game\docs\Units\music\music-data-schema.mdmd -->
+```{unit} Music Data Schema
+id: music-data-schema
+source-ref: ../../src/music/MusicData.js
+source-type: javascript-class
+spec-version: 0.1.0
+---
+Defines the structure for storing music data, including tracks, notes, and instrument settings.
+```

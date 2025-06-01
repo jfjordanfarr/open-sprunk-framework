@@ -1,0 +1,97 @@
+<!-- filepath: g:\My Drive\Projects\Toy Projects\Spruki-Like-Game\docs\Units\core\state-manager-class.mdmd -->
+::: {unit}
+id: "state-manager-class"
+unit-type: "javascript-class-definition"
+language: "javascript"
+status: "draft"
+version: "0.2"
+brief: "Global state management for the application."
+source-ref: "../../src/core/StateManager.js"
+
+The StateManager class holds the global application state, including loaded project data, UI state, and other shared information.
+
+```javascript
+export class StateManager {
+    constructor(eventBus) {
+        this.eventBus = eventBus;
+        this.state = {
+            currentProject: null,
+            activeView: 'stage', // e.g., character, music, animation, stage
+            unsavedChanges: false,
+            // Add other global state properties here
+            characterData: { /* ... */ },
+            musicData: { /* ... */ },
+            animationData: { /* ... */ },
+        };
+
+        this._setupEventHandlers();
+    }
+
+    async init() {
+        // Load any persisted state if necessary
+        console.log('StateManager initialized');
+    }
+
+    _setupEventHandlers() {
+        // Example: Listen for view changes
+        this.eventBus.on('view:change', (viewName) => {
+            this.setActiveView(viewName);
+        });
+    }
+
+    getState() {
+        return { ...this.state }; // Return a copy to prevent direct mutation
+    }
+
+    getCurrentProject() {
+        return this.state.currentProject;
+    }
+
+    setProjectData(projectData) {
+        this.state.currentProject = projectData;
+        this.state.characterData = projectData.character || {};
+        this.state.musicData = projectData.music || {};
+        this.state.animationData = projectData.animation || {};
+        this.state.unsavedChanges = false;
+        this.eventBus.emit('state:project:loaded', this.state.currentProject);
+    }
+
+    loadProjectData(projectData) {
+        // Similar to setProjectData, but might involve more complex merging or validation
+        this.setProjectData(projectData);
+    }
+
+    updateCharacterData(data) {
+        this.state.characterData = { ...this.state.characterData, ...data };
+        this.state.unsavedChanges = true;
+        this.eventBus.emit('state:character:updated', this.state.characterData);
+    }
+
+    updateMusicData(data) {
+        this.state.musicData = { ...this.state.musicData, ...data };
+        this.state.unsavedChanges = true;
+        this.eventBus.emit('state:music:updated', this.state.musicData);
+    }
+
+    updateAnimationData(data) {
+        this.state.animationData = { ...this.state.animationData, ...data };
+        this.state.unsavedChanges = true;
+        this.eventBus.emit('state:animation:updated', this.state.animationData);
+    }
+
+    setActiveView(viewName) {
+        this.state.activeView = viewName;
+        this.eventBus.emit('state:view:changed', viewName);
+    }
+
+    hasUnsavedChanges() {
+        return this.state.unsavedChanges;
+    }
+
+    markAsSaved() {
+        this.state.unsavedChanges = false;
+        this.eventBus.emit('state:project:saved');
+    }
+}
+```
+:::

@@ -1,0 +1,52 @@
+<!-- filepath: g:/My Drive/Projects/Toy Projects/Spruki-Like-Game/docs/Compositions/sprunki-module-structure.mdmd -->
+::: {composition}
+id: "sprunki-module-structure"
+composition-type: "file-system-structure"
+status: "draft" 
+version: "0.2"
+brief: "Planned file structure for the src/ directory showing all implementation units."
+see-also: ["[[sprunki-core-architecture]]"]
+
+The `src/` directory will be organized as follows, with each file corresponding to a `{unit}` in this specification:
+
+```
+src/
+├── index.html                    # Main application entry point [[html-main-page]]
+├── main.js                       # Application bootstrap [[app-main-bootstrap]]
+├── core/
+│   ├── AppCore.js               # Main app orchestrator [[app-core-class]]
+│   ├── EventBus.js              # Event communication system [[event-bus-class]]
+│   └── StateManager.js          # Global state management [[state-manager-class]]
+├── character/
+│   ├── CharacterEditor.js       # Character creation interface [[character-editor-class]]
+│   ├── DrawingCanvas.js         # Fabric.js drawing component [[drawing-canvas-class]]
+│   ├── TextureManager.js        # Texture/image handling [[texture-manager-class]]
+│   └── CharacterData.js         # Character data structure [[character-data-schema]]
+├── music/
+│   ├── MusicEditor.js           # Music composition interface [[music-editor-class]]
+│   ├── PianoRoll.js             # Note input interface [[piano-roll-class]]
+│   ├── InstrumentSelector.js    # Instrument selection [[instrument-selector-class]]
+│   ├── AudioEngine.js           # Tone.js wrapper [[audio-engine-class]]
+│   └── MusicData.js             # Music data structure [[music-data-schema]]
+├── animation/
+│   ├── AnimationEditor.js       # Animation creation interface [[animation-editor-class]]
+│   ├── Timeline.js              # Keyframe timeline UI [[timeline-class]]
+│   ├── PropertyEditor.js        # Property editing controls [[property-editor-class]]
+│   ├── TweenEngine.js           # Custom animation engine [[tween-engine-class]]
+│   └── AnimationData.js         # Animation data structure [[animation-data-schema]]
+├── stage/
+│   ├── PerformanceStage.js      # Main performance view [[performance-stage-class]]
+│   ├── CharacterRenderer.js     # PixiJS character rendering [[character-renderer-class]]
+│   └── BackgroundManager.js     # Background customization [[background-manager-class]]
+├── data/
+│   ├── DataManager.js           # Data persistence and serialization [[data-manager-class]]
+│   ├── ProjectFile.js           # Project file handling [[project-file-schema]]
+│   └── LocalStorage.js          # Browser storage interface [[local-storage-class]]
+└── utils/
+    ├── Vector2D.js              # 2D vector math utilities [[vector2d-utils]]
+    ├── ColorUtils.js            # Color manipulation utilities [[color-utils]]
+    └── FileUtils.js             # File I/O utilities [[file-utils]]
+```
+
+Each of these files is specified as a concrete `{unit}` with implementation details.
+:::

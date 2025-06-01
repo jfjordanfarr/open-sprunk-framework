@@ -1,0 +1,109 @@
+<!-- filepath: g:\My Drive\Projects\Toy Projects\Spruki-Like-Game\docs\Units\core\event-bus-class.mdmd -->
+::: {unit}
+id: "event-bus-class"
+unit-type: "javascript-class-definition"
+language: "javascript"
+status: "draft"
+version: "0.2"
+brief: "Event communication system for decoupled module communication."
+source-ref: "../../src/core/EventBus.js"
+
+A simple but powerful event bus implementation that allows modules to communicate without direct coupling.
+
+```javascript
+export class EventBus {
+    constructor() {
+        this.events = new Map();
+        this.wildcardListeners = new Map();
+    }
+
+    on(eventName, callback) {
+        if (eventName.includes('*')) {
+            // Handle wildcard events (e.g., 'data:*', 'error:*')
+            const pattern = eventName.replace('*', '.*');
+            const regex = new RegExp(`^${pattern}$`);
+            
+            if (!this.wildcardListeners.has(regex.source)) {
+                this.wildcardListeners.set(regex.source, { regex, callbacks: [] });
+            }
+            this.wildcardListeners.get(regex.source).callbacks.push(callback);
+        } else {
+            // Handle specific events
+            if (!this.events.has(eventName)) {
+                this.events.set(eventName, []);
+            }
+            this.events.get(eventName).push(callback);
+        }
+    }
+
+    off(eventName, callback) {
+        if (eventName.includes('*')) {
+            const pattern = eventName.replace('*', '.*');
+            const wildcardEntry = this.wildcardListeners.get(pattern);
+            if (wildcardEntry) {
+                const index = wildcardEntry.callbacks.indexOf(callback);
+                if (index > -1) {
+                    wildcardEntry.callbacks.splice(index, 1);
+                }
+            }
+        } else {
+            const listeners = this.events.get(eventName);
+            if (listeners) {
+                const index = listeners.indexOf(callback);
+                if (index > -1) {
+                    listeners.splice(index, 1);
+                }
+            }
+        }
+    }
+
+    emit(eventName, ...args) {
+        // Emit to specific listeners
+        const listeners = this.events.get(eventName);
+        if (listeners) {
+            listeners.forEach(callback => {
+                try {
+                    callback(...args);
+                } catch (error) {
+                    console.error(`Error in event listener for '${eventName}':`, error);
+                }
+            });
+        }
+
+        // Emit to wildcard listeners
+        this.wildcardListeners.forEach(({ regex, callbacks }) => {
+            if (regex.test(eventName)) {
+                callbacks.forEach(callback => {
+                    try {
+                        callback(...args);
+                    } catch (error) {
+                        console.error(`Error in wildcard event listener for '${eventName}':`, error);
+                    }
+                });
+            }
+        });
+    }
+
+    once(eventName, callback) {
+        const onceCallback = (...args) => {
+            callback(...args);
+            this.off(eventName, onceCallback);
+        };
+        this.on(eventName, onceCallback);
+    }
+
+    removeAllListeners(eventName = null) {
+        if (eventName) {
+            this.events.delete(eventName);
+        } else {
+            this.events.clear();
+            this.wildcardListeners.clear();
+        }
+    }
+
+    getListenerCount(eventName) {
+        return this.events.get(eventName)?.length || 0;
+    }
+}
+```
+:::

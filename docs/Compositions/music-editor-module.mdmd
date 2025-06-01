@@ -1,0 +1,15 @@
+::: {composition}
+id: "music-editor-module"
+composition-type: "software-module-definition"
+status: "draft"
+version: "0.2"
+brief: "Module for music loop composition using a piano roll and Tone.js."
+see-also: ["[[sprunki-core-architecture]]", "[[piano-roll-class]]", "[[instrument-selector-class]]", "[[audio-engine-class]]", "[[music-data-schema]]"]
+
+The Music Editor module enables users to:
+
+- **Compose Melodies**: Using a piano roll interface [[piano-roll-class]]
+- **Select Instruments**: Choose from various synthesized instruments [[instrument-selector-class]]
+- **Control Playback**: Manage tempo, looping, and playback via [[audio-engine-class]]
+- **Save/Load Music**: Persist musical compositions [[music-data-schema]]
+:::

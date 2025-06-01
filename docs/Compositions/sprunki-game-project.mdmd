@@ -1,0 +1,32 @@
+<!-- filepath: g:/My Drive/Projects/Toy Projects/Spruki-Like-Game/docs/Compositions/sprunki-game-project.mdmd -->
+::: {composition}
+id: "sprunki-game-project"
+composition-type: "web-application-project"
+status: "draft"
+version: "0.2"
+brief: "Complete specification for a client-side creative game with character creation, music composition, and animation."
+see-also: ["[[sprunki-core-architecture]]", "[[sprunki-data-flow]]", "[[sprunki-module-structure]]"]
+
+This document specifies the Sprunki-like game using MDMD principles focused on concrete, implementable components. Every `{unit}` in this specification corresponds to an actual file that will be created in the `src/` directory.
+
+## Vision & Core Principles
+
+This is a 100% client-side, open-source creative game where users design characters, compose music loops, and create animations. The experience emphasizes:
+
+- **User Creation Focus**: Primary gameplay is creative expression
+- **Client-Side Simplicity**: No server dependencies for core functionality  
+- **Open Source & Modular**: Built with extensibility using existing open-source libraries
+- **Interpolation-Based Animation**: Smooth procedural animation rather than frame-by-frame
+
+## Technology Stack
+
+- **Core**: HTML5, CSS3, ES6+ JavaScript
+- **Rendering**: PixiJS for character display and animation
+- **Vector Graphics**: Fabric.js for character creation interface
+- **Audio**: Tone.js for music composition and playback
+- **Animation**: Custom tween system built on requestAnimationFrame
+- **UI**: Vanilla JavaScript with component-based architecture
+- **Data**: JSON serialization with localStorage persistence
+
+The implementation is structured around five core modules: [[sprunki-core-architecture]]
+:::

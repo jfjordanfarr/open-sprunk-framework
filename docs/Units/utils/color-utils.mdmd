@@ -1,0 +1,9 @@
+<!-- filepath: g:\My Drive\Projects\Toy Projects\Spruki-Like-Game\docs\Units\utils\color-utils.mdmd -->
+```{unit} Color Utils
+id: color-utils
+source-ref: ../../src/utils/ColorUtils.js
+source-type: javascript-module
+spec-version: 0.1.0
+---
+Provides utility functions for color manipulation and conversion.
+```

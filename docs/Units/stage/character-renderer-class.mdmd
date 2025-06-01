@@ -1,0 +1,9 @@
+<!-- filepath: g:\My Drive\Projects\Toy Projects\Spruki-Like-Game\docs\Units\stage\character-renderer-class.mdmd -->
+```{unit} Character Renderer Class
+id: character-renderer-class
+source-ref: ../../src/stage/CharacterRenderer.js
+source-type: javascript-class
+spec-version: 0.1.0
+---
+Handles rendering of characters on the stage.
+```

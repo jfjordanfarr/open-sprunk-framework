@@ -1,0 +1,17 @@
+::: {composition}
+id: "data-manager-module"
+composition-type: "software-module-definition"
+status: "draft"
+version: "0.2"
+brief: "Module for handling data persistence, serialization, and project files."
+see-also: ["[[sprunki-core-architecture]]", "[[data-manager-class]]", "[[project-file-schema]]", "[[local-storage-class]]"]
+
+The Data Manager module is responsible for:
+
+- **Project Management**: Saving and loading entire projects [[project-file-schema]]
+- **Data Persistence**: Using browser localStorage for quick saves [[local-storage-class]]
+- **Serialization**: Converting in-memory data to JSON and back
+- **File Export/Import**: Allowing users to save/load project files from their disk
+
+This module [[data-manager-class]] centralizes all data operations.
+:::
