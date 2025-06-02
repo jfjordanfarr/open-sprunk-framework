@@ -3,6 +3,7 @@
  * Initializes all modules and sets up the UI
  */
 import { AppCore } from './core/AppCore.js';
+import { PerformanceStage } from './stage/PerformanceStage.js';
 
 class SpunkiApp {
     constructor() {
@@ -19,22 +20,22 @@ class SpunkiApp {
             this.appCore = new AppCore();
             await this.appCore.init();
 
-            // For now, we'll create placeholder editor modules
-            // These will be implemented in subsequent iterations
+            // Initialize editors - Stage gets real implementation!
             this.editors = {
                 character: new PlaceholderEditor('character', this.appCore.getEventBus()),
                 music: new PlaceholderEditor('music', this.appCore.getEventBus()),
                 animation: new PlaceholderEditor('animation', this.appCore.getEventBus()),
-                stage: new PlaceholderEditor('stage', this.appCore.getEventBus())
+                stage: await this.createPerformanceStage()
             };
 
-            // Initialize all editors
+            // Initialize other editors (non-async)
             await Promise.all([
                 this.editors.character.init(),
                 this.editors.music.init(),
-                this.editors.animation.init(),
-                this.editors.stage.init()
+                this.editors.animation.init()
             ]);
+            
+            // Stage is already initialized in createPerformanceStage
 
             // Register editors with the core
             Object.entries(this.editors).forEach(([name, editor]) => {
@@ -48,14 +49,238 @@ class SpunkiApp {
             // Set up global event listeners
             this.setupGlobalEventListeners();
 
-            // Show initial welcome message
-            this.showWelcomeMessage();
+            // Show initial message in console
+            console.log('🎉 Sprunki Creative Studio initialized successfully!');
+            console.log('🎭 Performance Stage is ready for creativity!');
+            
+            // Add some test data to demonstrate the stage
+            this.addTestData();
 
             console.log('🎉 Sprunki Creative Studio initialized successfully!');
         } catch (error) {
             console.error('❌ Failed to initialize Sprunki App:', error);
             this.showErrorMessage('Failed to initialize application. Please refresh and try again.');
         }
+    }
+
+    async createPerformanceStage() {
+        console.log('🎭 Creating Performance Stage...');
+        
+        // Get or create canvas element
+        const stageContainer = document.getElementById('stage-canvas-container');
+        if (!stageContainer) {
+            throw new Error('Stage canvas container not found');
+        }
+        
+        // Create canvas element
+        let canvas = stageContainer.querySelector('canvas');
+        if (!canvas) {
+            canvas = document.createElement('canvas');
+            canvas.id = 'stage-canvas';
+            canvas.style.cssText = `
+                width: 100%;
+                height: 100%;
+                background: #1a1a2e;
+                border-radius: 8px;
+                cursor: crosshair;
+            `;
+            stageContainer.appendChild(canvas);
+        }
+        
+        // Create Performance Stage instance
+        const stage = new PerformanceStage(
+            canvas, 
+            this.appCore.getEventBus(), 
+            this.appCore.getStateManager()
+        );
+        
+        // Initialize the stage
+        await stage.initialize();
+        
+        // Add stage-specific methods for editor interface compatibility
+        stage.onActivate = () => {
+            console.log('🎭 Performance Stage activated');
+            this.appCore.getEventBus().emit('stage:activated');
+            stage.render(stage.currentTime); // Refresh render when activated
+        };
+        
+        console.log('🎭 Performance Stage created successfully');
+        return stage;
+    }
+
+    addTestData() {
+        console.log('🧪 Adding test data for Performance Stage demonstration...');
+        
+        const stateManager = this.appCore.getStateManager();
+        const eventBus = this.appCore.getEventBus();
+        
+        // Add test characters
+        const testCharacters = [
+            {
+                id: 'test-character-1',
+                name: 'Sprunki Blue',
+                color: '#4285f4',
+                size: 80,
+                shape: 'humanoid'
+            },
+            {
+                id: 'test-character-2', 
+                name: 'Sprunki Red',
+                color: '#ea4335',
+                size: 100,
+                shape: 'humanoid'
+            },
+            {
+                id: 'test-character-3',
+                name: 'Sprunki Green', 
+                color: '#34a853',
+                size: 90,
+                shape: 'humanoid'
+            }
+        ];
+        
+        // Set test project data
+        stateManager.setState('project.characters', testCharacters);
+        
+        // Place characters on stage
+        const stageLayout = {
+            characters: [
+                {
+                    characterId: 'test-character-1',
+                    x: 200,
+                    y: 300,
+                    scale: 1,
+                    rotation: 0
+                },
+                {
+                    characterId: 'test-character-2',
+                    x: 400,
+                    y: 300,
+                    scale: 1.2,
+                    rotation: 0
+                },
+                {
+                    characterId: 'test-character-3',
+                    x: 600,
+                    y: 300,
+                    scale: 0.8,
+                    rotation: 0
+                }
+            ]
+        };
+        
+        stateManager.setState('project.stages.main', stageLayout);
+        
+        // Add stage controls
+        this.addStageControls();
+        
+        console.log('🧪 Test data added - 3 Sprunki characters placed on stage!');
+        eventBus.emit('test:data-loaded');
+    }
+
+    addStageControls() {
+        const stageContainer = document.getElementById('stage-controls');
+        if (!stageContainer) return;
+        
+        stageContainer.innerHTML = `
+            <div style="padding: 10px; background: rgba(0,0,0,0.1); border-radius: 8px; margin: 10px 0;">
+                <h4 style="margin: 0 0 10px 0; color: #333;">🎭 Performance Controls</h4>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <button id="stage-play" style="padding: 8px 16px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                        ▶️ Play
+                    </button>
+                    <button id="stage-pause" style="padding: 8px 16px; background: #FF9800; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                        ⏸️ Pause
+                    </button>
+                    <button id="stage-stop" style="padding: 8px 16px; background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                        ⏹️ Stop
+                    </button>
+                    <span style="margin-left: 20px; color: #666;">
+                        Time: <span id="stage-time">0.00s</span>
+                    </span>
+                    <span style="margin-left: 20px; color: #666;">
+                        FPS: <span id="stage-fps">--</span>
+                    </span>
+                </div>
+                <div style="margin-top: 10px;">
+                    <label style="color: #666; margin-right: 10px;">
+                        <input type="checkbox" id="debug-mode" style="margin-right: 5px;"> Debug Mode
+                    </label>
+                    <button id="add-character" style="padding: 6px 12px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; margin-left: 10px;">
+                        + Add Character
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        // Set up stage control event handlers
+        document.getElementById('stage-play').addEventListener('click', () => {
+            this.appCore.getEventBus().emit('timeline:play');
+        });
+        
+        document.getElementById('stage-pause').addEventListener('click', () => {
+            this.appCore.getEventBus().emit('timeline:pause');
+        });
+        
+        document.getElementById('stage-stop').addEventListener('click', () => {
+            this.appCore.getEventBus().emit('timeline:stop');
+        });
+        
+        document.getElementById('debug-mode').addEventListener('change', (e) => {
+            this.appCore.getStateManager().setState('ui.debugMode', e.target.checked);
+        });
+        
+        document.getElementById('add-character').addEventListener('click', () => {
+            this.addRandomCharacter();
+        });
+        
+        // Set up real-time updates
+        this.setupStageMonitoring();
+    }
+
+    addRandomCharacter() {
+        const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57', '#ff9ff3'];
+        const names = ['Sprunki Pink', 'Sprunki Cyan', 'Sprunki Blue', 'Sprunki Mint', 'Sprunki Yellow', 'Sprunki Purple'];
+        
+        const randomColor = colors[Math.floor(Math.random() * colors.length)];
+        const randomName = names[Math.floor(Math.random() * names.length)];
+        const randomId = `test-character-${Date.now()}`;
+        
+        const newCharacter = {
+            id: randomId,
+            name: randomName,
+            color: randomColor,
+            size: 60 + Math.random() * 80,
+            shape: 'humanoid'
+        };
+        
+        // Add to project
+        const currentCharacters = this.appCore.getStateManager().getState('project.characters') || [];
+        currentCharacters.push(newCharacter);
+        this.appCore.getStateManager().setState('project.characters', currentCharacters);
+        
+        // Place on stage at random position
+        this.appCore.getEventBus().emit('stage:character_placed', {
+            characterId: randomId,
+            x: 100 + Math.random() * 600,
+            y: 200 + Math.random() * 200,
+            scale: 0.8 + Math.random() * 0.4,
+            rotation: 0
+        });
+        
+        console.log('🎨 Added random character:', randomName, randomColor);
+    }
+
+    setupStageMonitoring() {
+        // Update time and FPS displays
+        setInterval(() => {
+            if (this.editors.stage && this.editors.stage.getPerformanceMetrics) {
+                const metrics = this.editors.stage.getPerformanceMetrics();
+                
+                document.getElementById('stage-time').textContent = `${metrics.currentTime.toFixed(2)}s`;
+                document.getElementById('stage-fps').textContent = `${metrics.fps.toFixed(1)}`;
+            }
+        }, 100);
     }
 
     setupNavigation() {
