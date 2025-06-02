@@ -1,0 +1,20 @@
+<!-- filepath: docs/Units/utils/file-utils.mdmd -->
+::: {unit}
+id: "file-utils"
+title: "File Utils"
+unit-type: "javascript-module-definition"
+language: "javascript"
+status: "draft"
+version: "0.2"
+brief: "Provides utility functions for file operations, such as reading and writing data."
+source-ref: "../../src/utils/FileUtils.js"
+see-also:
+  - "[[html5-export-requirement]]" # Traceability (implements file export functionality)
+  - "[[../Concepts/data-manager-module.mdmd]]" # Architectural association (used by data management)
+
+Provides utility functions for file operations including reading, writing, and format conversion for browser environments.
+
+```javascript
+// File Utils implementation placeholder
+```
+:::

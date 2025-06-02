@@ -1,9 +1,0 @@
-<!-- filepath: docs/Units/animation/property-editor-class.mdmd -->
-```{unit} Property Editor Class
-id: property-editor-class
-source-ref: ../../src/animation/PropertyEditor.js
-source-type: javascript-class
-spec-version: 0.1.0
----
-Allows users to edit properties of animated objects.
-```

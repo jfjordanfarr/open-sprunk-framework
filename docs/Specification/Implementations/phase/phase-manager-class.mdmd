@@ -1,0 +1,463 @@
+```{unit}
+id: "phase-manager-class"
+title: "Phase Manager Class"
+unit-type: "javascript-class-definition"
+source-ref: "../../src/phase/PhaseManager.js"
+status: "draft"
+see-also:
+  - "[[phase-system-architecture]]"
+  - "[[phase-data-store-class]]"
+  - "[[phase-transition-engine-class]]"
+  - "[[phase-coordinator-class]]"
+  - "[[event-bus-class]]"
+```
+
+## Overview
+
+The PhaseManager class serves as the central orchestrator for all phase-related operations in the Open Sprunk Framework. It coordinates phase creation, modification, deletion, and transitions across all system components while maintaining data integrity and performance.
+
+## Class Definition
+
+```javascript
+/**
+ * Central manager for character and background phase operations
+ * Coordinates phase lifecycle, validation, and cross-system synchronization
+ */
+class PhaseManager {
+    constructor(eventBus, dataStore, transitionEngine, coordinator) {
+        this.eventBus = eventBus;
+        this.dataStore = dataStore;
+        this.transitionEngine = transitionEngine;
+        this.coordinator = coordinator;
+        
+        this.phases = new Map(); // phaseId -> PhaseData
+        this.activePhases = new Map(); // entityId -> currentPhaseId
+        this.phaseValidators = new Map(); // phaseType -> validatorFunction
+        
+        this._setupEventHandlers();
+        this._registerDefaultValidators();
+    }
+
+    // Phase Lifecycle Management
+    async createPhase(entityId, phaseData, options = {}) {
+        const { validateFirst = true, notifyChange = true } = options;
+        
+        if (validateFirst && !this.validatePhase(phaseData)) {
+            throw new Error(`Invalid phase data for entity ${entityId}`);
+        }
+        
+        const phaseId = phaseData.phaseId || this._generatePhaseId(entityId);
+        const fullPhaseData = {
+            ...phaseData,
+            phaseId,
+            entityId,
+            createdAt: Date.now(),
+            modifiedAt: Date.now()
+        };
+        
+        // Store in memory and persist
+        this.phases.set(phaseId, fullPhaseData);
+        await this.dataStore.savePhase(phaseId, fullPhaseData);
+        
+        if (notifyChange) {
+            this.eventBus.emit('phase:created', {
+                phaseId,
+                entityId,
+                phaseData: fullPhaseData
+            });
+        }
+        
+        return phaseId;
+    }
+
+    async updatePhase(phaseId, updates, options = {}) {
+        const { validateFirst = true, notifyChange = true } = options;
+        
+        const existingPhase = this.phases.get(phaseId);
+        if (!existingPhase) {
+            throw new Error(`Phase ${phaseId} not found`);
+        }
+        
+        const updatedPhase = {
+            ...existingPhase,
+            ...updates,
+            modifiedAt: Date.now()
+        };
+        
+        if (validateFirst && !this.validatePhase(updatedPhase)) {
+            throw new Error(`Invalid phase update for ${phaseId}`);
+        }
+        
+        this.phases.set(phaseId, updatedPhase);
+        await this.dataStore.savePhase(phaseId, updatedPhase);
+        
+        if (notifyChange) {
+            this.eventBus.emit('phase:updated', {
+                phaseId,
+                entityId: updatedPhase.entityId,
+                updates,
+                fullPhaseData: updatedPhase
+            });
+        }
+        
+        return updatedPhase;
+    }
+
+    async deletePhase(phaseId, options = {}) {
+        const { checkDependencies = true, notifyChange = true } = options;
+        
+        const phase = this.phases.get(phaseId);
+        if (!phase) {
+            throw new Error(`Phase ${phaseId} not found`);
+        }
+        
+        if (checkDependencies) {
+            const dependencies = await this._findPhaseDependencies(phaseId);
+            if (dependencies.length > 0) {
+                throw new Error(`Cannot delete phase ${phaseId}: has dependencies`);
+            }
+        }
+        
+        // Remove from active phases if currently active
+        for (const [entityId, activePhaseId] of this.activePhases.entries()) {
+            if (activePhaseId === phaseId) {
+                this.activePhases.delete(entityId);
+            }
+        }
+        
+        this.phases.delete(phaseId);
+        await this.dataStore.deletePhase(phaseId);
+        
+        if (notifyChange) {
+            this.eventBus.emit('phase:deleted', {
+                phaseId,
+                entityId: phase.entityId
+            });
+        }
+    }
+
+    // Phase Activation and Transitions
+    async activatePhase(entityId, phaseId, options = {}) {
+        const {
+            transitionType = 'instant',
+            transitionDuration = 0,
+            coordinateWithOthers = false,
+            beatAlign = false
+        } = options;
+        
+        const phase = this.phases.get(phaseId);
+        if (!phase) {
+            throw new Error(`Phase ${phaseId} not found`);
+        }
+        
+        if (phase.entityId !== entityId) {
+            throw new Error(`Phase ${phaseId} does not belong to entity ${entityId}`);
+        }
+        
+        const currentPhaseId = this.activePhases.get(entityId);
+        
+        if (coordinateWithOthers) {
+            return this.coordinator.coordinatedPhaseChange({
+                primaryEntity: entityId,
+                targetPhase: phaseId,
+                transitionType,
+                transitionDuration,
+                beatAlign
+            });
+        }
+        
+        return this._executePhaseTransition(entityId, currentPhaseId, phaseId, {
+            transitionType,
+            transitionDuration,
+            beatAlign
+        });
+    }
+
+    async _executePhaseTransition(entityId, fromPhaseId, toPhaseId, options) {
+        const fromPhase = fromPhaseId ? this.phases.get(fromPhaseId) : null;
+        const toPhase = this.phases.get(toPhaseId);
+        
+        this.eventBus.emit('phase:transition:start', {
+            entityId,
+            fromPhaseId,
+            toPhaseId,
+            options
+        });
+        
+        try {
+            await this.transitionEngine.executeTransition(
+                entityId,
+                fromPhase,
+                toPhase,
+                options
+            );
+            
+            this.activePhases.set(entityId, toPhaseId);
+            
+            this.eventBus.emit('phase:transition:complete', {
+                entityId,
+                fromPhaseId,
+                toPhaseId,
+                success: true
+            });
+            
+            return true;
+        } catch (error) {
+            this.eventBus.emit('phase:transition:complete', {
+                entityId,
+                fromPhaseId,
+                toPhaseId,
+                success: false,
+                error: error.message
+            });
+            
+            throw error;
+        }
+    }
+
+    // Phase Queries and Utilities
+    getPhase(phaseId) {
+        return this.phases.get(phaseId);
+    }
+
+    getEntityPhases(entityId) {
+        return Array.from(this.phases.values())
+            .filter(phase => phase.entityId === entityId);
+    }
+
+    getActivePhase(entityId) {
+        const activePhaseId = this.activePhases.get(entityId);
+        return activePhaseId ? this.phases.get(activePhaseId) : null;
+    }
+
+    getAllActivePhases() {
+        const result = new Map();
+        for (const [entityId, phaseId] of this.activePhases.entries()) {
+            const phase = this.phases.get(phaseId);
+            if (phase) {
+                result.set(entityId, phase);
+            }
+        }
+        return result;
+    }
+
+    // Phase Validation
+    validatePhase(phaseData) {
+        if (!phaseData || typeof phaseData !== 'object') {
+            return false;
+        }
+        
+        const { phaseType = 'character' } = phaseData;
+        const validator = this.phaseValidators.get(phaseType);
+        
+        if (!validator) {
+            console.warn(`No validator registered for phase type: ${phaseType}`);
+            return this._validateBasicPhase(phaseData);
+        }
+        
+        return validator(phaseData);
+    }
+
+    registerPhaseValidator(phaseType, validatorFunction) {
+        this.phaseValidators.set(phaseType, validatorFunction);
+    }
+
+    _validateBasicPhase(phaseData) {
+        const required = ['phaseId', 'entityId'];
+        return required.every(field => phaseData.hasOwnProperty(field));
+    }
+
+    // Phase Templates and Duplication
+    async duplicatePhase(sourcePhaseId, newEntityId = null, options = {}) {
+        const sourcePhase = this.phases.get(sourcePhaseId);
+        if (!sourcePhase) {
+            throw new Error(`Source phase ${sourcePhaseId} not found`);
+        }
+        
+        const targetEntityId = newEntityId || sourcePhase.entityId;
+        const newPhaseId = this._generatePhaseId(targetEntityId);
+        
+        const duplicatedPhase = {
+            ...sourcePhase,
+            phaseId: newPhaseId,
+            entityId: targetEntityId,
+            name: `${sourcePhase.name} (Copy)`,
+            createdAt: Date.now(),
+            modifiedAt: Date.now(),
+            sourcePhaseId: sourcePhaseId // Track duplication source
+        };
+        
+        return this.createPhase(targetEntityId, duplicatedPhase, options);
+    }
+
+    async createPhaseFromTemplate(templateId, entityId, customizations = {}) {
+        const template = await this.dataStore.getPhaseTemplate(templateId);
+        if (!template) {
+            throw new Error(`Phase template ${templateId} not found`);
+        }
+        
+        const phaseData = {
+            ...template.data,
+            ...customizations,
+            entityId,
+            phaseId: this._generatePhaseId(entityId),
+            templateId
+        };
+        
+        return this.createPhase(entityId, phaseData);
+    }
+
+    // Event Handlers and Utilities
+    _setupEventHandlers() {
+        this.eventBus.on('entity:deleted', ({ entityId }) => {
+            this._cleanupEntityPhases(entityId);
+        });
+        
+        this.eventBus.on('project:loading', () => {
+            this._clearTemporaryState();
+        });
+        
+        this.eventBus.on('project:loaded', ({ phases }) => {
+            this._loadPhasesFromProject(phases);
+        });
+    }
+
+    async _cleanupEntityPhases(entityId) {
+        const entityPhases = this.getEntityPhases(entityId);
+        for (const phase of entityPhases) {
+            await this.deletePhase(phase.phaseId, { checkDependencies: false });
+        }
+        this.activePhases.delete(entityId);
+    }
+
+    _clearTemporaryState() {
+        this.phases.clear();
+        this.activePhases.clear();
+    }
+
+    async _loadPhasesFromProject(phasesData) {
+        for (const [phaseId, phaseData] of Object.entries(phasesData)) {
+            this.phases.set(phaseId, phaseData);
+            
+            // Restore active phase state if specified
+            if (phaseData.isActive) {
+                this.activePhases.set(phaseData.entityId, phaseId);
+            }
+        }
+    }
+
+    _generatePhaseId(entityId) {
+        const timestamp = Date.now();
+        const random = Math.random().toString(36).substr(2, 5);
+        return `phase-${entityId}-${timestamp}-${random}`;
+    }
+
+    async _findPhaseDependencies(phaseId) {
+        // Check if other phases reference this phase in transitions
+        const dependencies = [];
+        for (const phase of this.phases.values()) {
+            if (phase.transitionRules) {
+                for (const rule of phase.transitionRules) {
+                    if (rule.targetPhaseId === phaseId) {
+                        dependencies.push({
+                            type: 'transition',
+                            sourcePhaseId: phase.phaseId,
+                            rule
+                        });
+                    }
+                }
+            }
+        }
+        return dependencies;
+    }
+
+    _registerDefaultValidators() {
+        this.registerPhaseValidator('character', (phase) => {
+            return phase.appearance && phase.musicLoop && 
+                   Array.isArray(phase.animations);
+        });
+        
+        this.registerPhaseValidator('background', (phase) => {
+            return phase.appearance && 
+                   (phase.musicLoop || phase.ambientAudio);
+        });
+    }
+
+    // Public API for external systems
+    getPhaseManagerStats() {
+        return {
+            totalPhases: this.phases.size,
+            activePhases: this.activePhases.size,
+            phasesByType: this._getPhaseTypeDistribution(),
+            memoryUsage: this._estimateMemoryUsage()
+        };
+    }
+
+    _getPhaseTypeDistribution() {
+        const distribution = {};
+        for (const phase of this.phases.values()) {
+            const type = phase.phaseType || 'character';
+            distribution[type] = (distribution[type] || 0) + 1;
+        }
+        return distribution;
+    }
+
+    _estimateMemoryUsage() {
+        // Rough estimation of memory usage
+        let totalSize = 0;
+        for (const phase of this.phases.values()) {
+            totalSize += JSON.stringify(phase).length;
+        }
+        return totalSize;
+    }
+}
+```
+
+## Dependencies
+
+- **EventBus**: For system-wide phase change notifications
+- **PhaseDataStore**: For persistent phase data management
+- **PhaseTransitionEngine**: For executing phase transitions
+- **PhaseCoordinator**: For multi-entity phase coordination
+
+## Integration Points
+
+- **Character Editor**: Calls phase creation/modification methods
+- **Animation Editor**: Queries phase data for animation context
+- **Music Editor**: Associates music loops with phases
+- **Performance Stage**: Triggers phase activations and transitions
+
+## Usage Examples
+
+```javascript
+// Create a new character phase
+const phaseId = await phaseManager.createPhase('character-001', {
+    name: 'Excited State',
+    phaseType: 'character',
+    appearance: { spriteSet: 'excited', colorTint: '#ff6b6b' },
+    musicLoop: { trackId: 'upbeat-loop-001', volume: 0.8 },
+    animations: ['jump-animation', 'dance-animation']
+});
+
+// Activate phase with smooth transition
+await phaseManager.activatePhase('character-001', phaseId, {
+    transitionType: 'crossfade',
+    transitionDuration: 1000,
+    beatAlign: true
+});
+
+// Coordinate phase change across multiple characters
+await phaseManager.activatePhase('character-001', phaseId, {
+    coordinateWithOthers: true,
+    transitionType: 'synchronized'
+});
+```
+
+## Performance Considerations
+
+- Phases are loaded lazily and cached in memory for quick access
+- Phase validation is configurable to balance safety and performance  
+- Large phase datasets are paginated to prevent memory issues
+- Phase transitions are optimized to maintain 60fps during execution
+
+The PhaseManager serves as the foundational component enabling Open Sprunk Framework's unique multi-modal creative capabilities.

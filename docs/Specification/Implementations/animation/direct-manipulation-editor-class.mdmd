@@ -1,0 +1,486 @@
+<!-- filepath: do../Implementations/animation/direct-manipulation-editor-class.mdmd -->
+::: {unit}
+id: "direct-manipulation-editor-class"
+title: "Direct Manipulation Animation Editor"
+unit-type: "javascript-class-definition"
+language: "javascript"
+status: "draft"
+version: "0.1"
+brief: "Interactive editor enabling 'click and drag a doll to make it dance' animation authoring."
+source-ref: "../../src/animation/DirectManipulationEditor.js"
+see-also:
+  - "[[../../Definition/Requirements/humanoid-character-animation-requirement]]" # Implements direct manipulation requirement
+  - "[[../character/humanoid-character-schema]]" # Character data structure
+  - "[[humanoid-animation-schema]]" # Animation data structure
+  - "[[../core/event-bus-class]]" # Event communication
+  - "[[../Concepts/animation-editor-module]]" # Parent composition
+
+Interactive animation editor that allows users to create keyframes by directly manipulating character body parts on screen. Implements the "click and drag a doll to make it dance" interface paradigm.
+
+```javascript
+/**
+ * Direct Manipulation Animation Editor
+ * 
+ * Enables intuitive character animation through direct interaction with body parts.
+ * Users click and drag body parts to create keyframes at the current timeline position.
+ * 
+ * Key Features:
+ * - Real-time character pose manipulation
+ * - Automatic keyframe creation from user interaction
+ * - Visual feedback for valid manipulation ranges
+ * - Inverse kinematics for natural limb movement
+ * - Beat-aware keyframe placement
+ */
+class DirectManipulationEditor {
+    constructor(canvasElement, eventBus, options = {}) {
+        this.canvas = canvasElement;
+        this.eventBus = eventBus;
+        this.options = {
+            snapToBeats: true,
+            showConstraints: true,
+            enableIK: true,
+            ghostPoseOpacity: 0.3,
+            manipulationSensitivity: 1.0,
+            ...options
+        };
+
+        // Animation state
+        this.currentCharacter = null;
+        this.currentAnimation = null;
+        this.currentTime = 0;
+        this.isPlaying = false;
+        this.tempo = 120;
+        
+        // Interaction state
+        this.selectedBodyPart = null;
+        this.isDragging = false;
+        this.dragStartPos = { x: 0, y: 0 };
+        this.manipulationGizmos = new Map();
+        
+        // Visual elements
+        this.characterRenderer = null;
+        this.constraintVisualizer = null;
+        this.ghostPoseRenderer = null;
+        
+        this.initializeCanvas();
+        this.setupEventListeners();
+        this.setupKeyboardShortcuts();
+    }
+
+    /**
+     * Initialize the animation canvas and rendering system
+     */
+    initializeCanvas() {
+        // Initialize PixiJS or Fabric.js rendering system
+        this.app = new PIXI.Application({
+            view: this.canvas,
+            width: 800,
+            height: 600,
+            backgroundColor: 0xf0f0f0,
+            antialias: true
+        });
+
+        // Create rendering layers
+        this.backgroundLayer = new PIXI.Container();
+        this.characterLayer = new PIXI.Container();
+        this.constraintLayer = new PIXI.Container();
+        this.gizmoLayer = new PIXI.Container();
+        this.uiLayer = new PIXI.Container();
+
+        this.app.stage.addChild(this.backgroundLayer);
+        this.app.stage.addChild(this.characterLayer);
+        this.app.stage.addChild(this.constraintLayer);
+        this.app.stage.addChild(this.gizmoLayer);
+        this.app.stage.addChild(this.uiLayer);
+
+        // Initialize character renderer
+        this.characterRenderer = new HumanoidCharacterRenderer(this.characterLayer);
+        this.constraintVisualizer = new ConstraintVisualizer(this.constraintLayer);
+        this.ghostPoseRenderer = new GhostPoseRenderer(this.characterLayer);
+    }
+
+    /**
+     * Set up mouse and touch event listeners for direct manipulation
+     */
+    setupEventListeners() {
+        // Mouse interaction events
+        this.canvas.addEventListener('mousedown', this.handleMouseDown.bind(this));
+        this.canvas.addEventListener('mousemove', this.handleMouseMove.bind(this));
+        this.canvas.addEventListener('mouseup', this.handleMouseUp.bind(this));
+        this.canvas.addEventListener('wheel', this.handleWheel.bind(this));
+
+        // Touch events for mobile support
+        this.canvas.addEventListener('touchstart', this.handleTouchStart.bind(this));
+        this.canvas.addEventListener('touchmove', this.handleTouchMove.bind(this));
+        this.canvas.addEventListener('touchend', this.handleTouchEnd.bind(this));
+
+        // EventBus subscriptions
+        this.eventBus.subscribe('character.loaded', this.handleCharacterLoaded.bind(this));
+        this.eventBus.subscribe('animation.loaded', this.handleAnimationLoaded.bind(this));
+        this.eventBus.subscribe('timeline.timeChanged', this.handleTimeChanged.bind(this));
+        this.eventBus.subscribe('music.tempoChanged', this.handleTempoChanged.bind(this));
+        this.eventBus.subscribe('animation.play', this.handlePlayStateChanged.bind(this));
+        this.eventBus.subscribe('animation.pause', this.handlePlayStateChanged.bind(this));
+    }
+
+    /**
+     * Handle mouse down events - start body part manipulation
+     */
+    handleMouseDown(event) {
+        const worldPos = this.screenToWorld(event.clientX, event.clientY);
+        const hitBodyPart = this.getBodyPartAtPosition(worldPos);
+
+        if (hitBodyPart) {
+            this.startManipulation(hitBodyPart, worldPos);
+        } else {
+            this.clearSelection();
+        }
+    }
+
+    /**
+     * Handle mouse move events - update body part position during drag
+     */
+    handleMouseMove(event) {
+        const worldPos = this.screenToWorld(event.clientX, event.clientY);
+
+        if (this.isDragging && this.selectedBodyPart) {
+            this.updateBodyPartPosition(this.selectedBodyPart, worldPos);
+            this.updateCharacterPose();
+            this.showManipulationFeedback();
+        } else {
+            // Show hover feedback
+            const hoveredPart = this.getBodyPartAtPosition(worldPos);
+            this.updateHoverFeedback(hoveredPart);
+        }
+    }
+
+    /**
+     * Handle mouse up events - finalize manipulation and create keyframe
+     */
+    handleMouseUp(event) {
+        if (this.isDragging && this.selectedBodyPart) {
+            this.finishManipulation();
+        }
+    }
+
+    /**
+     * Start manipulation of a body part
+     */
+    startManipulation(bodyPart, startPosition) {
+        this.selectedBodyPart = bodyPart;
+        this.isDragging = true;
+        this.dragStartPos = { ...startPosition };
+
+        // Show manipulation gizmos
+        this.showManipulationGizmos(bodyPart);
+        
+        // Show ghost pose of original position
+        if (this.options.showGhostPose) {
+            this.ghostPoseRenderer.showGhostPose(this.getCurrentPose());
+        }
+
+        // Show constraint visualization
+        if (this.options.showConstraints) {
+            this.constraintVisualizer.showConstraints(bodyPart);
+        }
+
+        this.eventBus.publish('manipulation.started', {
+            bodyPart: bodyPart.id,
+            startPosition,
+            timestamp: this.currentTime
+        });
+    }
+
+    /**
+     * Update body part position during manipulation
+     */
+    updateBodyPartPosition(bodyPart, newPosition) {
+        // Apply constraints
+        const constrainedPosition = this.applyConstraints(bodyPart, newPosition);
+        
+        // Apply inverse kinematics if enabled
+        if (this.options.enableIK) {
+            this.applyInverseKinematics(bodyPart, constrainedPosition);
+        } else {
+            // Direct position update
+            bodyPart.transform.position = constrainedPosition;
+        }
+
+        // Update dependent body parts (children in hierarchy)
+        this.updateDependentParts(bodyPart);
+    }
+
+    /**
+     * Apply movement constraints to maintain realistic poses
+     */
+    applyConstraints(bodyPart, proposedPosition) {
+        const constraints = this.currentCharacter.skeleton.joints[bodyPart.jointName];
+        
+        if (!constraints) return proposedPosition;
+
+        let constrainedPos = { ...proposedPosition };
+
+        // Joint angle constraints
+        if (constraints.minAngle !== undefined && constraints.maxAngle !== undefined) {
+            const parentPart = this.getParentPart(bodyPart);
+            if (parentPart) {
+                const angle = this.calculateJointAngle(parentPart, bodyPart, constrainedPos);
+                const clampedAngle = Math.max(constraints.minAngle, 
+                                            Math.min(constraints.maxAngle, angle));
+                constrainedPos = this.positionFromJointAngle(parentPart, bodyPart, clampedAngle);
+            }
+        }
+
+        // Distance constraints (for limb length preservation)
+        const parentPart = this.getParentPart(bodyPart);
+        if (parentPart && bodyPart.naturalLength) {
+            const distance = this.distance(parentPart.transform.position, constrainedPos);
+            if (distance > bodyPart.naturalLength) {
+                const direction = this.normalize(this.subtract(constrainedPos, parentPart.transform.position));
+                constrainedPos = this.add(parentPart.transform.position, 
+                                        this.multiply(direction, bodyPart.naturalLength));
+            }
+        }
+
+        return constrainedPos;
+    }
+
+    /**
+     * Apply inverse kinematics for natural limb movement
+     */
+    applyInverseKinematics(endEffector, targetPosition) {
+        const chain = this.getKinematicChain(endEffector);
+        
+        if (chain.length < 2) return;
+
+        // Simple 2-bone IK for arms and legs
+        if (chain.length === 3) { // shoulder/hip -> elbow/knee -> hand/foot
+            this.solveTwoBoneIK(chain[0], chain[1], chain[2], targetPosition);
+        } else {
+            // More complex IK for longer chains
+            this.solveCCDIK(chain, targetPosition);
+        }
+    }
+
+    /**
+     * Solve two-bone inverse kinematics (for arms and legs)
+     */
+    solveTwoBoneIK(root, middle, end, target) {
+        const rootPos = root.transform.position;
+        const upperLength = middle.naturalLength || 100;
+        const lowerLength = end.naturalLength || 100;
+        
+        const targetDistance = this.distance(rootPos, target);
+        const maxReach = upperLength + lowerLength;
+        
+        // Clamp target to reachable distance
+        let clampedTarget = target;
+        if (targetDistance > maxReach) {
+            const direction = this.normalize(this.subtract(target, rootPos));
+            clampedTarget = this.add(rootPos, this.multiply(direction, maxReach * 0.99));
+        }
+        
+        // Calculate elbow/knee position using law of cosines
+        const a = upperLength;
+        const b = lowerLength;
+        const c = this.distance(rootPos, clampedTarget);
+        
+        const angleA = Math.acos((b * b + c * c - a * a) / (2 * b * c));
+        const angleB = Math.acos((a * a + c * c - b * b) / (2 * a * c));
+        
+        // Position middle joint
+        const rootToTarget = this.normalize(this.subtract(clampedTarget, rootPos));
+        const perpendicular = { x: -rootToTarget.y, y: rootToTarget.x };
+        
+        const middleDistance = a * Math.cos(angleB);
+        const middleOffset = a * Math.sin(angleB);
+        
+        const middlePos = this.add(rootPos, 
+            this.add(this.multiply(rootToTarget, middleDistance),
+                    this.multiply(perpendicular, middleOffset)));
+        
+        // Update transforms
+        middle.transform.position = middlePos;
+        end.transform.position = clampedTarget;
+        
+        // Update rotations to point toward next joint
+        root.transform.rotation = Math.atan2(middlePos.y - rootPos.y, middlePos.x - rootPos.x);
+        middle.transform.rotation = Math.atan2(clampedTarget.y - middlePos.y, clampedTarget.x - middlePos.x);
+    }
+
+    /**
+     * Finalize manipulation and create keyframe
+     */
+    finishManipulation() {
+        if (!this.selectedBodyPart) return;
+
+        const finalPose = this.getCurrentPose();
+        const keyframeTime = this.options.snapToBeats ? 
+            this.snapToNearestBeat(this.currentTime) : this.currentTime;
+
+        // Create keyframe from current pose
+        this.createKeyframeFromPose(finalPose, keyframeTime);
+
+        // Clean up manipulation state
+        this.isDragging = false;
+        this.hideManipulationGizmos();
+        this.ghostPoseRenderer.hideGhostPose();
+        this.constraintVisualizer.hideConstraints();
+
+        this.eventBus.publish('manipulation.completed', {
+            bodyPart: this.selectedBodyPart.id,
+            timestamp: keyframeTime,
+            pose: finalPose
+        });
+
+        this.eventBus.publish('animation.keyframeCreated', {
+            timestamp: keyframeTime,
+            method: 'direct-manipulation',
+            pose: finalPose
+        });
+    }
+
+    /**
+     * Create animation keyframe from current character pose
+     */
+    createKeyframeFromPose(pose, timestamp) {
+        if (!this.currentAnimation) return;
+
+        const keyframeId = `kf_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        
+        // Create pose keyframe
+        const poseKeyframe = {
+            id: keyframeId,
+            name: `Pose at ${timestamp.toFixed(2)}s`,
+            timestamp: timestamp,
+            beatPosition: this.timeToBeat(timestamp),
+            poseData: pose,
+            createdBy: 'direct-manipulation'
+        };
+
+        this.currentAnimation.poses.push(poseKeyframe);
+
+        // Update individual body part tracks
+        Object.keys(pose).forEach(bodyPartId => {
+            if (!this.currentAnimation.bodyPartTracks[bodyPartId]) {
+                this.currentAnimation.bodyPartTracks[bodyPartId] = {
+                    enabled: true,
+                    keyframes: [],
+                    constraints: {}
+                };
+            }
+
+            const keyframe = {
+                id: `${keyframeId}_${bodyPartId}`,
+                timestamp: timestamp,
+                beatPosition: this.timeToBeat(timestamp),
+                transform: pose[bodyPartId],
+                easing: 'ease-in-out',
+                createdBy: 'direct-manipulation'
+            };
+
+            this.currentAnimation.bodyPartTracks[bodyPartId].keyframes.push(keyframe);
+            
+            // Sort keyframes by timestamp
+            this.currentAnimation.bodyPartTracks[bodyPartId].keyframes.sort((a, b) => a.timestamp - b.timestamp);
+        });
+    }
+
+    /**
+     * Get current character pose (all body part transforms)
+     */
+    getCurrentPose() {
+        if (!this.currentCharacter) return {};
+
+        const pose = {};
+        Object.keys(this.currentCharacter.bodyParts).forEach(partId => {
+            const part = this.currentCharacter.bodyParts[partId];
+            pose[partId] = {
+                position: { ...part.transform.position },
+                rotation: part.transform.rotation,
+                scale: { ...part.transform.scale }
+            };
+        });
+
+        return pose;
+    }
+
+    /**
+     * Update character visualization
+     */
+    updateCharacterPose() {
+        if (this.characterRenderer && this.currentCharacter) {
+            this.characterRenderer.updatePose(this.getCurrentPose());
+        }
+    }
+
+    /**
+     * Convert screen coordinates to world coordinates
+     */
+    screenToWorld(screenX, screenY) {
+        const rect = this.canvas.getBoundingClientRect();
+        return {
+            x: screenX - rect.left,
+            y: screenY - rect.top
+        };
+    }
+
+    /**
+     * Get body part at specified world position
+     */
+    getBodyPartAtPosition(worldPos) {
+        if (!this.currentCharacter) return null;
+
+        // Check each body part's bounds
+        for (const [partId, part] of Object.entries(this.currentCharacter.bodyParts)) {
+            const bounds = this.getBodyPartBounds(part);
+            if (this.pointInBounds(worldPos, bounds)) {
+                return { id: partId, ...part };
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Snap time to nearest musical beat
+     */
+    snapToNearestBeat(time) {
+        const beatDuration = 60 / this.tempo;
+        const subdivision = this.options.beatSubdivision || 4;
+        const snapDuration = beatDuration / subdivision;
+        
+        return Math.round(time / snapDuration) * snapDuration;
+    }
+
+    /**
+     * Convert time to beat position
+     */
+    timeToBeat(time) {
+        const beatDuration = 60 / this.tempo;
+        return time / beatDuration;
+    }
+
+    // ... additional utility methods for vector math, event handling, etc.
+}
+
+export default DirectManipulationEditor;
+```
+
+This component provides:
+
+1. **Direct Manipulation Interface**: Click and drag body parts to create poses
+2. **Real-time Feedback**: Visual constraints, ghost poses, manipulation gizmos
+3. **Automatic Keyframing**: Poses automatically become keyframes at current time
+4. **Inverse Kinematics**: Natural limb movement when dragging end effectors
+5. **Musical Synchronization**: Beat-aware keyframe placement
+6. **Constraint System**: Realistic movement limits and joint constraints
+
+Key innovations:
+- **Pose-Based Animation**: Complete character poses as primary animation unit
+- **IK Integration**: Two-bone and CCD inverse kinematics for natural movement
+- **Beat Snapping**: Automatic alignment with musical timing
+- **Visual Feedback**: Ghost poses, constraints, and manipulation gizmos
+- **Educational Support**: Constraint visualization helps users learn natural movement
+
+:::

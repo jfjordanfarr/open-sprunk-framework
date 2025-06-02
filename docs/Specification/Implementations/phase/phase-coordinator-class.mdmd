@@ -1,0 +1,745 @@
+```{unit}
+id: "phase-coordinator-class"
+title: "Phase Coordinator Class"
+unit-type: "javascript-class-definition"
+source-ref: "../../src/phase/PhaseCoordinator.js"
+status: "draft"
+see-also:
+  - "[[phase-system-architecture]]"
+  - "[[phase-manager-class]]"
+  - "[[phase-transition-engine-class]]"
+  - "[[event-bus-class]]"
+```
+
+## Overview
+
+The PhaseCoordinator manages relationships and synchronization between multiple entities (characters and backgrounds) during phase changes. It implements coordination modes, conditional logic, and advanced synchronization strategies to create cohesive multi-entity performances.
+
+## Class Definition
+
+```javascript
+/**
+ * Coordinates phase changes across multiple entities
+ * Manages relationships, synchronization, and conditional phase logic
+ */
+class PhaseCoordinator {
+    constructor(eventBus, phaseManager, transitionEngine) {
+        this.eventBus = eventBus;
+        this.phaseManager = phaseManager;
+        this.transitionEngine = transitionEngine;
+        
+        this.coordinationRules = new Map(); // entityId -> coordinationConfig
+        this.entityGroups = new Map(); // groupId -> entityIds[]
+        this.conditionalRules = new Map(); // ruleId -> conditionalConfig
+        this.activeCoordinations = new Map(); // coordinationId -> coordinationData
+        
+        this.coordinationModes = {
+            INDEPENDENT: 'independent',
+            SYNCHRONIZED: 'synchronized',
+            LEADER_FOLLOWER: 'leader-follower',
+            CONDITIONAL: 'conditional',
+            LAYERED: 'layered'
+        };
+        
+        this._setupEventHandlers();
+    }
+
+    // Coordination Configuration
+    setEntityCoordination(entityId, coordinationConfig) {
+        const config = {
+            mode: coordinationConfig.mode || this.coordinationModes.INDEPENDENT,
+            groupId: coordinationConfig.groupId || null,
+            leaderId: coordinationConfig.leaderId || null,
+            followDelay: coordinationConfig.followDelay || 0,
+            conditions: coordinationConfig.conditions || [],
+            priority: coordinationConfig.priority || 'normal',
+            ...coordinationConfig
+        };
+        
+        this.coordinationRules.set(entityId, config);
+        
+        // Add to group if specified
+        if (config.groupId) {
+            this._addEntityToGroup(entityId, config.groupId);
+        }
+        
+        this.eventBus.emit('coordination:config-updated', { entityId, config });
+        
+        return config;
+    }
+
+    createEntityGroup(groupId, entityIds, groupConfig = {}) {
+        const config = {
+            coordinationMode: groupConfig.coordinationMode || this.coordinationModes.SYNCHRONIZED,
+            transitionStyle: groupConfig.transitionStyle || 'simultaneous',
+            staggerDelay: groupConfig.staggerDelay || 0,
+            priority: groupConfig.priority || 'normal',
+            ...groupConfig
+        };
+        
+        this.entityGroups.set(groupId, {
+            entityIds: [...entityIds],
+            config
+        });
+        
+        // Update entity coordination rules
+        for (const entityId of entityIds) {
+            const existingConfig = this.coordinationRules.get(entityId) || {};
+            this.setEntityCoordination(entityId, {
+                ...existingConfig,
+                groupId,
+                mode: config.coordinationMode
+            });
+        }
+        
+        this.eventBus.emit('coordination:group-created', { groupId, entityIds, config });
+        
+        return groupId;
+    }
+
+    // Main Coordination Method
+    async coordinatedPhaseChange(request) {
+        const {
+            primaryEntity,
+            targetPhase,
+            transitionType = 'synchronized',
+            transitionDuration = 1000,
+            beatAlign = false,
+            forceCoordination = false
+        } = request;
+        
+        const coordinationId = this._generateCoordinationId();
+        const coordinationData = {
+            coordinationId,
+            primaryEntity,
+            targetPhase,
+            request,
+            status: 'planning',
+            affectedEntities: new Set([primaryEntity]),
+            startTime: null,
+            completedEntities: new Set()
+        };
+        
+        this.activeCoordinations.set(coordinationId, coordinationData);
+        
+        try {
+            // Plan the coordination
+            const plan = await this._planCoordination(coordinationData, forceCoordination);
+            
+            // Execute the coordination
+            coordinationData.status = 'executing';
+            coordinationData.startTime = performance.now();
+            
+            this.eventBus.emit('coordination:started', {
+                coordinationId,
+                plan,
+                affectedEntities: Array.from(coordinationData.affectedEntities)
+            });
+            
+            await this._executeCoordinationPlan(plan, coordinationData);
+            
+            coordinationData.status = 'completed';
+            
+            this.eventBus.emit('coordination:completed', {
+                coordinationId,
+                duration: performance.now() - coordinationData.startTime,
+                successfulEntities: Array.from(coordinationData.completedEntities)
+            });
+            
+            return true;
+            
+        } catch (error) {
+            coordinationData.status = 'failed';
+            
+            this.eventBus.emit('coordination:failed', {
+                coordinationId,
+                error: error.message,
+                partiallyCompleted: Array.from(coordinationData.completedEntities)
+            });
+            
+            throw error;
+        } finally {
+            this.activeCoordinations.delete(coordinationId);
+        }
+    }
+
+    // Coordination Planning
+    async _planCoordination(coordinationData, forceCoordination) {
+        const { primaryEntity, targetPhase, request } = coordinationData;
+        const primaryConfig = this.coordinationRules.get(primaryEntity);
+        
+        if (!primaryConfig && !forceCoordination) {
+            // No coordination configured, execute independently
+            return this._createIndependentPlan(coordinationData);
+        }
+        
+        const plan = {
+            mode: primaryConfig?.mode || this.coordinationModes.INDEPENDENT,
+            phases: [], // Array of { entityId, fromPhase, toPhase, timing }
+            timing: {
+                startDelay: 0,
+                staggerDelay: primaryConfig?.staggerDelay || 0,
+                beatAlign: request.beatAlign
+            }
+        };
+        
+        switch (plan.mode) {
+            case this.coordinationModes.SYNCHRONIZED:
+                await this._planSynchronizedCoordination(plan, coordinationData);
+                break;
+                
+            case this.coordinationModes.LEADER_FOLLOWER:
+                await this._planLeaderFollowerCoordination(plan, coordinationData);
+                break;
+                
+            case this.coordinationModes.CONDITIONAL:
+                await this._planConditionalCoordination(plan, coordinationData);
+                break;
+                
+            case this.coordinationModes.LAYERED:
+                await this._planLayeredCoordination(plan, coordinationData);
+                break;
+                
+            default:
+                await this._planIndependentCoordination(plan, coordinationData);
+        }
+        
+        return plan;
+    }
+
+    async _planSynchronizedCoordination(plan, coordinationData) {
+        const { primaryEntity, targetPhase } = coordinationData;
+        const primaryConfig = this.coordinationRules.get(primaryEntity);
+        
+        // Find all entities in the same group
+        const groupMembers = this._getGroupMembers(primaryConfig.groupId);
+        
+        for (const entityId of groupMembers) {
+            if (entityId === primaryEntity) {
+                // Primary entity uses specified target phase
+                plan.phases.push({
+                    entityId,
+                    fromPhase: this.phaseManager.getActivePhase(entityId),
+                    toPhase: targetPhase,
+                    timing: { delay: 0 }
+                });
+                coordinationData.affectedEntities.add(entityId);
+            } else {
+                // Other entities need coordinated phases
+                const coordinatedPhase = await this._findCoordinatedPhase(entityId, targetPhase);
+                if (coordinatedPhase) {
+                    plan.phases.push({
+                        entityId,
+                        fromPhase: this.phaseManager.getActivePhase(entityId),
+                        toPhase: coordinatedPhase,
+                        timing: { delay: 0 }
+                    });
+                    coordinationData.affectedEntities.add(entityId);
+                }
+            }
+        }
+    }
+
+    async _planLeaderFollowerCoordination(plan, coordinationData) {
+        const { primaryEntity, targetPhase } = coordinationData;
+        const primaryConfig = this.coordinationRules.get(primaryEntity);
+        
+        // Primary entity is the leader
+        plan.phases.push({
+            entityId: primaryEntity,
+            fromPhase: this.phaseManager.getActivePhase(primaryEntity),
+            toPhase: targetPhase,
+            timing: { delay: 0, role: 'leader' }
+        });
+        coordinationData.affectedEntities.add(primaryEntity);
+        
+        // Find followers
+        const followers = this._getFollowers(primaryEntity);
+        
+        for (const followerId of followers) {
+            const followerConfig = this.coordinationRules.get(followerId);
+            const followerPhase = await this._findCoordinatedPhase(followerId, targetPhase);
+            
+            if (followerPhase) {
+                plan.phases.push({
+                    entityId: followerId,
+                    fromPhase: this.phaseManager.getActivePhase(followerId),
+                    toPhase: followerPhase,
+                    timing: { 
+                        delay: followerConfig.followDelay || 0,
+                        role: 'follower',
+                        waitForLeader: true
+                    }
+                });
+                coordinationData.affectedEntities.add(followerId);
+            }
+        }
+    }
+
+    async _planConditionalCoordination(plan, coordinationData) {
+        const { primaryEntity, targetPhase } = coordinationData;
+        
+        // Evaluate conditional rules for affected entities
+        const conditionalEntities = await this._evaluateConditionalRules(primaryEntity, targetPhase);
+        
+        // Add primary entity
+        plan.phases.push({
+            entityId: primaryEntity,
+            fromPhase: this.phaseManager.getActivePhase(primaryEntity),
+            toPhase: targetPhase,
+            timing: { delay: 0 }
+        });
+        coordinationData.affectedEntities.add(primaryEntity);
+        
+        // Add conditional entities
+        for (const { entityId, phase, condition } of conditionalEntities) {
+            plan.phases.push({
+                entityId,
+                fromPhase: this.phaseManager.getActivePhase(entityId),
+                toPhase: phase,
+                timing: { 
+                    delay: condition.delay || 0,
+                    condition: condition.name
+                }
+            });
+            coordinationData.affectedEntities.add(entityId);
+        }
+    }
+
+    async _planLayeredCoordination(plan, coordinationData) {
+        const { primaryEntity, targetPhase } = coordinationData;
+        
+        // Layered coordination allows overlay effects and secondary responses
+        plan.phases.push({
+            entityId: primaryEntity,
+            fromPhase: this.phaseManager.getActivePhase(primaryEntity),
+            toPhase: targetPhase,
+            timing: { delay: 0, layer: 'primary' }
+        });
+        coordinationData.affectedEntities.add(primaryEntity);
+        
+        // Find layered responses
+        const layeredResponses = await this._findLayeredResponses(primaryEntity, targetPhase);
+        
+        for (const { entityId, phase, layer, delay } of layeredResponses) {
+            plan.phases.push({
+                entityId,
+                fromPhase: this.phaseManager.getActivePhase(entityId),
+                toPhase: phase,
+                timing: { delay, layer }
+            });
+            coordinationData.affectedEntities.add(entityId);
+        }
+    }
+
+    // Coordination Execution
+    async _executeCoordinationPlan(plan, coordinationData) {
+        const { mode, phases, timing } = plan;
+        
+        // Sort phases by timing
+        const sortedPhases = phases.sort((a, b) => a.timing.delay - b.timing.delay);
+        
+        // Group phases by timing for parallel execution
+        const timingGroups = new Map();
+        for (const phase of sortedPhases) {
+            const delay = phase.timing.delay;
+            if (!timingGroups.has(delay)) {
+                timingGroups.set(delay, []);
+            }
+            timingGroups.get(delay).push(phase);
+        }
+        
+        // Execute timing groups in sequence
+        for (const [delay, phasesInGroup] of timingGroups.entries()) {
+            if (delay > 0) {
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+            
+            // Execute phases in this timing group in parallel
+            const transitionPromises = phasesInGroup.map(phase => 
+                this._executePhaseTransition(phase, coordinationData)
+            );
+            
+            await Promise.all(transitionPromises);
+        }
+    }
+
+    async _executePhaseTransition(phase, coordinationData) {
+        const { entityId, fromPhase, toPhase, timing } = phase;
+        
+        try {
+            await this.transitionEngine.executeTransition(
+                entityId,
+                fromPhase,
+                toPhase,
+                coordinationData.request
+            );
+            
+            coordinationData.completedEntities.add(entityId);
+            
+            this.eventBus.emit('coordination:entity-completed', {
+                coordinationId: coordinationData.coordinationId,
+                entityId,
+                timing
+            });
+            
+        } catch (error) {
+            this.eventBus.emit('coordination:entity-failed', {
+                coordinationId: coordinationData.coordinationId,
+                entityId,
+                error: error.message
+            });
+            
+            throw error;
+        }
+    }
+
+    // Coordination Logic Helpers
+    async _findCoordinatedPhase(entityId, referencePhase) {
+        const entityPhases = this.phaseManager.getEntityPhases(entityId);
+        
+        // Strategy 1: Find phase with matching coordination tags
+        if (referencePhase.coordinationTags) {
+            for (const phase of entityPhases) {
+                if (phase.coordinationTags && 
+                    this._hasMatchingTags(phase.coordinationTags, referencePhase.coordinationTags)) {
+                    return phase;
+                }
+            }
+        }
+        
+        // Strategy 2: Find phase with similar emotional/energy level
+        if (referencePhase.emotionalProfile) {
+            const matchingPhase = this._findPhaseByEmotionalProfile(
+                entityPhases, 
+                referencePhase.emotionalProfile
+            );
+            if (matchingPhase) return matchingPhase;
+        }
+        
+        // Strategy 3: Use default coordination phase
+        const defaultPhase = entityPhases.find(p => p.isDefaultCoordination);
+        if (defaultPhase) return defaultPhase;
+        
+        // Strategy 4: Return current phase (no change)
+        return this.phaseManager.getActivePhase(entityId);
+    }
+
+    async _evaluateConditionalRules(triggerEntity, triggerPhase) {
+        const conditionalEntities = [];
+        
+        for (const [ruleId, rule] of this.conditionalRules.entries()) {
+            if (await this._evaluateCondition(rule.condition, triggerEntity, triggerPhase)) {
+                const targetPhase = await this._resolveConditionalPhase(rule, triggerEntity, triggerPhase);
+                if (targetPhase) {
+                    conditionalEntities.push({
+                        entityId: rule.targetEntity,
+                        phase: targetPhase,
+                        condition: rule
+                    });
+                }
+            }
+        }
+        
+        return conditionalEntities;
+    }
+
+    async _findLayeredResponses(primaryEntity, primaryPhase) {
+        const responses = [];
+        
+        // Find background responses
+        const backgroundEntities = this._getBackgroundEntities();
+        for (const bgEntityId of backgroundEntities) {
+            const response = await this._findBackgroundResponse(bgEntityId, primaryPhase);
+            if (response) {
+                responses.push({
+                    entityId: bgEntityId,
+                    phase: response,
+                    layer: 'background',
+                    delay: 0
+                });
+            }
+        }
+        
+        // Find supporting character responses
+        const supportingEntities = this._getSupportingCharacters(primaryEntity);
+        for (const supportEntityId of supportingEntities) {
+            const response = await this._findSupportingResponse(supportEntityId, primaryPhase);
+            if (response) {
+                responses.push({
+                    entityId: supportEntityId,
+                    phase: response,
+                    layer: 'supporting',
+                    delay: 100 // Slight delay for natural feel
+                });
+            }
+        }
+        
+        return responses;
+    }
+
+    // Conditional Logic
+    addConditionalRule(ruleConfig) {
+        const ruleId = ruleConfig.ruleId || this._generateRuleId();
+        
+        const rule = {
+            ruleId,
+            targetEntity: ruleConfig.targetEntity,
+            condition: ruleConfig.condition,
+            action: ruleConfig.action,
+            priority: ruleConfig.priority || 'normal',
+            enabled: ruleConfig.enabled !== false,
+            ...ruleConfig
+        };
+        
+        this.conditionalRules.set(ruleId, rule);
+        
+        this.eventBus.emit('coordination:rule-added', { ruleId, rule });
+        
+        return ruleId;
+    }
+
+    async _evaluateCondition(condition, triggerEntity, triggerPhase) {
+        switch (condition.type) {
+            case 'entity-phase':
+                return condition.entityId === triggerEntity && 
+                       condition.phaseId === triggerPhase.phaseId;
+                       
+            case 'phase-tag':
+                return triggerPhase.tags && 
+                       triggerPhase.tags.includes(condition.tag);
+                       
+            case 'emotional-state':
+                return triggerPhase.emotionalProfile && 
+                       triggerPhase.emotionalProfile.primary === condition.emotion;
+                       
+            case 'music-genre':
+                return triggerPhase.musicLoop && 
+                       triggerPhase.musicLoop.genre === condition.genre;
+                       
+            case 'custom':
+                return condition.evaluator(triggerEntity, triggerPhase);
+                
+            default:
+                return false;
+        }
+    }
+
+    // Utility Methods
+    _addEntityToGroup(entityId, groupId) {
+        let group = this.entityGroups.get(groupId);
+        if (!group) {
+            group = { entityIds: [], config: {} };
+            this.entityGroups.set(groupId, group);
+        }
+        
+        if (!group.entityIds.includes(entityId)) {
+            group.entityIds.push(entityId);
+        }
+    }
+
+    _getGroupMembers(groupId) {
+        const group = this.entityGroups.get(groupId);
+        return group ? group.entityIds : [];
+    }
+
+    _getFollowers(leaderId) {
+        const followers = [];
+        for (const [entityId, config] of this.coordinationRules.entries()) {
+            if (config.mode === this.coordinationModes.LEADER_FOLLOWER && 
+                config.leaderId === leaderId) {
+                followers.push(entityId);
+            }
+        }
+        return followers;
+    }
+
+    _getBackgroundEntities() {
+        // Return entities marked as backgrounds
+        return Array.from(this.coordinationRules.entries())
+            .filter(([entityId, config]) => config.entityType === 'background')
+            .map(([entityId]) => entityId);
+    }
+
+    _getSupportingCharacters(primaryEntity) {
+        // Return characters configured to support the primary entity
+        return Array.from(this.coordinationRules.entries())
+            .filter(([entityId, config]) => 
+                config.entityType === 'character' && 
+                config.supportTarget === primaryEntity)
+            .map(([entityId]) => entityId);
+    }
+
+    _hasMatchingTags(tags1, tags2) {
+        return tags1.some(tag => tags2.includes(tag));
+    }
+
+    _findPhaseByEmotionalProfile(phases, targetProfile) {
+        // Find phase with closest emotional match
+        let bestMatch = null;
+        let bestScore = -1;
+        
+        for (const phase of phases) {
+            if (phase.emotionalProfile) {
+                const score = this._calculateEmotionalSimilarity(
+                    phase.emotionalProfile, 
+                    targetProfile
+                );
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestMatch = phase;
+                }
+            }
+        }
+        
+        return bestScore > 0.6 ? bestMatch : null; // Threshold for acceptable match
+    }
+
+    _calculateEmotionalSimilarity(profile1, profile2) {
+        // Simple emotional similarity calculation
+        let score = 0;
+        
+        if (profile1.primary === profile2.primary) score += 0.5;
+        if (profile1.energy === profile2.energy) score += 0.3;
+        if (profile1.mood === profile2.mood) score += 0.2;
+        
+        return score;
+    }
+
+    _createIndependentPlan(coordinationData) {
+        return {
+            mode: this.coordinationModes.INDEPENDENT,
+            phases: [{
+                entityId: coordinationData.primaryEntity,
+                fromPhase: this.phaseManager.getActivePhase(coordinationData.primaryEntity),
+                toPhase: coordinationData.targetPhase,
+                timing: { delay: 0 }
+            }],
+            timing: { startDelay: 0, staggerDelay: 0 }
+        };
+    }
+
+    _setupEventHandlers() {
+        this.eventBus.on('entity:deleted', ({ entityId }) => {
+            this._cleanupEntityCoordination(entityId);
+        });
+        
+        this.eventBus.on('phase:activated', ({ entityId, phaseId }) => {
+            // Could trigger conditional rules or coordination updates
+        });
+    }
+
+    _cleanupEntityCoordination(entityId) {
+        this.coordinationRules.delete(entityId);
+        
+        // Remove from groups
+        for (const [groupId, group] of this.entityGroups.entries()) {
+            const index = group.entityIds.indexOf(entityId);
+            if (index !== -1) {
+                group.entityIds.splice(index, 1);
+                if (group.entityIds.length === 0) {
+                    this.entityGroups.delete(groupId);
+                }
+            }
+        }
+        
+        // Remove conditional rules targeting this entity
+        for (const [ruleId, rule] of this.conditionalRules.entries()) {
+            if (rule.targetEntity === entityId) {
+                this.conditionalRules.delete(ruleId);
+            }
+        }
+    }
+
+    _generateCoordinationId() {
+        return `coord-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+    }
+
+    _generateRuleId() {
+        return `rule-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+    }
+
+    // Public API
+    getCoordinationStatus() {
+        return {
+            activeCoordinations: this.activeCoordinations.size,
+            configuredEntities: this.coordinationRules.size,
+            entityGroups: this.entityGroups.size,
+            conditionalRules: this.conditionalRules.size
+        };
+    }
+
+    getEntityCoordinationConfig(entityId) {
+        return this.coordinationRules.get(entityId) || null;
+    }
+
+    getGroupConfiguration(groupId) {
+        return this.entityGroups.get(groupId) || null;
+    }
+
+    isCoordinationActive() {
+        return this.activeCoordinations.size > 0;
+    }
+}
+```
+
+## Dependencies
+
+- **EventBus**: For coordination event communication
+- **PhaseManager**: For phase data and activation
+- **PhaseTransitionEngine**: For executing coordinated transitions
+
+## Integration Points
+
+- **PhaseManager**: Uses coordinator for complex phase changes
+- **Performance Stage**: Configures coordination rules and triggers
+- **Character/Background Editors**: Configure entity coordination settings
+
+## Usage Examples
+
+```javascript
+// Set up synchronized group coordination
+const groupId = phaseCoordinator.createEntityGroup('main-characters', 
+    ['char-1', 'char-2', 'char-3'], {
+    coordinationMode: 'synchronized',
+    transitionStyle: 'simultaneous'
+});
+
+// Configure leader-follower relationship
+phaseCoordinator.setEntityCoordination('char-backup', {
+    mode: 'leader-follower',
+    leaderId: 'char-main',
+    followDelay: 200
+});
+
+// Add conditional rule for background responses
+phaseCoordinator.addConditionalRule({
+    targetEntity: 'background-main',
+    condition: {
+        type: 'phase-tag',
+        tag: 'energetic'
+    },
+    action: {
+        type: 'activate-phase',
+        phaseId: 'bg-party-mode'
+    }
+});
+
+// Execute coordinated phase change
+await phaseCoordinator.coordinatedPhaseChange({
+    primaryEntity: 'char-1',
+    targetPhase: excitedPhase,
+    transitionType: 'crossfade',
+    beatAlign: true
+});
+```
+
+## Coordination Modes
+
+1. **Independent**: No coordination, entities change phases individually
+2. **Synchronized**: Group entities change phases simultaneously  
+3. **Leader-Follower**: Followers respond to leader's phase changes
+4. **Conditional**: Phase changes trigger based on conditions
+5. **Layered**: Primary changes trigger layered background responses
+
+The PhaseCoordinator enables sophisticated multi-entity performances that feel cohesive and intentional, elevating Open Sprunk Framework beyond simple individual character control.

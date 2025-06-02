@@ -1,0 +1,24 @@
+<!-- filepath: docs/Units/data/data-manager-class.mdmd -->
+::: {unit}
+id: "data-manager-class"
+title: "Data Manager Class"
+unit-type: "javascript-class-definition"
+language: "javascript"
+status: "draft"
+version: "0.2"
+brief: "Handles loading and saving of project data."
+source-ref: "../../src/data/DataManager.js"
+see-also:
+  - "[[local-storage-class]]" # Implementation dependency (uses LocalStorage for persistence)
+  - "[[project-file-schema]]" # Implementation dependency (validates against project schema)
+  - "[[../core/event-bus-class.mdmd]]" # Implementation dependency (uses EventBus for notifications)
+  - "[[project-saving-requirement]]" # Traceability (implements project save/load requirements)
+  - "[[project-autosave-requirement]]" # Traceability (implements autosave functionality)
+  - "[[../Concepts/data-manager-module.mdmd]]" # Parent composition
+
+Handles loading and saving of project data, including autosave functionality and data validation.
+
+```javascript
+// Data Manager implementation placeholder
+```
+:::

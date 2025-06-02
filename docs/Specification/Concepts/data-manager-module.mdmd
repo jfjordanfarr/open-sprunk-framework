@@ -1,0 +1,28 @@
+<!-- filepath: docs/Compositions/data-manager-module.mdmd -->
+::: {composition}
+id: "data-manager-module"
+title: "Data Manager Module"
+composition-type: "software-module-definition"
+status: "draft"
+version: "0.2"
+brief: "Module for handling data persistence, serialization, and project files."
+see-also:
+  - "[[sprunki-core-architecture]]"
+  - "[[../../Definition/Requirements/project-saving-requirement.mdmd]]"
+  - "[[../../Definition/Requirements/project-autosave-requirement.mdmd]]"
+  - "[[../../Definition/Requirements/html5-export-requirement.mdmd]]"
+  - "[[../../Definition/Requirements/client-side-architecture-requirement.mdmd]]"
+  - "[[../Implementations/data/data-manager-class.mdmd]]"
+  - "[[../Implementations/data/project-file-schema.mdmd]]"
+  - "[[../Implementations/data/local-storage-class.mdmd]]"
+  - "[[../Implementations/utils/file-utils.mdmd]]"
+
+The Data Manager module is responsible for:
+
+- **Project Management**: Saving and loading entire projects `[[../Implementations/data/project-file-schema.mdmd]]`
+- **Data Persistence**: Using browser localStorage for quick saves `[[../Implementations/data/local-storage-class.mdmd]]`
+- **Serialization**: Converting in-memory data to JSON and back
+- **File Export/Import**: Allowing users to save/load project files from their disk `[[../Implementations/utils/file-utils.mdmd]]`
+
+This module `[[../Implementations/data/data-manager-class.mdmd]]` centralizes all data operations. It is responsible for all aspects of data persistence and handling, directly fulfilling `[[../../Definition/Requirements/project-saving-requirement.mdmd]]` and `[[../../Definition/Requirements/project-autosave-requirement.mdmd]]`. It plays a crucial role in preparing data for `[[../../Definition/Requirements/html5-export-requirement.mdmd]]` and operates entirely on the client-side, in line with `[[../../Definition/Requirements/client-side-architecture-requirement.mdmd]]`.
+:::

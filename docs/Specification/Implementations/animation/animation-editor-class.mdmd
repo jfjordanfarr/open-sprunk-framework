@@ -1,0 +1,24 @@
+<!-- filepath: docs/Units/animation/animation-editor-class.mdmd -->
+::: {unit}
+id: "animation-editor-class"
+title: "Animation Editor Class"
+unit-type: "javascript-class-definition"
+language: "javascript"
+status: "draft"
+version: "0.2"
+brief: "Provides the main interface for creating and editing animations."
+source-ref: "../../src/animation/AnimationEditor.js"
+see-also:
+  - "[[timeline-class]]" # Implementation dependency (uses Timeline)
+  - "[[property-editor-class]]" # Implementation dependency (uses PropertyEditor)
+  - "[[tween-engine-class]]" # Implementation dependency (uses TweenEngine)
+  - "[[animation-data-schema]]" # Implementation dependency (works with animation data structure)
+  - "[[../core/event-bus-class.mdmd]]" # Implementation dependency (uses EventBus for communication)
+  - "[[../Concepts/animation-editor-module.mdmd]]" # Parent composition
+
+Provides the main interface for creating and editing animations with timeline control and property editing.
+
+```javascript
+// Animation Editor implementation placeholder
+```
+:::

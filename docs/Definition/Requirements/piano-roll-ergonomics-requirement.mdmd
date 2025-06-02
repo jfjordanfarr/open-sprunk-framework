@@ -1,0 +1,82 @@
+::: {unit}
+id: "piano-roll-ergonomics-requirement"
+title: "Piano Roll Ergonomics Requirement"
+unit-type: "functional-requirement"
+language: "markdown"
+status: "draft" 
+version: "0.1"
+brief: "Modern piano roll interface with educational key highlighting and DAW-style ergonomics."
+priority: "high"
+owner: "music-editor-team"
+see-also:
+  - "[[../Definition/Vision/OriginatingPrompt.md]]" # Traceability (originated from educational goals)
+  - "[[multi-modal-audio-input-requirement]]" # Architectural association (complementary audio features)
+  - "[[../../Specification/Concepts/music-editor-module.mdmd]]" # Parent composition
+
+## Description
+
+The piano roll interface shall provide modern DAW-style ergonomics with educational features specifically designed to assist early musicians in learning music theory and composition.
+
+## Functional Requirements
+
+### Key Highlighting System
+- **FR-PRE-001**: The piano roll SHALL highlight notes based on musical key and scale selection
+- **FR-PRE-002**: The system SHALL support major, minor, modal (dorian, phrygian, lydian, mixolydian, locrian), blues, and pentatonic scales
+- **FR-PRE-003**: Notes SHALL be visually categorized as:
+  - Root notes (highest priority highlighting)
+  - Chord tones (medium priority highlighting)  
+  - Passing tones (in-scale, low priority highlighting)
+  - Out-of-scale notes (minimal/neutral highlighting)
+- **FR-PRE-004**: The key selector SHALL provide real-time scale note display (e.g., "C - D - E - F - G - A - B")
+
+### Educational Features
+- **FR-PRE-005**: Hovering over cells SHALL display note information including:
+  - Note name and octave
+  - Scale degree (1-7)
+  - Chord tone status
+  - In-scale/out-of-scale indication
+- **FR-PRE-006**: The system SHALL provide scale degree visual indicators (1, 3, 5 emphasized for triads)
+- **FR-PRE-007**: The interface SHALL support preset key shortcuts for common keys (C Major, A Minor, etc.)
+
+### Ghost Notes Support
+- **FR-PRE-008**: The piano roll SHALL support displaying semi-transparent "ghost notes" from other tracks
+- **FR-PRE-009**: Ghost notes SHALL be visually distinct from active track notes (30% opacity)
+- **FR-PRE-010**: Users SHALL be able to toggle ghost note visibility per track
+- **FR-PRE-011**: Ghost notes SHALL NOT interfere with note editing on the active track
+
+### Visual Design Requirements
+- **FR-PRE-012**: Black key rows SHALL be visually distinguished from white key rows
+- **FR-PRE-013**: Beat boundaries SHALL be emphasized with stronger grid lines
+- **FR-PRE-014**: The interface SHALL maintain performance with highlighting for grids up to 88 keys × 64 steps
+- **FR-PRE-015**: Color coding SHALL be accessible (colorblind-friendly palette)
+
+## Acceptance Criteria
+
+1. **Educational Value**: A novice musician can identify which notes belong to a selected key within 30 seconds of using the interface
+2. **Performance**: Key highlighting updates SHALL complete within 100ms of key selection change
+3. **Usability**: The interface SHALL remain intuitive with highlighting disabled (graceful degradation)
+4. **Accessibility**: All highlighting information SHALL be available via hover tooltips
+5. **Integration**: The key selector SHALL seamlessly integrate with the existing piano roll layout
+
+## Technical Constraints
+
+- Implementation SHALL use CSS classes for highlighting (not inline styles)
+- Music theory calculations SHALL be cached for performance
+- The system SHALL support future multi-track architecture
+- Ghost notes infrastructure SHALL be designed for extensibility
+
+## Educational Impact Goals
+
+- **Music Theory Learning**: Visual reinforcement of scale patterns and chord construction
+- **Composition Assistance**: Harmonic context while writing melodies
+- **Confidence Building**: Clear visual feedback reduces trial-and-error composition
+- **Professional Workflow**: Introduces DAW-standard features in an educational context
+
+## Priority Justification
+
+This requirement is HIGH priority because:
+- It directly supports the educational mission for early musicians
+- It provides immediate user value without complex backend dependencies
+- It establishes the foundation for advanced features (ghost notes, multi-track)
+- It differentiates the framework from basic MIDI editors
+:::

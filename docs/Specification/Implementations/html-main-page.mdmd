@@ -1,0 +1,73 @@
+<!-- filepath: docs/Units/html-main-page.mdmd -->
+::: {unit}
+id: "html-main-page"
+title: "HTML Main Page"
+unit-type: "html-page-definition"
+language: "html"
+status: "draft"
+version: "0.2"
+brief: "Main HTML page structure with containers for all editor modules."
+source-ref: "../src/index.html"
+see-also:
+  - "[[app-main-bootstrap]]" # Architectural association (loads main bootstrap script)
+  - "[[../../Definition/Requirements/client-side-architecture-requirement.mdmd]]" # Traceability (implements HTML5 client-side requirement)
+  - "[[../../Specification/Concepts/sprunki-game-project.mdmd]]" # Parent composition
+
+The main HTML page provides the structure for the entire application with dedicated containers for each editor and the performance stage.
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sprunki Game - Creative Character & Music Studio</title>
+    <link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+    <div id="app">
+        <header id="app-header">
+            <h1>Sprunki Creative Studio</h1>
+            <nav id="main-nav">
+                <button id="nav-character" class="nav-tab">Character</button>
+                <button id="nav-music" class="nav-tab">Music</button>
+                <button id="nav-animation" class="nav-tab">Animation</button>
+                <button id="nav-stage" class="nav-tab active">Stage</button>
+            </nav>
+            <div id="project-controls">
+                <button id="save-project">Save</button>
+                <button id="load-project">Load</button>
+                <button id="export-project">Export</button>
+            </div>
+        </header>
+        
+        <main id="app-main">
+            <div id="character-editor" class="editor-panel hidden">
+                <div id="character-canvas-container"></div>
+                <div id="character-controls"></div>
+            </div>
+            
+            <div id="music-editor" class="editor-panel hidden">
+                <div id="piano-roll-container"></div>
+                <div id="instrument-controls"></div>
+                <div id="music-controls"></div>
+            </div>
+            
+            <div id="animation-editor" class="editor-panel hidden">
+                <div id="timeline-container"></div>
+                <div id="property-editor-container"></div>
+                <div id="animation-preview"></div>
+            </div>
+            
+            <div id="performance-stage" class="editor-panel">
+                <div id="stage-canvas-container"></div>
+                <div id="stage-controls"></div>
+            </div>
+        </main>
+    </div>
+    
+    <script type="module" src="main.js"></script>
+</body>
+</html>
+```
+:::

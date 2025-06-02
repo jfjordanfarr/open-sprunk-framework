@@ -1,0 +1,298 @@
+<!-- filepath: do../Implementations/character/humanoid-character-schema.mdmd -->
+::: {unit}
+id: "humanoid-character-schema"
+title: "Humanoid Character Data Schema"
+unit-type: "json-schema-definition"
+language: "json"
+status: "draft"
+version: "0.1"
+brief: "Enhanced character schema supporting body-part-based humanoid animation system."
+source-ref: "../../src/character/HumanoidCharacterData.js"
+see-also:
+  - "[[character-data-schema]]" # Base character schema
+  - "[[../../Definition/Requirements/humanoid-character-animation-requirement]]" # Implements this requirement
+  - "[[../Concepts/character-editor-module]]" # Parent composition
+  - "[[../animation/humanoid-animation-schema]]" # Used by animation system
+
+Enhanced character data schema specifically designed for humanoid "Sprunks" with modular body parts, hinge points, and instrument integration capabilities.
+
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Humanoid Character Data",
+  "description": "Schema for humanoid Sprunk character with body-part-based animation support",
+  "type": "object",
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "name": { "type": "string" },
+        "created": { "type": "string", "format": "date-time" },
+        "modified": { "type": "string", "format": "date-time" },
+        "version": { "type": "string", "default": "1.0" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "description": { "type": "string" }
+      },
+      "required": ["id", "name", "created"]
+    },
+
+    "bodyParts": {
+      "type": "object",
+      "description": "Modular body parts with individual artistic assets and animation properties",
+      "properties": {
+        "head": { "$ref": "#/definitions/BodyPart" },
+        "body": { "$ref": "#/definitions/BodyPart" },
+        "leftArm": { "$ref": "#/definitions/BodyPart" },
+        "rightArm": { "$ref": "#/definitions/BodyPart" },
+        "leftLeg": { "$ref": "#/definitions/BodyPart" },
+        "rightLeg": { "$ref": "#/definitions/BodyPart" },
+        "leftHand": { "$ref": "#/definitions/BodyPart" },
+        "rightHand": { "$ref": "#/definitions/BodyPart" },
+        "leftFoot": { "$ref": "#/definitions/BodyPart" },
+        "rightFoot": { "$ref": "#/definitions/BodyPart" }
+      },
+      "required": ["head", "body", "leftArm", "rightArm", "leftLeg", "rightLeg"]
+    },
+
+    "skeleton": {
+      "type": "object",
+      "description": "Hierarchical structure defining body part relationships and hinge points",
+      "properties": {
+        "joints": {
+          "type": "object",
+          "description": "Joint/hinge point definitions for realistic articulation",
+          "properties": {
+            "neck": { "$ref": "#/definitions/Joint" },
+            "leftShoulder": { "$ref": "#/definitions/Joint" },
+            "rightShoulder": { "$ref": "#/definitions/Joint" },
+            "leftElbow": { "$ref": "#/definitions/Joint" },
+            "rightElbow": { "$ref": "#/definitions/Joint" },
+            "leftWrist": { "$ref": "#/definitions/Joint" },
+            "rightWrist": { "$ref": "#/definitions/Joint" },
+            "leftHip": { "$ref": "#/definitions/Joint" },
+            "rightHip": { "$ref": "#/definitions/Joint" },
+            "leftKnee": { "$ref": "#/definitions/Joint" },
+            "rightKnee": { "$ref": "#/definitions/Joint" },
+            "leftAnkle": { "$ref": "#/definitions/Joint" },
+            "rightAnkle": { "$ref": "#/definitions/Joint" }
+          }
+        },
+        "hierarchy": {
+          "type": "object",
+          "description": "Parent-child relationships for transform inheritance",
+          "properties": {
+            "root": { "type": "string", "default": "body" },
+            "children": {
+              "type": "object",
+              "patternProperties": {
+                "^[a-zA-Z][a-zA-Z0-9]*$": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "instruments": {
+      "type": "array",
+      "description": "Instruments attached to this character for performance animations",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "type": { 
+            "type": "string", 
+            "enum": ["trumpet", "piano", "guitar", "drums", "violin", "flute", "custom"]
+          },
+          "attachmentPoint": { 
+            "type": "string",
+            "description": "Body part ID where instrument attaches"
+          },
+          "visualData": {
+            "type": "object",
+            "description": "Fabric.js or visual representation of the instrument",
+            "properties": {
+              "fabricObjects": { "type": "array" },
+              "scale": { "type": "number", "default": 1.0 },
+              "offset": { "$ref": "#/definitions/Vector2D" }
+            }
+          },
+          "constraints": {
+            "type": "object",
+            "description": "Animation constraints when using this instrument",
+            "properties": {
+              "handPositions": {
+                "type": "object",
+                "properties": {
+                  "left": { "$ref": "#/definitions/Vector2D" },
+                  "right": { "$ref": "#/definitions/Vector2D" }
+                }
+              },
+              "postureRequirements": {
+                "type": "object",
+                "description": "Required body positions for playing"
+              }
+            }
+          }
+        },
+        "required": ["id", "type", "attachmentPoint"]
+      }
+    },
+
+    "viewpoints": {
+      "type": "object",
+      "description": "Support for multiple character viewpoints (future: side-view)",
+      "properties": {
+        "front": {
+          "type": "object",
+          "description": "Front-facing character view (primary)",
+          "properties": {
+            "active": { "type": "boolean", "default": true },
+            "fabricCanvas": { "type": "object" }
+          }
+        },
+        "side": {
+          "type": "object",
+          "description": "Side-view character sprites (future enhancement)",
+          "properties": {
+            "active": { "type": "boolean", "default": false },
+            "fabricCanvas": { "type": "object" }
+          }
+        }
+      }
+    },
+
+    "animationPresets": {
+      "type": "array",
+      "description": "Pre-defined poses and animation snippets for this character",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "type": { 
+            "type": "string", 
+            "enum": ["pose", "dance", "idle", "instrument-playing", "custom"]
+          },
+          "poseData": {
+            "type": "object",
+            "description": "Body part positions and rotations for this pose",
+            "patternProperties": {
+              "^[a-zA-Z][a-zA-Z0-9]*$": {
+                "type": "object",
+                "properties": {
+                  "position": { "$ref": "#/definitions/Vector2D" },
+                  "rotation": { "type": "number" },
+                  "scale": { "$ref": "#/definitions/Vector2D" }
+                }
+              }
+            }
+          }
+        },
+        "required": ["id", "name", "type", "poseData"]
+      }
+    }
+  },
+
+  "definitions": {
+    "BodyPart": {
+      "type": "object",
+      "description": "Individual body part with artistic assets and animation properties",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "fabricObjects": {
+          "type": "array",
+          "description": "Fabric.js objects comprising this body part",
+          "items": { "type": "string" }
+        },
+        "bounds": {
+          "type": "object",
+          "description": "Bounding box for this body part",
+          "properties": {
+            "width": { "type": "number" },
+            "height": { "type": "number" },
+            "centerX": { "type": "number" },
+            "centerY": { "type": "number" }
+          }
+        },
+        "defaultTransform": {
+          "type": "object",
+          "description": "Default position, rotation, and scale",
+          "properties": {
+            "position": { "$ref": "#/definitions/Vector2D" },
+            "rotation": { "type": "number", "default": 0 },
+            "scale": { "$ref": "#/definitions/Vector2D" }
+          }
+        },
+        "constraints": {
+          "type": "object",
+          "description": "Movement and rotation limits for realistic animation",
+          "properties": {
+            "rotationMin": { "type": "number" },
+            "rotationMax": { "type": "number" },
+            "scaleMin": { "type": "number", "default": 0.5 },
+            "scaleMax": { "type": "number", "default": 2.0 }
+          }
+        }
+      },
+      "required": ["id", "name", "fabricObjects", "defaultTransform"]
+    },
+
+    "Joint": {
+      "type": "object",
+      "description": "Connection point between body parts",
+      "properties": {
+        "position": { "$ref": "#/definitions/Vector2D" },
+        "parentPart": { "type": "string" },
+        "childPart": { "type": "string" },
+        "type": { 
+          "type": "string", 
+          "enum": ["hinge", "ball", "fixed"],
+          "default": "hinge"
+        },
+        "constraints": {
+          "type": "object",
+          "properties": {
+            "minAngle": { "type": "number" },
+            "maxAngle": { "type": "number" }
+          }
+        }
+      },
+      "required": ["position", "parentPart", "childPart"]
+    },
+
+    "Vector2D": {
+      "type": "object",
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" }
+      },
+      "required": ["x", "y"]
+    }
+  },
+
+  "required": ["metadata", "bodyParts", "skeleton"]
+}
+```
+
+This schema enables:
+
+1. **Modular Design**: Each body part is independently drawable and animatable
+2. **Realistic Animation**: Joint constraints ensure natural human movement
+3. **Instrument Integration**: Built-in support for musical instrument attachments
+4. **Extensibility**: Framework for future enhancements (side-view, additional limbs)
+5. **Educational Features**: Pre-defined poses and movement constraints for learning
+
+Key innovations:
+- **Hierarchical Skeleton**: Parent-child relationships for realistic limb movement
+- **Joint Constraints**: Realistic movement limits prevent impossible poses
+- **Instrument Attachment System**: Characters can have built-in instruments with playing constraints
+- **Animation Presets**: Pre-defined poses and movements for educational assistance
+- **Future-Proof**: Structure supports side-view sprites and additional complexity
+
+:::

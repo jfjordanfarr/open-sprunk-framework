@@ -1,0 +1,456 @@
+```{unit}
+id: "phase-aware-animation-schema"
+title: "Phase-Aware Animation Schema"
+unit-type: "json-schema-definition"
+source-ref: "../../src/animation/PhaseAwareAnimationSchema.js"
+status: "draft"
+see-also:
+  - "[[humanoid-animation-schema]]"
+  - "[[animation-data-schema]]"
+  - "[[enhanced-character-schema]]"
+  - "[[phase-system-architecture]]"
+  - "[[beat-sync-service-class]]"
+```
+
+## Overview
+
+The **Phase-Aware Animation Schema** defines how character animations are structured and linked to specific character phases, enabling the tri-modal integration of appearance, music, and movement. This schema extends the base animation system to support phase-specific animation sets, transition animations, and coordination behaviors.
+
+## Schema Structure
+
+### Phase Animation Set
+Each character phase contains a complete animation set for that phase's movement patterns:
+
+```javascript
+const PhaseAnimationSet = {
+    // Phase identification
+    phaseId: "string", // Links to character phase
+    phaseName: "string", // Human-readable phase name
+    
+    // Core animations for this phase
+    animations: {
+        // Primary loop animation for continuous playback
+        primary: {
+            type: "loop",
+            keyframes: [], // Humanoid keyframe data
+            duration: 2000, // Duration in milliseconds
+            beatAlignment: {
+                enabled: true,
+                beatsPerLoop: 4, // Animation loops every 4 beats
+                subdivision: 0.25, // Keyframes align to 16th notes
+                offset: 0 // Timing offset in beats
+            }
+        },
+        
+        // Secondary variations (optional)
+        variations: [
+            {
+                id: "variation-1",
+                type: "loop",
+                keyframes: [],
+                duration: 2000,
+                probability: 0.3, // 30% chance of playing instead of primary
+                triggers: ["beat", "phrase"], // When this variation can trigger
+                beatAlignment: { /* same structure */ }
+            }
+        ],
+        
+        // Transition animations
+        transitions: {
+            // Transition TO this phase from others
+            enter: {
+                from: {
+                    "*": { // Default enter transition from any phase
+                        type: "transition",
+                        keyframes: [],
+                        duration: 500,
+                        easing: "ease-in-out"
+                    },
+                    "idle-phase": { // Specific transition from idle phase
+                        type: "transition",
+                        keyframes: [],
+                        duration: 1000,
+                        easing: "bounce"
+                    }
+                }
+            },
+            
+            // Transition FROM this phase to others
+            exit: {
+                to: {
+                    "*": { // Default exit transition to any phase
+                        type: "transition",
+                        keyframes: [],
+                        duration: 500,
+                        easing: "ease-in-out"
+                    }
+                }
+            }
+        },
+        
+        // Reactive animations triggered by events
+        reactions: [
+            {
+                id: "beat-emphasis",
+                trigger: {
+                    type: "beat",
+                    subdivision: 1, // Every beat
+                    probability: 0.5 // 50% chance per beat
+                },
+                animation: {
+                    type: "overlay", // Plays over primary animation
+                    keyframes: [], // Quick accent movement
+                    duration: 200,
+                    blendMode: "additive"
+                }
+            },
+            {
+                id: "music-accent",
+                trigger: {
+                    type: "audio-analysis",
+                    feature: "onset", // Musical onset detection
+                    threshold: 0.7 // Sensitivity threshold
+                },
+                animation: {
+                    type: "overlay",
+                    keyframes: [],
+                    duration: 300,
+                    blendMode: "additive"
+                }
+            }
+        ]
+    },
+    
+    // Animation behavior settings
+    behavior: {
+        // How this phase's animations coordinate with others
+        coordination: {
+            mode: "independent", // "independent" | "synchronized" | "leader" | "follower"
+            syncTarget: null, // Character ID to sync with (if follower mode)
+            syncOffset: 0, // Timing offset in beats
+            syncTolerance: 0.1 // Acceptable timing variance
+        },
+        
+        // Performance optimization settings
+        performance: {
+            enableLOD: true, // Level-of-detail optimization
+            minFrameRate: 30, // Minimum acceptable frame rate
+            complexityLevel: "medium", // "low" | "medium" | "high"
+            enableCaching: true, // Cache computed animations
+            enablePrediction: true // Predict upcoming keyframes
+        },
+        
+        // Musical responsiveness settings
+        musicality: {
+            beatResponsive: true, // React to beat events
+            tempoAdaptive: true, // Adjust animation speed to tempo
+            dynamicResponsive: true, // React to volume/intensity changes
+            phraseAware: true // Recognize musical phrases for longer movements
+        }
+    },
+    
+    // Constraints and limits for this phase
+    constraints: {
+        // Inherit from character's base constraints
+        inherits: "character", // Use character's base humanoid constraints
+        
+        // Phase-specific constraint overrides
+        overrides: {
+            // Example: This phase allows more extreme movements
+            "right-arm": {
+                rotation: { min: -180, max: 180 }, // Full rotation allowed
+                extension: { min: 0.5, max: 2.0 } // Extended reach
+            }
+        },
+        
+        // Additional constraints for this phase
+        additions: {
+            // Example: This phase requires staying in specific area
+            "position": {
+                bounds: { x: [-100, 100], y: [-50, 50] },
+                enforceStrict: true
+            }
+        }
+    },
+    
+    // Metadata and authoring information
+    metadata: {
+        created: "2025-06-02T00:00:00Z",
+        modified: "2025-06-02T00:00:00Z",
+        author: "string",
+        description: "string",
+        tags: ["dancing", "energetic", "4/4-time"],
+        version: "1.0.0",
+        
+        // Animation authoring workflow tracking
+        workflow: {
+            createdFrom: "animation-first", // "animation-first" | "music-first" | "appearance-first"
+            sourcePhase: null, // Phase ID if created by duplicating another phase
+            iterationCount: 1, // Number of refinement iterations
+            lastEditType: "keyframe" // "keyframe" | "timing" | "behavior" | "transition"
+        }
+    }
+};
+```
+
+### Character Phase Animation Collection
+Complete animation data for all phases of a character:
+
+```javascript
+const CharacterPhaseAnimations = {
+    characterId: "string",
+    characterName: "string",
+    
+    // All animation sets for all phases
+    phases: {
+        "idle-phase": PhaseAnimationSet,
+        "dancing-phase": PhaseAnimationSet,
+        "singing-phase": PhaseAnimationSet,
+        // ... additional phases
+    },
+    
+    // Global animation settings
+    global: {
+        // Default transition settings
+        defaultTransitions: {
+            duration: 500,
+            easing: "ease-in-out",
+            type: "crossfade"
+        },
+        
+        // Animation engine settings
+        engine: {
+            updateRate: 60, // Target FPS
+            interpolationMethod: "cubic", // Keyframe interpolation
+            enablePhysics: false, // Physics simulation
+            enableIK: true // Inverse kinematics
+        },
+        
+        // Performance monitoring
+        performance: {
+            trackFrameRate: true,
+            trackMemoryUsage: true,
+            adaptiveQuality: true, // Automatically reduce quality if needed
+            fallbackMode: "simple" // Fallback to simple animations if performance issues
+        }
+    },
+    
+    // Cross-phase animation data
+    shared: {
+        // Common animation elements used across multiple phases
+        commonKeyframes: {
+            "basic-bounce": [], // Reusable animation snippet
+            "arm-wave": [],
+            "head-nod": []
+        },
+        
+        // Transition templates
+        transitionTemplates: {
+            "quick-fade": {
+                duration: 200,
+                easing: "ease-out",
+                type: "crossfade"
+            },
+            "bounce-in": {
+                duration: 800,
+                easing: "bounce",
+                type: "sequential"
+            }
+        }
+    },
+    
+    // Schema version and validation
+    schema: {
+        version: "1.0.0",
+        lastValidated: "2025-06-02T00:00:00Z",
+        validationErrors: [],
+        migrationRequired: false
+    }
+};
+```
+
+## Integration with Humanoid Animation System
+
+### Body Part Animation Data
+Phase animations use the humanoid constraint system with phase-specific enhancements:
+
+```javascript
+const PhaseHumanoidKeyframe = {
+    timestamp: 1000, // Time in milliseconds
+    
+    // Body part positions (inherits from humanoid system)
+    bodyParts: {
+        head: { rotation: 15, tilt: 5 },
+        body: { posture: 0.8, lean: 10 },
+        leftArm: { rotation: -45, extension: 0.7 },
+        rightArm: { rotation: 30, extension: 1.0 },
+        leftHand: { gesture: "open", rotation: 0 },
+        rightHand: { gesture: "point", rotation: 15 },
+        leftLeg: { angle: 20, extension: 0.9 },
+        rightLeg: { angle: -10, extension: 1.0 },
+        leftFoot: { angle: 5, flex: 0.5 },
+        rightFoot: { angle: -5, flex: 0.3 }
+    },
+    
+    // Phase-specific enhancements
+    phaseData: {
+        // Musical synchronization
+        beatPosition: 0.0, // Position within beat (0.0-1.0)
+        musicalEmphasis: 0.5, // How much this keyframe emphasizes the music
+        
+        // Visual coordination
+        appearanceSync: {
+            highlightBodyParts: ["rightHand"], // Parts to visually emphasize
+            colorTint: "#ff6b6b", // Temporary color tint
+            brightness: 1.2 // Brightness multiplier
+        },
+        
+        // Transition hints
+        transitionData: {
+            isTransitionFrame: false, // True if this is a transition keyframe
+            transitionType: null, // Type of transition this frame supports
+            blendWeight: 1.0 // How strongly this frame influences final pose
+        }
+    }
+};
+```
+
+## Beat Synchronization Integration
+
+### Beat-Aligned Animation Timing
+```javascript
+const BeatSyncAnimationConfig = {
+    // Beat alignment settings
+    beatAlignment: {
+        enabled: true,
+        mode: "strict", // "strict" | "loose" | "adaptive"
+        
+        // Timing relationship to music
+        beatsPerLoop: 4, // Animation loops every 4 beats
+        subdivision: 0.25, // Keyframes align to 16th notes
+        offset: 0, // Timing offset in beats
+        
+        // Synchronization behavior
+        syncOnPhaseChange: true, // Re-sync when phase changes
+        driftCorrection: true, // Automatically correct timing drift
+        maxDriftTolerance: 0.1 // Maximum drift before correction (beats)
+    },
+    
+    // Dynamic tempo adaptation
+    tempoAdaptation: {
+        enabled: true,
+        method: "time-stretch", // "time-stretch" | "keyframe-skip" | "interpolation"
+        
+        // Speed limits
+        minSpeedMultiplier: 0.5, // 50% of original speed
+        maxSpeedMultiplier: 2.0, // 200% of original speed
+        
+        // Quality settings
+        maintainKeyframes: true, // Preserve important keyframes
+        smoothTransitions: true // Smooth tempo changes
+    }
+};
+```
+
+## Phase Transition Animations
+
+### Advanced Transition System
+```javascript
+const PhaseTransitionAnimation = {
+    // Transition identification
+    fromPhase: "idle-phase",
+    toPhase: "dancing-phase",
+    transitionId: "idle-to-dancing",
+    
+    // Transition type and behavior
+    type: "morphing", // "instant" | "crossfade" | "morphing" | "sequential"
+    duration: 1000, // Total transition time
+    
+    // Keyframe-based transition definition
+    keyframes: [
+        {
+            timestamp: 0, // Start of transition
+            blend: { from: 1.0, to: 0.0 }, // 100% from-phase, 0% to-phase
+            bodyParts: {}, // Specific overrides if needed
+        },
+        {
+            timestamp: 500, // Mid-transition
+            blend: { from: 0.5, to: 0.5 }, // 50/50 blend
+            bodyParts: {
+                // Special transition-only movements
+                head: { rotation: 25, emphasis: "transition" }
+            }
+        },
+        {
+            timestamp: 1000, // End of transition
+            blend: { from: 0.0, to: 1.0 }, // 0% from-phase, 100% to-phase
+            bodyParts: {}
+        }
+    ],
+    
+    // Musical timing for transition
+    beatSync: {
+        startOnBeat: true, // Begin transition on beat boundary
+        beatAlignment: 1, // Start on downbeat
+        allowEarlyStart: false, // Wait for exact beat timing
+        snapToGrid: true // Quantize timing to musical grid
+    },
+    
+    // Advanced transition effects
+    effects: {
+        // Visual effects during transition
+        visual: {
+            trailEffect: true, // Leave visual trail during transition
+            blurAmount: 0.2, // Motion blur during transition
+            scaleEffect: { start: 1.0, peak: 1.1, end: 1.0 } // Scale animation
+        },
+        
+        // Audio coordination
+        audio: {
+            crossfadeMusic: true, // Crossfade between phase music
+            transitionSound: "whoosh", // Sound effect for transition
+            volumeRamp: "smooth" // How to handle volume changes
+        }
+    }
+};
+```
+
+## Performance Optimization
+
+### Level-of-Detail (LOD) System
+```javascript
+const AnimationLODConfig = {
+    // LOD levels
+    levels: {
+        high: {
+            keyframeResolution: 1.0, // Full keyframe density
+            bodyPartDetail: "full", // All body parts animated
+            transitionQuality: "smooth", // High-quality transitions
+            effectsEnabled: true // All visual effects enabled
+        },
+        medium: {
+            keyframeResolution: 0.7, // 70% of keyframes
+            bodyPartDetail: "essential", // Core body parts only
+            transitionQuality: "standard", // Standard transitions
+            effectsEnabled: true // Essential effects only
+        },
+        low: {
+            keyframeResolution: 0.4, // 40% of keyframes
+            bodyPartDetail: "minimal", // Basic pose only
+            transitionQuality: "simple", // Simple transitions
+            effectsEnabled: false // No additional effects
+        }
+    },
+    
+    // Automatic LOD selection
+    adaptive: {
+        enabled: true,
+        frameRateThreshold: 45, // Switch to lower LOD below 45 FPS
+        memoryThreshold: 0.8, // Switch to lower LOD above 80% memory usage
+        batteryThreshold: 0.3, // Switch to lower LOD below 30% battery
+        entityCountThreshold: 8 // Switch to lower LOD with more than 8 entities
+    }
+};
+```
+
+This schema provides the foundation for creating rich, musically-synchronized character animations that seamlessly integrate with the Phase System's tri-modal architecture.

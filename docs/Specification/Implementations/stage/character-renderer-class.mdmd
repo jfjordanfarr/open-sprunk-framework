@@ -1,0 +1,22 @@
+<!-- filepath: docs/Units/stage/character-renderer-class.mdmd -->
+::: {unit}
+id: "character-renderer-class"
+title: "Character Renderer Class"
+unit-type: "javascript-class-definition"
+language: "javascript"
+status: "draft"
+version: "0.2"
+brief: "Handles rendering of characters on the stage."
+source-ref: "../../src/stage/CharacterRenderer.js"
+see-also:
+  - "[[../character/character-data-schema.mdmd]]" # Implementation dependency (renders character data structure)
+  - "[[../character/texture-manager-class.mdmd]]" # Implementation dependency (uses TextureManager for character textures)
+  - "[[../utils/vector2d-utils.mdmd]]" # Implementation dependency (uses for positioning calculations)
+  - "[[../Concepts/stage-module.mdmd]]" # Parent composition
+
+Handles rendering of characters on the stage with support for animations and transformations.
+
+```javascript
+// Character Renderer implementation placeholder
+```
+:::

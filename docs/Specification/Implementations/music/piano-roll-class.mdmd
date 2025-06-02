@@ -1,0 +1,453 @@
+<!-- filepath: docs/Units/music/piano-roll-class.mdmd -->
+::: {unit}
+id: "piano-roll-class"
+title: "Piano Roll Class"
+unit-type: "javascript-class-definition"
+language: "javascript"
+status: "draft"
+version: "0.2"
+brief: "UI component for musical note input and editing (piano roll).
+Note: This is a complex component; the implementation below is a conceptual sketch."
+source-ref: "../../src/music/PianoRoll.js"
+see-also:
+  - "[[music-data-schema]]" # Implementation dependency (works with music data structure)
+  - "[[../core/event-bus-class.mdmd]]" # Implementation dependency (uses EventBus for note events)
+  - "[[../utils/vector2d-utils.mdmd]]" # Implementation dependency (uses for coordinate calculations)
+  - "[[../utils/music-theory-utils]]" # Implementation dependency (uses for key highlighting)
+  - "[[key-selector-class]]" # Implementation dependency (receives key context for highlighting)
+  - "[[../Concepts/music-editor-module.mdmd]]" # Parent composition
+
+A visual interface for creating and editing musical notes with educational key highlighting and modern DAW-style ergonomics.
+
+```javascript
+// Enhanced piano roll with educational key highlighting and modern ergonomics
+import { MusicTheoryUtils } from '../utils/MusicTheoryUtils.js';
+
+export class PianoRoll {
+    constructor(containerElement, eventBus) {
+        this.container = containerElement;
+        this.eventBus = eventBus;
+        this.notes = []; // Array of { pitch, time, duration, velocity }
+        this.config = {
+            octaves: 3,
+            stepsPerBeat: 4,
+            beats: 4, // Length of the loop
+            minPitch: 48, // C3
+            maxPitch: 83  // B5
+        };
+        this.gridElement = null;
+        
+        // Key highlighting state
+        this.musicalContext = {
+            rootNote: 'C',
+            scaleType: 'major',
+            chordType: 'triad_major',
+            highlightingEnabled: true
+        };
+        
+        // Ghost notes state (for future multi-track support)
+        this.ghostTracks = new Map(); // trackId -> notes array
+        this.ghostNotesEnabled = false;
+    }
+
+    async init() {
+        this._renderGrid();
+        this._setupEventHandlers();
+        this._subscribeToKeyChanges();
+        console.log('PianoRoll initialized with key highlighting');
+    }
+
+    _subscribeToKeyChanges() {
+        // Listen for key selector changes
+        this.eventBus.on('keySelector:changed', (keyData) => {
+            this.musicalContext = { ...this.musicalContext, ...keyData };
+            this._updateKeyHighlighting();
+        });
+    }
+
+    _renderGrid() {
+        this.container.innerHTML = ''; // Clear previous content
+        this.gridElement = document.createElement('div');
+        this.gridElement.className = 'piano-roll-grid';
+        
+        const totalPitches = this.config.maxPitch - this.config.minPitch + 1;
+        const totalTimeSteps = this.config.beats * this.config.stepsPerBeat;
+
+        this.gridElement.style.display = 'grid';
+        this.gridElement.style.gridTemplateRows = `repeat(${totalPitches}, 20px)`;
+        this.gridElement.style.gridTemplateColumns = `repeat(${totalTimeSteps}, 30px)`;
+
+        for (let p = 0; p < totalPitches; p++) {
+            for (let t = 0; t < totalTimeSteps; t++) {
+                const cell = document.createElement('div');
+                cell.className = 'piano-roll-cell';
+                const pitch = this.config.maxPitch - p; // Higher pitches at the top
+                cell.dataset.pitch = pitch;
+                cell.dataset.time = t / this.config.stepsPerBeat; // Time in beats
+                cell.dataset.step = t;
+                
+                // Add styling for beat/subdivision lines
+                if (t % this.config.stepsPerBeat === 0) {
+                    cell.classList.add('beat-line');
+                }
+                
+                // Add black/white key styling based on note
+                const noteName = MusicTheoryUtils.midiToNoteName(pitch);
+                const noteBase = noteName.replace(/\d+$/, ''); // Remove octave
+                if (noteBase.includes('#')) {
+                    cell.classList.add('black-key-row');
+                } else {
+                    cell.classList.add('white-key-row');
+                }
+                
+                this.gridElement.appendChild(cell);
+            }
+        }
+        this.container.appendChild(this.gridElement);
+        this._renderNotes();
+        this._updateKeyHighlighting();
+    }    _setupEventHandlers() {
+        this.gridElement.addEventListener('click', (e) => {
+            if (e.target.classList.contains('piano-roll-cell')) {
+                const pitch = parseInt(e.target.dataset.pitch);
+                const time = parseFloat(e.target.dataset.time);
+                const step = parseInt(e.target.dataset.step);
+                this._toggleNote(pitch, time, step);
+            }
+        });
+        
+        // Add hover effects for key highlighting feedback
+        this.gridElement.addEventListener('mouseover', (e) => {
+            if (e.target.classList.contains('piano-roll-cell') && this.musicalContext.highlightingEnabled) {
+                const pitch = parseInt(e.target.dataset.pitch);
+                this._showNoteInfo(pitch, e.target);
+            }
+        });
+        
+        this.gridElement.addEventListener('mouseout', (e) => {
+            if (e.target.classList.contains('piano-roll-cell')) {
+                this._hideNoteInfo();
+            }
+        });
+    }
+
+    _updateKeyHighlighting() {
+        if (!this.gridElement || !this.musicalContext.highlightingEnabled) {
+            return;
+        }
+        
+        // Clear existing highlighting classes
+        this.gridElement.querySelectorAll('.piano-roll-cell').forEach(cell => {
+            cell.classList.remove(
+                'note-in-scale', 'note-out-of-scale', 'note-chord-tone', 
+                'note-passing', 'note-root', 'scale-degree-1', 'scale-degree-2',
+                'scale-degree-3', 'scale-degree-4', 'scale-degree-5', 
+                'scale-degree-6', 'scale-degree-7'
+            );
+            cell.removeAttribute('data-note-info');
+        });
+        
+        // Apply new highlighting based on current musical context
+        for (let pitch = this.config.minPitch; pitch <= this.config.maxPitch; pitch++) {
+            const highlighting = MusicTheoryUtils.getNoteHighlighting(pitch, this.musicalContext);
+            const cells = this.gridElement.querySelectorAll(
+                `.piano-roll-cell[data-pitch='${pitch}']`
+            );
+            
+            cells.forEach(cell => {
+                // Apply highlighting classes
+                highlighting.classes.forEach(cls => cell.classList.add(cls));
+                
+                // Add scale degree class for specific styling
+                if (highlighting.scaleDegree) {
+                    cell.classList.add(`scale-degree-${highlighting.scaleDegree}`);
+                }
+                
+                // Store note info for tooltips
+                cell.setAttribute('data-note-info', JSON.stringify({
+                    noteName: highlighting.noteName,
+                    scaleDegree: highlighting.scaleDegree,
+                    isInScale: highlighting.isInScale,
+                    isChordTone: highlighting.isChordTone
+                }));
+            });
+        }
+    }
+
+    _showNoteInfo(pitch, cellElement) {
+        const noteInfo = cellElement.getAttribute('data-note-info');
+        if (!noteInfo) return;
+        
+        try {
+            const info = JSON.parse(noteInfo);
+            const tooltip = this._createTooltip(info);
+            this._positionTooltip(tooltip, cellElement);
+        } catch (error) {
+            console.error('Error displaying note info:', error);
+        }
+    }
+
+    _createTooltip(noteInfo) {
+        // Remove existing tooltip
+        this._hideNoteInfo();
+        
+        const tooltip = document.createElement('div');
+        tooltip.className = 'piano-roll-tooltip';
+        tooltip.innerHTML = `
+            <div class="note-name">${noteInfo.noteName}</div>
+            ${noteInfo.scaleDegree ? `<div class="scale-degree">Scale degree: ${noteInfo.scaleDegree}</div>` : ''}
+            <div class="note-status">
+                ${noteInfo.isInScale ? '✓ In scale' : '✗ Out of scale'}
+                ${noteInfo.isChordTone ? ' • Chord tone' : ''}
+            </div>
+        `;
+        
+        document.body.appendChild(tooltip);
+        this.currentTooltip = tooltip;
+        return tooltip;
+    }
+
+    _positionTooltip(tooltip, cellElement) {
+        const cellRect = cellElement.getBoundingClientRect();
+        const tooltipRect = tooltip.getBoundingClientRect();
+        
+        // Position above the cell, centered
+        const left = cellRect.left + (cellRect.width / 2) - (tooltipRect.width / 2);
+        const top = cellRect.top - tooltipRect.height - 5;
+        
+        tooltip.style.left = `${Math.max(5, left)}px`;
+        tooltip.style.top = `${Math.max(5, top)}px`;
+    }
+
+    _hideNoteInfo() {
+        if (this.currentTooltip) {
+            this.currentTooltip.remove();
+            this.currentTooltip = null;
+        }
+    }                this._toggleNote(pitch, time, step);
+            }
+        });
+    }
+
+    _toggleNote(pitch, time, step) {
+        const existingNoteIndex = this.notes.findIndex(n => n.pitch === pitch && n.step === step);
+        if (existingNoteIndex > -1) {
+            this.notes.splice(existingNoteIndex, 1); // Remove note
+        } else {
+            this.notes.push({
+                pitch: pitch, 
+                time: time, // Time in beats from start of loop
+                duration: 1 / this.config.stepsPerBeat, // Duration in beats (e.g., a 16th note)
+                velocity: 0.8, 
+                step: step // Discrete time step index
+            });
+        }
+        this.notes.sort((a,b) => a.time - b.time || b.pitch - a.pitch); // Sort for consistent playback
+        this._renderNotes();
+        this.eventBus.emit('pianoroll:notes:changed', this.getNotes());
+    }
+
+    _renderNotes() {
+        // Clear existing note elements
+        this.gridElement.querySelectorAll('.note-on').forEach(el => el.classList.remove('note-on'));
+
+        // Draw current notes
+        this.notes.forEach(note => {
+            const cell = this.gridElement.querySelector(
+                `.piano-roll-cell[data-pitch='${note.pitch}'][data-step='${note.step}']`
+            );
+            if (cell) {
+                cell.classList.add('note-on');
+                // Could also create separate elements for notes to span multiple cells for duration
+            }
+        });
+    }
+
+    // Public API methods for key highlighting
+    setMusicalContext(context) {
+        this.musicalContext = { ...this.musicalContext, ...context };
+        this._updateKeyHighlighting();
+    }
+
+    toggleKeyHighlighting(enabled = null) {
+        if (enabled === null) {
+            this.musicalContext.highlightingEnabled = !this.musicalContext.highlightingEnabled;
+        } else {
+            this.musicalContext.highlightingEnabled = enabled;
+        }
+        this._updateKeyHighlighting();
+    }
+
+    // Ghost notes support (for future multi-track features)
+    setGhostTrack(trackId, notes) {
+        this.ghostTracks.set(trackId, notes || []);
+        if (this.ghostNotesEnabled) {
+            this._renderGhostNotes();
+        }
+    }
+
+    toggleGhostNotes(enabled = null) {
+        if (enabled === null) {
+            this.ghostNotesEnabled = !this.ghostNotesEnabled;
+        } else {
+            this.ghostNotesEnabled = enabled;
+        }
+        this._renderGhostNotes();
+    }
+
+    _renderGhostNotes() {
+        // Clear existing ghost notes
+        this.gridElement.querySelectorAll('.ghost-note').forEach(el => el.classList.remove('ghost-note'));
+        
+        if (!this.ghostNotesEnabled) return;
+        
+        // Render ghost notes from other tracks
+        this.ghostTracks.forEach((notes, trackId) => {
+            notes.forEach(note => {
+                const cell = this.gridElement.querySelector(
+                    `.piano-roll-cell[data-pitch='${note.pitch}'][data-step='${note.step}']`
+                );
+                if (cell && !cell.classList.contains('note-on')) {
+                    cell.classList.add('ghost-note');
+                    cell.setAttribute('data-ghost-track', trackId);
+                }
+            });
+        });
+    }
+
+    getNotes() {
+        return JSON.parse(JSON.stringify(this.notes)); // Return a deep copy
+    }
+
+    setNotes(notesData) {
+        this.notes = notesData ? JSON.parse(JSON.stringify(notesData)) : [];
+        this._renderNotes();
+    }
+
+    clear() {
+        this.notes = [];
+        this._renderNotes();
+        this.eventBus.emit('pianoroll:notes:changed', this.getNotes());
+    }
+
+    dispose() {
+        this._hideNoteInfo();
+        this.eventBus.off('keySelector:changed');
+        this.container.innerHTML = '';
+        console.log('PianoRoll disposed');
+    }
+}
+```
+
+```css
+/* Enhanced piano roll styling with key highlighting */
+.piano-roll-grid {
+    position: relative;
+    border: 1px solid #ccc;
+    background: #fafafa;
+}
+
+.piano-roll-cell {
+    border: 1px solid #e0e0e0;
+    position: relative;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+/* Basic row styling */
+.white-key-row {
+    background: #ffffff;
+}
+
+.black-key-row {
+    background: #f8f8f8;
+    border-color: #d0d0d0;
+}
+
+/* Beat line emphasis */
+.beat-line {
+    border-left: 2px solid #999 !important;
+}
+
+/* Note states */
+.note-on {
+    background: #4a90e2 !important;
+    border-color: #357abd !important;
+    z-index: 2;
+}
+
+.ghost-note {
+    background: rgba(74, 144, 226, 0.3) !important;
+    border-color: rgba(53, 122, 189, 0.4) !important;
+    z-index: 1;
+}
+
+/* Key highlighting classes */
+.note-in-scale {
+    background-color: rgba(76, 175, 80, 0.1);
+    border-color: rgba(76, 175, 80, 0.3);
+}
+
+.note-out-of-scale {
+    background-color: rgba(158, 158, 158, 0.05);
+}
+
+.note-chord-tone {
+    background-color: rgba(255, 152, 0, 0.15) !important;
+    border-color: rgba(255, 152, 0, 0.4) !important;
+}
+
+.note-root {
+    background-color: rgba(244, 67, 54, 0.2) !important;
+    border-color: rgba(244, 67, 54, 0.5) !important;
+    font-weight: bold;
+}
+
+/* Scale degree specific highlighting */
+.scale-degree-1 { box-shadow: inset 0 0 0 1px rgba(244, 67, 54, 0.6); }
+.scale-degree-3 { box-shadow: inset 0 0 0 1px rgba(255, 152, 0, 0.6); }
+.scale-degree-5 { box-shadow: inset 0 0 0 1px rgba(255, 193, 7, 0.6); }
+
+/* Hover effects */
+.piano-roll-cell:hover {
+    border-color: #4a90e2;
+    z-index: 3;
+}
+
+.note-in-scale:hover {
+    background-color: rgba(76, 175, 80, 0.2);
+}
+
+.note-chord-tone:hover {
+    background-color: rgba(255, 152, 0, 0.25) !important;
+}
+
+/* Tooltip styling */
+.piano-roll-tooltip {
+    position: absolute;
+    background: #333;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    z-index: 1000;
+    pointer-events: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.piano-roll-tooltip .note-name {
+    font-weight: bold;
+    font-size: 14px;
+}
+
+.piano-roll-tooltip .scale-degree {
+    color: #ffa726;
+    margin: 2px 0;
+}
+
+.piano-roll-tooltip .note-status {
+    font-size: 11px;
+    color: #e0e0e0;
+}
+```
+:::

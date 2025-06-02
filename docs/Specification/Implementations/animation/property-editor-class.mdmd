@@ -1,0 +1,21 @@
+<!-- filepath: docs/Units/animation/property-editor-class.mdmd -->
+::: {unit}
+id: "property-editor-class"
+title: "Property Editor Class"
+unit-type: "javascript-class-definition"
+language: "javascript"
+status: "draft"
+version: "0.2"
+brief: "Allows users to edit properties of animated objects."
+source-ref: "../../src/animation/PropertyEditor.js"
+see-also:
+  - "[[../core/event-bus-class.mdmd]]" # Implementation dependency (uses EventBus for property changes)
+  - "[[../utils/color-utils.mdmd]]" # Implementation dependency (uses for color property editing)
+  - "[[../Concepts/animation-editor-module.mdmd]]" # Parent composition
+
+Provides UI controls for editing animation properties including colors, transforms, and custom attributes.
+
+```javascript
+// Property Editor implementation placeholder
+```
+:::

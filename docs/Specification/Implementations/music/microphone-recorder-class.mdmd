@@ -1,0 +1,387 @@
+{unit}
+id: "microphone-recorder-class"
+title: "Microphone Recorder Class"
+unit-type: "javascript-class-definition"
+language: "javascript"
+status: "draft"
+version: "1.0"
+brief: "User interface component for microphone recording with real-time feedback and controls"
+source-ref: "../../src/music/MicrophoneRecorder.js"
+see-also:
+  - "[[audio-engine-class]]" # Implementation dependency (uses AudioEngine for recording)
+  - "[[../core/event-bus-class]]" # Implementation dependency (uses EventBus for communication)
+  - "[[../../Definition/Requirements/multi-modal-audio-input-requirement]]" # Traceability (implements microphone recording UI)
+  - "[[../Concepts/music-editor-module]]" # Parent composition
+
+This class provides a user-friendly interface for recording audio through the microphone, with visual feedback and recording controls.
+
+```javascript
+export class MicrophoneRecorder {
+    constructor(eventBus, audioEngine) {
+        this.eventBus = eventBus;
+        this.audioEngine = audioEngine;
+        
+        // UI state
+        this.isRecording = false;
+        this.recordingDuration = 0;
+        this.recordingTimer = null;
+        this.visualizer = null;
+        this.analyserNode = null;
+        
+        // UI elements (to be set by calling code)
+        this.recordButton = null;
+        this.stopButton = null;
+        this.durationDisplay = null;
+        this.visualizerCanvas = null;
+        this.statusDisplay = null;
+        
+        this.setupEventListeners();
+    }
+    
+    setupEventListeners() {
+        // Listen to audio engine events
+        this.eventBus.on('microphone:available', () => {
+            this.updateUI('ready');
+        });
+        
+        this.eventBus.on('microphone:unavailable', (error) => {
+            this.updateUI('unavailable', error.message);
+        });
+        
+        this.eventBus.on('recording:started', () => {
+            this.onRecordingStarted();
+        });
+        
+        this.eventBus.on('recording:stopped', () => {
+            this.onRecordingStopped();
+        });
+        
+        this.eventBus.on('recording:processed', (recordingData) => {
+            this.onRecordingProcessed(recordingData);
+        });
+        
+        this.eventBus.on('recording:error', (error) => {
+            this.onRecordingError(error);
+        });
+    }
+    
+    /**
+     * Initialize UI elements and bind event handlers
+     */
+    bindToUI(uiElements) {
+        this.recordButton = uiElements.recordButton;
+        this.stopButton = uiElements.stopButton;
+        this.durationDisplay = uiElements.durationDisplay;
+        this.visualizerCanvas = uiElements.visualizerCanvas;
+        this.statusDisplay = uiElements.statusDisplay;
+        
+        // Bind button events
+        if (this.recordButton) {
+            this.recordButton.addEventListener('click', () => this.startRecording());
+        }
+        
+        if (this.stopButton) {
+            this.stopButton.addEventListener('click', () => this.stopRecording());
+        }
+        
+        // Initialize visualizer if canvas is provided
+        if (this.visualizerCanvas) {
+            this.initializeVisualizer();
+        }
+        
+        this.updateUI('ready');
+    }
+    
+    /**
+     * Start recording process
+     */
+    async startRecording() {
+        if (this.isRecording) return;
+        
+        try {
+            this.updateUI('requesting_permission');
+            
+            // Start recording through audio engine
+            await this.audioEngine.startRecording();
+            
+            // Audio engine will emit 'recording:started' event
+        } catch (error) {
+            this.onRecordingError(error);
+        }
+    }
+    
+    /**
+     * Stop recording process
+     */
+    stopRecording() {
+        if (!this.isRecording) return;
+        
+        this.audioEngine.stopRecording();
+        // Audio engine will emit 'recording:stopped' event
+    }
+    
+    /**
+     * Handle recording started event
+     */
+    onRecordingStarted() {
+        this.isRecording = true;
+        this.recordingDuration = 0;
+        
+        // Start duration timer
+        this.recordingTimer = setInterval(() => {
+            this.recordingDuration += 0.1;
+            this.updateDurationDisplay();
+        }, 100);
+        
+        // Set up real-time visualizer
+        this.startVisualizer();
+        
+        this.updateUI('recording');
+    }
+    
+    /**
+     * Handle recording stopped event
+     */
+    onRecordingStopped() {
+        this.isRecording = false;
+        
+        // Stop timer
+        if (this.recordingTimer) {
+            clearInterval(this.recordingTimer);
+            this.recordingTimer = null;
+        }
+        
+        // Stop visualizer
+        this.stopVisualizer();
+        
+        this.updateUI('processing');
+    }
+    
+    /**
+     * Handle recording processed event
+     */
+    onRecordingProcessed(recordingData) {
+        this.updateUI('completed');
+        
+        // Emit event for other components
+        this.eventBus.emit('recorder:recording_ready', {
+            id: recordingData.id,
+            duration: recordingData.duration,
+            name: `Recording ${new Date().toLocaleTimeString()}`
+        });
+        
+        // Auto-reset after a delay
+        setTimeout(() => {
+            if (!this.isRecording) {
+                this.updateUI('ready');
+                this.recordingDuration = 0;
+                this.updateDurationDisplay();
+            }
+        }, 2000);
+    }
+    
+    /**
+     * Handle recording error
+     */
+    onRecordingError(error) {
+        this.isRecording = false;
+        
+        if (this.recordingTimer) {
+            clearInterval(this.recordingTimer);
+            this.recordingTimer = null;
+        }
+        
+        this.stopVisualizer();
+        this.updateUI('error', error.message || error);
+        
+        // Auto-reset after error display
+        setTimeout(() => {
+            this.updateUI('ready');
+        }, 3000);
+    }
+    
+    /**
+     * Update UI based on current state
+     */
+    updateUI(state, message = '') {
+        const states = {
+            ready: {
+                recordEnabled: true,
+                stopEnabled: false,
+                status: 'Ready to record',
+                recordText: '● Record'
+            },
+            requesting_permission: {
+                recordEnabled: false,
+                stopEnabled: false,
+                status: 'Requesting microphone permission...',
+                recordText: '● Record'
+            },
+            recording: {
+                recordEnabled: false,
+                stopEnabled: true,
+                status: 'Recording...',
+                recordText: '● Recording'
+            },
+            processing: {
+                recordEnabled: false,
+                stopEnabled: false,
+                status: 'Processing recording...',
+                recordText: '● Record'
+            },
+            completed: {
+                recordEnabled: true,
+                stopEnabled: false,
+                status: 'Recording completed!',
+                recordText: '● Record'
+            },
+            error: {
+                recordEnabled: true,
+                stopEnabled: false,
+                status: `Error: ${message}`,
+                recordText: '● Record'
+            },
+            unavailable: {
+                recordEnabled: false,
+                stopEnabled: false,
+                status: `Microphone unavailable: ${message}`,
+                recordText: '● Record (Unavailable)'
+            }
+        };
+        
+        const currentState = states[state];
+        if (!currentState) return;
+        
+        // Update button states
+        if (this.recordButton) {
+            this.recordButton.disabled = !currentState.recordEnabled;
+            this.recordButton.textContent = currentState.recordText;
+            this.recordButton.className = `record-button ${state}`;
+        }
+        
+        if (this.stopButton) {
+            this.stopButton.disabled = !currentState.stopEnabled;
+            this.stopButton.className = `stop-button ${state}`;
+        }
+        
+        // Update status display
+        if (this.statusDisplay) {
+            this.statusDisplay.textContent = currentState.status;
+            this.statusDisplay.className = `status ${state}`;
+        }
+    }
+    
+    /**
+     * Update duration display
+     */
+    updateDurationDisplay() {
+        if (this.durationDisplay) {
+            const minutes = Math.floor(this.recordingDuration / 60);
+            const seconds = (this.recordingDuration % 60).toFixed(1);
+            this.durationDisplay.textContent = `${minutes}:${seconds.padStart(4, '0')}`;
+        }
+    }
+    
+    /**
+     * Initialize audio visualizer
+     */
+    initializeVisualizer() {
+        if (!this.visualizerCanvas) return;
+        
+        this.visualizer = {
+            canvas: this.visualizerCanvas,
+            context: this.visualizerCanvas.getContext('2d'),
+            animationFrame: null
+        };
+        
+        // Set canvas size
+        const rect = this.visualizer.canvas.getBoundingClientRect();
+        this.visualizer.canvas.width = rect.width * devicePixelRatio;
+        this.visualizer.canvas.height = rect.height * devicePixelRatio;
+        this.visualizer.context.scale(devicePixelRatio, devicePixelRatio);
+    }
+    
+    /**
+     * Start real-time audio visualization
+     */
+    startVisualizer() {
+        if (!this.visualizer || !this.audioEngine.microphoneStream) return;
+        
+        // Create analyser node for visualization
+        const audioContext = new AudioContext();
+        const source = audioContext.createMediaStreamSource(this.audioEngine.microphoneStream);
+        this.analyserNode = audioContext.createAnalyser();
+        this.analyserNode.fftSize = 256;
+        
+        source.connect(this.analyserNode);
+        
+        const bufferLength = this.analyserNode.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
+        
+        const draw = () => {
+            if (!this.isRecording) return;
+            
+            this.visualizer.animationFrame = requestAnimationFrame(draw);
+            
+            this.analyserNode.getByteFrequencyData(dataArray);
+            
+            const { context, canvas } = this.visualizer;
+            const width = canvas.width / devicePixelRatio;
+            const height = canvas.height / devicePixelRatio;
+            
+            // Clear canvas
+            context.clearRect(0, 0, width, height);
+            
+            // Draw frequency bars
+            const barWidth = width / bufferLength;
+            let x = 0;
+            
+            for (let i = 0; i < bufferLength; i++) {
+                const barHeight = (dataArray[i] / 255) * height;
+                
+                const hue = (i / bufferLength) * 360;
+                context.fillStyle = `hsl(${hue}, 70%, 50%)`;
+                
+                context.fillRect(x, height - barHeight, barWidth, barHeight);
+                x += barWidth;
+            }
+        };
+        
+        draw();
+    }
+    
+    /**
+     * Stop audio visualization
+     */
+    stopVisualizer() {
+        if (this.visualizer && this.visualizer.animationFrame) {
+            cancelAnimationFrame(this.visualizer.animationFrame);
+            this.visualizer.animationFrame = null;
+        }
+        
+        if (this.analyserNode) {
+            this.analyserNode.disconnect();
+            this.analyserNode = null;
+        }
+        
+        // Clear canvas
+        if (this.visualizer && this.visualizer.context) {
+            const { context, canvas } = this.visualizer;
+            context.clearRect(0, 0, canvas.width / devicePixelRatio, canvas.height / devicePixelRatio);
+        }
+    }
+    
+    /**
+     * Cleanup resources
+     */
+    dispose() {
+        this.stopRecording();
+        this.stopVisualizer();
+        
+        if (this.recordingTimer) {
+            clearInterval(this.recordingTimer);
+        }
+    }
+}
+```
+{/unit}

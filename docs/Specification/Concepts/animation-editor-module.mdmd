@@ -1,0 +1,34 @@
+<!-- filepath: docs/Compositions/animation-editor-module.mdmd -->
+::: {composition}
+id: "animation-editor-module"
+title: "Animation Editor Module"
+composition-type: "software-module-definition"
+status: "draft"
+version: "0.2"
+brief: "Module for creating character animations using a keyframe timeline."
+see-also:
+  - "[[sprunki-core-architecture]]"
+  - "[[animation-editor-class]]"
+  - "[[timeline-class]]"
+  - "[[property-editor-class]]"
+  - "[[tween-engine-class]]"
+  - "[[animation-data-schema]]"
+  - "[[../../Definition/Requirements/client-side-architecture-requirement.mdmd]]"
+  - "[[../../Definition/Requirements/undo-redo-requirement.mdmd]]"
+  - "[[../../Definition/Requirements/project-saving-requirement.mdmd]]"
+  - "[[../../Definition/Requirements/project-autosave-requirement.mdmd]]"
+  - "[[../../Definition/Requirements/html5-export-requirement.mdmd]]"
+  - "[[../../Definition/Requirements/unified-timeline-requirement.mdmd]]"
+  - "[[music-editor-module]]" # Cross-domain integration (unified timeline)
+
+The Animation Editor module allows users to create and manage character animations, a key creative capability outlined in `[[core-system-requirements]]`. It operates entirely client-side, adhering to `[[../../Definition/Requirements/client-side-architecture-requirement.mdmd]]`. This module implements the animation portion of `[[../../Definition/Requirements/unified-timeline-requirement.mdmd]]`, enabling users to compose animation sequences that synchronize with music through a shared temporal interface. User actions within this module should support `[[../../Definition/Requirements/undo-redo-requirement.mdmd]]`, and the animation data it produces is subject to `[[../../Definition/Requirements/project-saving-requirement.mdmd]]`, `[[../../Definition/Requirements/project-autosave-requirement.mdmd]]`, and will be included in `[[../../Definition/Requirements/html5-export-requirement.mdmd]]`.
+
+The module is implemented through the main `[[animation-editor-class]]` interface and its supporting components.
+
+Users can:
+
+- **Define Keyframes**: Set character poses and properties on a timeline `[[timeline-class]]`
+- **Edit Properties**: Adjust position, rotation, scale, opacity etc. `[[property-editor-class]]`
+- **Preview Animations**: View animations powered by a custom `[[tween-engine-class]]`
+- **Save/Load Animations**: Persist animation data `[[animation-data-schema]]`
+:::

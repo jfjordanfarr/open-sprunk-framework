@@ -1,0 +1,24 @@
+<!-- filepath: docs/Units/data/project-file-schema.mdmd -->
+::: {unit}
+id: "project-file-schema"
+title: "Project File Schema"
+unit-type: "json-schema-definition"
+language: "json"
+status: "draft"
+version: "0.2"
+brief: "Defines the structure of the project file."
+source-ref: "../../src/data/ProjectFileSchema.js"
+see-also:
+  - "[[character-data-schema]]" # Implementation dependency (includes character data structure)
+  - "[[../music/music-data-schema.mdmd]]" # Implementation dependency (includes music data structure)
+  - "[[../animation/animation-data-schema.mdmd]]" # Implementation dependency (includes animation data structure)
+  - "[[project-saving-requirement]]" # Traceability (defines structure for save requirement)
+  - "[[html5-export-requirement]]" # Traceability (defines exportable data structure)
+  - "[[../Concepts/data-manager-module.mdmd]]" # Parent composition
+
+Defines the complete structure and validation rules for project files, incorporating all module-specific data schemas.
+
+```json
+// Project file schema placeholder
+```
+:::

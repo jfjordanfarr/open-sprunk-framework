@@ -1,9 +1,0 @@
-<!-- filepath: docs/Units/animation/tween-engine-class.mdmd -->
-```{unit} Tween Engine Class
-id: tween-engine-class
-source-ref: ../../src/animation/TweenEngine.js
-source-type: javascript-class
-spec-version: 0.1.0
----
-Handles interpolation and easing for animations.
-```

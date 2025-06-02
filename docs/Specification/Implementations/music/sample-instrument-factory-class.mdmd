@@ -1,0 +1,330 @@
+{unit}
+id: "sample-instrument-factory-class"
+title: "Sample Instrument Factory Class"
+unit-type: "javascript-class-definition"
+language: "javascript"
+status: "draft"
+version: "1.0"
+brief: "Factory for creating different types of playable instruments from uploaded audio samples"
+source-ref: "../../src/music/SampleInstrumentFactory.js"
+see-also:
+  - "[[audio-engine-class]]" # Implementation dependency (creates instruments for AudioEngine)
+  - "[[microphone-recorder-class]]" # Implementation dependency (processes recorded audio)
+  - "[[../../Definition/Requirements/multi-modal-audio-input-requirement]]" # Traceability (implements sample-to-instrument conversion)
+  - "[[../Concepts/music-editor-module]]" # Parent composition
+
+This class analyzes uploaded audio samples and creates appropriate Tone.js instruments based on the content and user preferences.
+
+```javascript
+export class SampleInstrumentFactory {
+    constructor(eventBus) {
+        this.eventBus = eventBus;
+        this.audioContext = null;
+    }
+    
+    async init() {
+        this.audioContext = Tone.getContext().rawContext;
+    }
+    
+    /**
+     * CORE FUNCTION: Convert audio sample into playable instrument
+     * This is where the magic happens - different strategies for different content types
+     */
+    async createInstrument(sampleId, audioBuffer, options = {}) {
+        // Step 1: Analyze the audio content
+        const analysis = await this.analyzeSample(audioBuffer);
+        
+        // Step 2: Determine best instrument mode based on content and user preference
+        const instrumentMode = options.mode || this.suggestInstrumentMode(analysis);
+        
+        // Step 3: Create the appropriate instrument type
+        switch (instrumentMode) {
+            case 'chromatic':
+                return this.createChromaticInstrument(sampleId, audioBuffer, options);
+            
+            case 'trigger':
+                return this.createTriggerInstrument(sampleId, audioBuffer, options);
+            
+            case 'sliced':
+                return this.createSlicedInstrument(sampleId, audioBuffer, options);
+            
+            case 'granular':
+                return this.createGranularInstrument(sampleId, audioBuffer, options);
+            
+            default:
+                return this.createTriggerInstrument(sampleId, audioBuffer, options);
+        }
+    }
+    
+    /**
+     * CHROMATIC INSTRUMENT: One sample pitched across keyboard
+     * Perfect for: Voice recordings, melodic samples, sound effects
+     */
+    createChromaticInstrument(sampleId, audioBuffer, options = {}) {
+        const toneBuffer = new Tone.ToneAudioBuffer(audioBuffer);
+        
+        // Create a mapping where the sample plays at different pitches
+        const rootNote = options.rootNote || 'C4';
+        const sampleMap = {};
+        sampleMap[rootNote] = toneBuffer;
+        
+        const instrument = new Tone.Sampler(sampleMap, {
+            attack: options.attack || 0,
+            release: options.release || 0.1,
+            curve: options.curve || 'exponential'
+        });
+        
+        // CRITICAL: This is how pitch shifting works
+        // Tone.js automatically pitch-shifts the sample based on the played note
+        // C4 plays original pitch, C5 plays one octave higher, etc.
+        
+        return {
+            type: 'chromatic',
+            instrument: instrument,
+            sampleId: sampleId,
+            rootNote: rootNote,
+            playNote: (note, time, duration, velocity) => {
+                instrument.triggerAttackRelease(note, duration, time, velocity);
+            },
+            metadata: {
+                originalDuration: audioBuffer.duration,
+                canPitchShift: true,
+                preservesTimbre: false // pitch shifting changes timbre
+            }
+        };
+    }
+    
+    /**
+     * TRIGGER INSTRUMENT: Sample plays as-is, any key triggers it
+     * Perfect for: Drum sounds, vocal phrases, sound effects
+     */
+    createTriggerInstrument(sampleId, audioBuffer, options = {}) {
+        const toneBuffer = new Tone.ToneAudioBuffer(audioBuffer);
+        
+        const player = new Tone.Player(toneBuffer).toDestination();
+        player.loop = options.loop || false;
+        
+        return {
+            type: 'trigger',
+            instrument: player,
+            sampleId: sampleId,
+            playNote: (note, time, duration, velocity) => {
+                // Ignore pitch - always play at original pitch
+                player.start(time, 0, duration);
+                
+                // Optional: Use velocity to control volume
+                const gainNode = new Tone.Gain(velocity || 0.8);
+                player.connect(gainNode);
+                gainNode.toDestination();
+            },
+            metadata: {
+                originalDuration: audioBuffer.duration,
+                canPitchShift: false,
+                preservesTimbre: true // original sound preserved
+            }
+        };
+    }
+    
+    /**
+     * SLICED INSTRUMENT: Automatically slice sample into playable parts
+     * Perfect for: Drum loops, rhythmic samples, spoken phrases
+     */
+    async createSlicedInstrument(sampleId, audioBuffer, options = {}) {
+        // Step 1: Detect beats or transients in the audio
+        const slices = await this.detectSlices(audioBuffer, options);
+        
+        // Step 2: Create a sampler with each slice mapped to different keys
+        const sampleMap = {};
+        const sliceInstruments = [];
+        
+        for (let i = 0; i < slices.length; i++) {
+            const slice = slices[i];
+            const sliceBuffer = this.extractSlice(audioBuffer, slice.start, slice.end);
+            const toneBuffer = new Tone.ToneAudioBuffer(sliceBuffer);
+            
+            // Map each slice to a different MIDI note
+            const noteNumber = 36 + i; // Start from C2 (MIDI 36)
+            const noteName = Tone.Frequency(noteNumber, "midi").toNote();
+            sampleMap[noteName] = toneBuffer;
+            
+            sliceInstruments.push({
+                note: noteName,
+                slice: slice,
+                buffer: toneBuffer
+            });
+        }
+        
+        const instrument = new Tone.Sampler(sampleMap);
+        
+        return {
+            type: 'sliced',
+            instrument: instrument,
+            sampleId: sampleId,
+            slices: sliceInstruments,
+            playNote: (note, time, duration, velocity) => {
+                instrument.triggerAttackRelease(note, duration, time, velocity);
+            },
+            metadata: {
+                originalDuration: audioBuffer.duration,
+                sliceCount: slices.length,
+                canPitchShift: true, // each slice can be pitched
+                preservesTimbre: false
+            }
+        };
+    }
+    
+    /**
+     * GRANULAR INSTRUMENT: Advanced real-time manipulation
+     * Perfect for: Ambient textures, evolving sounds, experimental music
+     */
+    createGranularInstrument(sampleId, audioBuffer, options = {}) {
+        // This is more advanced - using Tone.js GrainPlayer
+        const grainPlayer = new Tone.GrainPlayer({
+            url: new Tone.ToneAudioBuffer(audioBuffer),
+            grainSize: options.grainSize || 0.1,
+            overlap: options.overlap || 0.1,
+            drift: options.drift || 0,
+            playbackRate: 1
+        });
+        
+        return {
+            type: 'granular',
+            instrument: grainPlayer,
+            sampleId: sampleId,
+            playNote: (note, time, duration, velocity) => {
+                // Use note to control playback rate (pitch)
+                const pitchRatio = Tone.Frequency(note).toFrequency() / Tone.Frequency('C4').toFrequency();
+                grainPlayer.playbackRate = pitchRatio;
+                grainPlayer.start(time, 0, duration);
+            },
+            metadata: {
+                originalDuration: audioBuffer.duration,
+                canPitchShift: true,
+                preservesTimbre: true, // granular synthesis preserves character better
+                isRealTime: true
+            }
+        };
+    }
+    
+    /**
+     * AUDIO ANALYSIS: Determine what type of content we're dealing with
+     */
+    async analyzeSample(audioBuffer) {
+        const analysis = {
+            duration: audioBuffer.duration,
+            channels: audioBuffer.numberOfChannels,
+            sampleRate: audioBuffer.sampleRate,
+            hasPercussiveContent: false,
+            hasTonalContent: false,
+            hasVocalContent: false,
+            recommendedMode: 'trigger'
+        };
+        
+        // Simple analysis based on duration and content
+        if (audioBuffer.duration < 2.0) {
+            // Short samples are probably one-shots
+            analysis.recommendedMode = 'trigger';
+        } else if (audioBuffer.duration > 10.0) {
+            // Long samples might benefit from slicing
+            analysis.recommendedMode = 'sliced';
+        } else {
+            // Medium samples could work as chromatic instruments
+            analysis.recommendedMode = 'chromatic';
+        }
+        
+        // TODO: More sophisticated analysis:
+        // - FFT analysis for tonal vs noise content
+        // - Onset detection for rhythmic content
+        // - Spectral analysis for vocal content
+        
+        return analysis;
+    }
+    
+    /**
+     * SUGGEST INSTRUMENT MODE: AI-like decision making
+     */
+    suggestInstrumentMode(analysis) {
+        // Simple heuristics - could be made much more sophisticated
+        if (analysis.duration < 1.0) {
+            return 'trigger'; // Short sounds work best as triggers
+        }
+        
+        if (analysis.duration > 8.0) {
+            return 'sliced'; // Long sounds benefit from slicing
+        }
+        
+        return 'chromatic'; // Default for medium-length sounds
+    }
+    
+    /**
+     * SLICE DETECTION: Find natural break points in audio
+     */
+    async detectSlices(audioBuffer, options = {}) {
+        const channelData = audioBuffer.getChannelData(0); // Use first channel
+        const sampleRate = audioBuffer.sampleRate;
+        const minSliceLength = (options.minSliceLength || 0.1) * sampleRate; // Minimum 100ms
+        
+        const slices = [];
+        const threshold = options.threshold || 0.1; // Amplitude threshold
+        
+        let currentSliceStart = 0;
+        let silenceLength = 0;
+        const silenceThreshold = 0.05 * sampleRate; // 50ms of silence
+        
+        for (let i = 0; i < channelData.length; i++) {
+            const sample = Math.abs(channelData[i]);
+            
+            if (sample < threshold) {
+                silenceLength++;
+            } else {
+                if (silenceLength > silenceThreshold && i - currentSliceStart > minSliceLength) {
+                    // Found a slice boundary
+                    slices.push({
+                        start: currentSliceStart / sampleRate,
+                        end: (i - silenceLength) / sampleRate
+                    });
+                    currentSliceStart = i;
+                }
+                silenceLength = 0;
+            }
+        }
+        
+        // Add final slice
+        if (currentSliceStart < channelData.length - minSliceLength) {
+            slices.push({
+                start: currentSliceStart / sampleRate,
+                end: audioBuffer.duration
+            });
+        }
+        
+        return slices;
+    }
+    
+    /**
+     * EXTRACT SLICE: Create new buffer from slice of original
+     */
+    extractSlice(audioBuffer, startTime, endTime) {
+        const startSample = Math.floor(startTime * audioBuffer.sampleRate);
+        const endSample = Math.floor(endTime * audioBuffer.sampleRate);
+        const sliceLength = endSample - startSample;
+        
+        const sliceBuffer = this.audioContext.createBuffer(
+            audioBuffer.numberOfChannels,
+            sliceLength,
+            audioBuffer.sampleRate
+        );
+        
+        for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
+            const originalData = audioBuffer.getChannelData(channel);
+            const sliceData = sliceBuffer.getChannelData(channel);
+            
+            for (let i = 0; i < sliceLength; i++) {
+                sliceData[i] = originalData[startSample + i];
+            }
+        }
+        
+        return sliceBuffer;
+    }
+}
+```
+{/unit}

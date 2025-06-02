@@ -1,0 +1,561 @@
+```{unit}
+id: "phase-aware-character-editor-class"
+title: "Phase-Aware Character Editor Class"
+unit-type: "javascript-class-definition"
+source-ref: "../../src/character/PhaseAwareCharacterEditor.js"
+status: "draft"
+see-also:
+  - "[[character-editor-class]]"
+  - "[[enhanced-character-schema]]"
+  - "[[phase-manager-class]]"
+  - "[[drawing-canvas-class]]"
+  - "[[phase-system-architecture]]"
+```
+
+## Overview
+
+The **Phase-Aware Character Editor** extends the base Character Editor with comprehensive phase management capabilities, enabling users to create and manage multiple appearance variations for each character. This editor provides intuitive workflows for appearance-first, music-first, and animation-first phase creation.
+
+## Core Features
+
+### Phase Management Interface
+- **Phase List Panel**: Visual list of all character phases with thumbnails and quick access
+- **Phase Creation Workflow**: Guided process for creating new phases with different starting approaches
+- **Phase Duplication**: Clone existing phases as starting points for variations
+- **Phase Organization**: Drag-and-drop reordering and categorization of phases
+
+### Multi-Modal Phase Authoring
+- **Appearance-First Workflow**: Start with visual design, then add music and animation
+- **Music-First Integration**: Import music and create matching visual appearance
+- **Animation-First Coordination**: Design appearance to complement existing animations
+- **Template-Based Creation**: Use predefined phase templates for rapid content creation
+
+### Phase-Aware Drawing Tools
+- **Contextual Drawing**: All drawing operations automatically apply to current active phase
+- **Cross-Phase Comparison**: Side-by-side view of multiple phases for consistency checking
+- **Shared Element Management**: Manage elements common across all phases vs. phase-specific elements
+- **Appearance Variation Tools**: Specialized tools for creating appearance variations
+
+## Technical Implementation
+
+```javascript
+class PhaseAwareCharacterEditor {
+    constructor(containerElement, eventBus, phaseManager) {
+        this.container = containerElement;
+        this.eventBus = eventBus;
+        this.phaseManager = phaseManager;
+        
+        // Base character editor functionality
+        this.baseEditor = null;
+        this.drawingCanvas = null;
+        this.textureManager = null;
+        
+        // Phase-specific state
+        this.characterId = null;
+        this.currentPhaseId = null;
+        this.phases = new Map(); // All phases for current character
+        this.phaseHistory = []; // Undo/redo for phase operations
+        
+        // UI elements
+        this.phaseListPanel = null;
+        this.phaseCreationModal = null;
+        this.phaseToolbar = null;
+        this.appearanceVariationTools = null;
+        
+        // Workflows and templates
+        this.phaseTemplates = new Map();
+        this.activeWorkflow = null; // "appearance-first" | "music-first" | "animation-first"
+        
+        this.setupUI();
+        this.setupEventHandlers();
+    }
+    
+    async init() {
+        // Initialize base character editor
+        await this.initializeBaseEditor();
+        
+        // Initialize phase-specific components
+        await this.initializePhaseComponents();
+        
+        // Load phase templates
+        await this.loadPhaseTemplates();
+        
+        console.log('PhaseAwareCharacterEditor initialized');
+    }
+    
+    // Core Phase Management Methods
+    async loadCharacter(characterId) {
+        this.characterId = characterId;
+        
+        // Load character data with all phases
+        const characterData = await this.phaseManager.getCharacterPhases(characterId);
+        this.phases.clear();
+        
+        // Populate phases map
+        for (const phase of characterData.phases) {
+            this.phases.set(phase.id, phase);
+        }
+        
+        // Set initial active phase (or create default if none exist)
+        if (this.phases.size === 0) {
+            await this.createDefaultPhase();
+        } else {
+            this.setActivePhase(characterData.defaultPhase || this.phases.keys().next().value);
+        }
+        
+        this.updatePhaseListUI();
+        this.eventBus.emit('character-loaded', { characterId, phaseCount: this.phases.size });
+    }
+    
+    async createDefaultPhase() {
+        const defaultPhase = {
+            id: `${this.characterId}-default`,
+            name: "Default",
+            appearance: {
+                // Default appearance data
+                bodyParts: this.getDefaultBodyParts(),
+                textures: {},
+                colors: this.getDefaultColors()
+            },
+            metadata: {
+                created: new Date().toISOString(),
+                workflow: "appearance-first",
+                isDefault: true
+            }
+        };
+        
+        await this.phaseManager.createPhase(this.characterId, defaultPhase);
+        this.phases.set(defaultPhase.id, defaultPhase);
+        this.setActivePhase(defaultPhase.id);
+    }
+    
+    setActivePhase(phaseId) {
+        if (!this.phases.has(phaseId)) {
+            console.error(`Phase ${phaseId} not found`);
+            return;
+        }
+        
+        // Save current phase state before switching
+        if (this.currentPhaseId) {
+            this.saveCurrentPhaseState();
+        }
+        
+        this.currentPhaseId = phaseId;
+        const phase = this.phases.get(phaseId);
+        
+        // Load phase appearance into drawing canvas
+        this.loadPhaseAppearance(phase);
+        
+        // Update UI to reflect active phase
+        this.updateActivePhaseUI();
+        
+        this.eventBus.emit('phase-activated', { 
+            characterId: this.characterId, 
+            phaseId: phaseId,
+            phaseName: phase.name 
+        });
+    }
+    
+    // Phase Creation Workflows
+    async createNewPhase(workflow = "appearance-first", options = {}) {
+        const phaseId = `${this.characterId}-phase-${Date.now()}`;
+        
+        let newPhase;
+        switch (workflow) {
+            case "appearance-first":
+                newPhase = await this.createAppearanceFirstPhase(phaseId, options);
+                break;
+            case "music-first":
+                newPhase = await this.createMusicFirstPhase(phaseId, options);
+                break;
+            case "animation-first":
+                newPhase = await this.createAnimationFirstPhase(phaseId, options);
+                break;
+            case "template":
+                newPhase = await this.createFromTemplate(phaseId, options.templateId);
+                break;
+            default:
+                newPhase = await this.createAppearanceFirstPhase(phaseId, options);
+        }
+        
+        await this.phaseManager.createPhase(this.characterId, newPhase);
+        this.phases.set(phaseId, newPhase);
+        this.setActivePhase(phaseId);
+        
+        this.updatePhaseListUI();
+        return phaseId;
+    }
+    
+    async createAppearanceFirstPhase(phaseId, options) {
+        const sourcePhase = options.sourcePhaseId ? this.phases.get(options.sourcePhaseId) : null;
+        
+        return {
+            id: phaseId,
+            name: options.name || "New Phase",
+            appearance: sourcePhase ? this.duplicateAppearance(sourcePhase.appearance) : this.getDefaultAppearance(),
+            music: {
+                // Placeholder for music to be added later
+                loop: null,
+                bpm: 120,
+                timeSignature: { numerator: 4, denominator: 4 }
+            },
+            animation: {
+                // Placeholder for animation to be added later
+                primary: null,
+                variations: [],
+                transitions: {}
+            },
+            metadata: {
+                created: new Date().toISOString(),
+                workflow: "appearance-first",
+                sourcePhase: sourcePhase?.id || null
+            }
+        };
+    }
+    
+    async createMusicFirstPhase(phaseId, options) {
+        return {
+            id: phaseId,
+            name: options.name || "Music-Based Phase",
+            appearance: this.generateAppearanceFromMusic(options.musicData),
+            music: options.musicData,
+            animation: {
+                // Generate basic animation matching music tempo
+                primary: this.generateBasicAnimationFromMusic(options.musicData)
+            },
+            metadata: {
+                created: new Date().toISOString(),
+                workflow: "music-first",
+                musicSource: options.musicSource
+            }
+        };
+    }
+    
+    async createAnimationFirstPhase(phaseId, options) {
+        return {
+            id: phaseId,
+            name: options.name || "Animation-Based Phase",
+            appearance: this.generateAppearanceFromAnimation(options.animationData),
+            music: {
+                // Generate placeholder music matching animation timing
+                loop: null,
+                bpm: this.extractBPMFromAnimation(options.animationData),
+                timeSignature: { numerator: 4, denominator: 4 }
+            },
+            animation: options.animationData,
+            metadata: {
+                created: new Date().toISOString(),
+                workflow: "animation-first",
+                animationSource: options.animationSource
+            }
+        };
+    }
+    
+    // Phase Editing Operations
+    async duplicatePhase(sourcePhaseId, name = null) {
+        const sourcePhase = this.phases.get(sourcePhaseId);
+        if (!sourcePhase) return null;
+        
+        const newPhaseId = `${this.characterId}-phase-${Date.now()}`;
+        const duplicatedPhase = {
+            id: newPhaseId,
+            name: name || `${sourcePhase.name} Copy`,
+            appearance: this.duplicateAppearance(sourcePhase.appearance),
+            music: { ...sourcePhase.music },
+            animation: this.duplicateAnimation(sourcePhase.animation),
+            metadata: {
+                created: new Date().toISOString(),
+                workflow: sourcePhase.metadata.workflow,
+                sourcePhase: sourcePhaseId,
+                duplicatedFrom: sourcePhaseId
+            }
+        };
+        
+        await this.phaseManager.createPhase(this.characterId, duplicatedPhase);
+        this.phases.set(newPhaseId, duplicatedPhase);
+        this.updatePhaseListUI();
+        
+        return newPhaseId;
+    }
+    
+    async deletePhase(phaseId) {
+        if (this.phases.size <= 1) {
+            console.warn("Cannot delete the last phase");
+            return false;
+        }
+        
+        // Check for dependencies
+        const dependencies = await this.phaseManager.checkPhaseDependencies(this.characterId, phaseId);
+        if (dependencies.length > 0) {
+            const confirmed = await this.showDependencyWarning(dependencies);
+            if (!confirmed) return false;
+        }
+        
+        // Remove phase
+        await this.phaseManager.deletePhase(this.characterId, phaseId);
+        this.phases.delete(phaseId);
+        
+        // Switch to another phase if this was active
+        if (this.currentPhaseId === phaseId) {
+            const firstPhaseId = this.phases.keys().next().value;
+            this.setActivePhase(firstPhaseId);
+        }
+        
+        this.updatePhaseListUI();
+        return true;
+    }
+    
+    async renamePhase(phaseId, newName) {
+        const phase = this.phases.get(phaseId);
+        if (!phase) return false;
+        
+        phase.name = newName;
+        await this.phaseManager.updatePhase(this.characterId, phase);
+        this.updatePhaseListUI();
+        
+        return true;
+    }
+    
+    // Appearance Variation Tools
+    createAppearanceVariation(basePhaseId, variationType) {
+        const basePhase = this.phases.get(basePhaseId);
+        if (!basePhase) return;
+        
+        const variationData = this.generateAppearanceVariation(basePhase.appearance, variationType);
+        return this.createNewPhase("appearance-first", {
+            name: `${basePhase.name} - ${variationType}`,
+            sourcePhaseId: basePhaseId,
+            appearanceData: variationData
+        });
+    }
+    
+    generateAppearanceVariation(baseAppearance, variationType) {
+        switch (variationType) {
+            case "color-shift":
+                return this.generateColorVariation(baseAppearance);
+            case "outfit-change":
+                return this.generateOutfitVariation(baseAppearance);
+            case "expression-change":
+                return this.generateExpressionVariation(baseAppearance);
+            case "accessory-add":
+                return this.generateAccessoryVariation(baseAppearance);
+            default:
+                return { ...baseAppearance };
+        }
+    }
+    
+    // Cross-Phase Editing Tools
+    applyCrossPhaseEdit(editType, editData, targetPhaseIds = null) {
+        const targetPhases = targetPhaseIds || Array.from(this.phases.keys());
+        
+        for (const phaseId of targetPhases) {
+            const phase = this.phases.get(phaseId);
+            if (!phase) continue;
+            
+            switch (editType) {
+                case "color-change":
+                    this.applyColorChange(phase.appearance, editData);
+                    break;
+                case "body-part-adjust":
+                    this.applyBodyPartAdjustment(phase.appearance, editData);
+                    break;
+                case "texture-update":
+                    this.applyTextureUpdate(phase.appearance, editData);
+                    break;
+            }
+        }
+        
+        // Save all modified phases
+        this.saveAllPhases();
+        this.updatePhaseListUI();
+    }
+    
+    // Phase Comparison Tools
+    showPhaseComparison(phaseIds) {
+        const comparisonData = phaseIds.map(id => ({
+            phase: this.phases.get(id),
+            thumbnail: this.generatePhaseThumbnail(id)
+        }));
+        
+        this.displayComparisonView(comparisonData);
+    }
+    
+    generatePhaseThumbnail(phaseId) {
+        const phase = this.phases.get(phaseId);
+        if (!phase) return null;
+        
+        // Generate thumbnail from appearance data
+        return this.drawingCanvas.generateThumbnail(phase.appearance);
+    }
+    
+    // UI Management Methods
+    setupUI() {
+        this.createPhaseListPanel();
+        this.createPhaseToolbar();
+        this.createPhaseCreationModal();
+        this.createAppearanceVariationTools();
+        this.createCrossPhaseEditingTools();
+    }
+    
+    createPhaseListPanel() {
+        // Create phase list UI with thumbnails, names, and controls
+        this.phaseListPanel = document.createElement('div');
+        this.phaseListPanel.className = 'phase-list-panel';
+        this.phaseListPanel.innerHTML = `
+            <div class="phase-list-header">
+                <h3>Character Phases</h3>
+                <button class="create-phase-btn">+ New Phase</button>
+            </div>
+            <div class="phase-list-container">
+                <!-- Phase items will be populated here -->
+            </div>
+        `;
+        
+        this.container.appendChild(this.phaseListPanel);
+    }
+    
+    updatePhaseListUI() {
+        const container = this.phaseListPanel.querySelector('.phase-list-container');
+        container.innerHTML = '';
+        
+        for (const [phaseId, phase] of this.phases) {
+            const phaseItem = this.createPhaseListItem(phaseId, phase);
+            container.appendChild(phaseItem);
+        }
+    }
+    
+    createPhaseListItem(phaseId, phase) {
+        const item = document.createElement('div');
+        item.className = `phase-list-item ${phaseId === this.currentPhaseId ? 'active' : ''}`;
+        item.dataset.phaseId = phaseId;
+        
+        item.innerHTML = `
+            <div class="phase-thumbnail">
+                <img src="${this.generatePhaseThumbnail(phaseId)}" alt="${phase.name}">
+            </div>
+            <div class="phase-info">
+                <div class="phase-name">${phase.name}</div>
+                <div class="phase-workflow">${phase.metadata.workflow}</div>
+            </div>
+            <div class="phase-controls">
+                <button class="duplicate-phase-btn">📋</button>
+                <button class="delete-phase-btn">🗑️</button>
+            </div>
+        `;
+        
+        return item;
+    }
+    
+    // Event Handling
+    setupEventHandlers() {
+        // Phase list interactions
+        this.phaseListPanel.addEventListener('click', (e) => {
+            if (e.target.closest('.phase-list-item')) {
+                const phaseId = e.target.closest('.phase-list-item').dataset.phaseId;
+                this.setActivePhase(phaseId);
+            }
+        });
+        
+        // Drawing canvas changes
+        this.eventBus.on('canvas-changed', () => {
+            this.saveCurrentPhaseState();
+        });
+        
+        // Phase Manager events
+        this.eventBus.on('phase-created', (data) => {
+            if (data.characterId === this.characterId) {
+                this.phases.set(data.phaseId, data.phase);
+                this.updatePhaseListUI();
+            }
+        });
+    }
+    
+    // Utility Methods
+    saveCurrentPhaseState() {
+        if (!this.currentPhaseId || !this.drawingCanvas) return;
+        
+        const phase = this.phases.get(this.currentPhaseId);
+        if (!phase) return;
+        
+        // Capture current appearance state from drawing canvas
+        phase.appearance = this.drawingCanvas.getAppearanceData();
+        this.phaseManager.updatePhase(this.characterId, phase);
+    }
+    
+    async saveAllPhases() {
+        for (const [phaseId, phase] of this.phases) {
+            await this.phaseManager.updatePhase(this.characterId, phase);
+        }
+    }
+    
+    loadPhaseAppearance(phase) {
+        if (!this.drawingCanvas || !phase.appearance) return;
+        
+        this.drawingCanvas.loadAppearanceData(phase.appearance);
+    }
+    
+    // Template Management
+    async loadPhaseTemplates() {
+        const templates = await this.phaseManager.getPhaseTemplates();
+        this.phaseTemplates.clear();
+        
+        for (const template of templates) {
+            this.phaseTemplates.set(template.id, template);
+        }
+    }
+    
+    async createFromTemplate(phaseId, templateId) {
+        const template = this.phaseTemplates.get(templateId);
+        if (!template) throw new Error(`Template ${templateId} not found`);
+        
+        return {
+            id: phaseId,
+            name: `${template.name} Phase`,
+            appearance: { ...template.appearance },
+            music: { ...template.music },
+            animation: { ...template.animation },
+            metadata: {
+                created: new Date().toISOString(),
+                workflow: "template",
+                templateId: templateId
+            }
+        };
+    }
+}
+```
+
+## Integration Points
+
+### Phase Manager Integration
+- **Phase Lifecycle**: Uses Phase Manager for create, read, update, delete operations
+- **Cross-Character Coordination**: Coordinates with Phase Manager for multi-character scenarios
+- **Template Management**: Leverages Phase Manager's template system
+
+### Drawing Canvas Integration
+- **Appearance Data**: Bidirectional sync between canvas and phase appearance data
+- **Real-time Updates**: Automatic saving of appearance changes to active phase
+- **Thumbnail Generation**: Uses canvas rendering for phase list thumbnails
+
+### Event Bus Communication
+- **Phase Activation**: Broadcasts phase changes for coordination with other editors
+- **Canvas Changes**: Responds to drawing canvas modifications
+- **Cross-Editor Sync**: Coordinates with Animation and Music editors for phase alignment
+
+## User Experience Features
+
+### Intuitive Phase Creation
+- **Workflow Selection**: Choose creation approach based on starting point (appearance, music, animation)
+- **Template Library**: Predefined phase templates for rapid content creation
+- **Guided Process**: Step-by-step creation with contextual help
+
+### Visual Phase Management
+- **Thumbnail Previews**: Visual thumbnails of each phase in the phase list
+- **Active Phase Indication**: Clear visual indication of currently edited phase
+- **Drag-and-Drop Organization**: Reorder phases with intuitive drag-and-drop
+
+### Advanced Editing Tools
+- **Cross-Phase Editing**: Apply changes across multiple phases simultaneously
+- **Variation Generation**: Automated creation of appearance variations
+- **Comparison View**: Side-by-side comparison of multiple phases
+
+This enhanced Character Editor provides comprehensive phase management while maintaining an intuitive, creative workflow for users designing multi-modal character experiences.

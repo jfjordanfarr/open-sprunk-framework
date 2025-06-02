@@ -1,0 +1,42 @@
+<!-- filepath: docs/Definition/Requirements/CoreSystemRequirements.mdmd -->
+::: {composition}
+id: "core-system-requirements"
+title: "Core System Requirements"
+composition-type: "feature-requirements-group"
+brief: "Defines the core, non-negotiable system-level requirements for the Open Sprunk Framework."
+status: "draft"
+owner: "ProjectLead"
+see-also:
+  - "[[../Definition/Vision/Idea.md#core-tenets]]"
+  - "[[../Definition/Vision/Idea.md#layer-1-user-experience--functional-requirements-the-what]]"
+  - "[[../Definition/Vision/OriginatingPrompt.md]]"
+  - "[[client-side-architecture-requirement]]"
+  - "[[project-saving-requirement]]"
+  - "[[project-autosave-requirement]]"
+  - "[[html5-export-requirement]]"
+  - "[[undo-redo-requirement]]"
+  - "[[unified-timeline-requirement]]"
+  - "[[../../Specification/Concepts/sprunki-game-project.mdmd]]"
+  - "[[../../Specification/Concepts/sprunki-core-architecture.mdmd]]"
+
+This document outlines the fundamental requirements that the Open Sprunk Framework must meet. These are derived from the project's foundational ideas in `[[../Definition/Vision/Idea.md]]` and the `[[../Definition/Vision/OriginatingPrompt.md]]`. The overall fulfillment of these requirements is envisioned in the `[[../../Specification/Concepts/sprunki-game-project.mdmd]]` and supported by the `[[../../Specification/Concepts/sprunki-core-architecture.mdmd]]`.
+
+## Key Requirements
+
+The system **MUST** adhere to the following:
+
+1.  **Client-Side Operation:** The core application logic **MUST** run entirely in the user's web browser. (see `[[client-side-architecture-requirement]]`)
+    *   *Rationale:* Ensures accessibility, reduces server load, and aligns with modern web application trends. Derived from `[[../Definition/Vision/Idea.md#core-tenets]]`.
+2.  **Project Saving & Loading:** Users **MUST** be able to save their creative projects and load them back into the application. (see `[[project-saving-requirement]]`)
+    *   *Rationale:* Essential for any creative tool.
+3.  **Autosave Functionality:** The system **SHOULD** implement an autosave feature to prevent data loss. (see `[[project-autosave-requirement]]`)
+    *   *Rationale:* Enhances user experience and data integrity.
+4.  **HTML5 Export:** Users **MUST** be able to export their projects as runnable HTML5 applications/experiences. (see `[[html5-export-requirement]]`)
+    *   *Rationale:* Key deliverable and distribution format. This is a primary goal mentioned in `[[../Definition/Vision/OriginatingPrompt.md]]`.
+5.  **Undo/Redo Functionality:** The system **MUST** provide robust undo and redo capabilities for most user actions. (see `[[undo-redo-requirement]]`)
+    *   *Rationale:* Standard feature for creative applications, allowing for error correction and experimentation.
+6.  **Unified Timeline Experience:** The system **MUST** provide a unified temporal interface where music and animation editing share the same timeline, enabling users to compose loops of synchronized content. (see `[[unified-timeline-requirement]]`)
+    *   *Rationale:* Core to the Sprunki experience where users "deal in time" as a unified creative medium, composing moments that combine sound and motion rather than managing separate timing systems.
+
+These requirements are foundational and will be elaborated upon in their respective detailed requirement documents and further refined in architectural and unit specifications.
+:::

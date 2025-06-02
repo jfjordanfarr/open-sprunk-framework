@@ -1,9 +1,0 @@
-<!-- filepath: docs/Units/utils/file-utils.mdmd -->
-```{unit} File Utils
-id: file-utils
-source-ref: ../../src/utils/FileUtils.js
-source-type: javascript-module
-spec-version: 0.1.0
----
-Provides utility functions for file operations, such as reading and writing data.
-```

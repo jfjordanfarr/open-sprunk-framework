@@ -1,0 +1,112 @@
+<!-- filepath: docs/Units/character/character-editor-class.mdmd -->
+::: {unit}
+id: "character-editor-class"
+title: "Character Editor Class"
+unit-type: "javascript-class-definition"
+language: "javascript"
+status: "draft"
+version: "0.2"
+brief: "Main class for the Character Editor module, handling UI and logic."
+source-ref: "../../src/character/CharacterEditor.js"
+see-also:
+  - "[[drawing-canvas-class]]" # Implementation dependency (uses DrawingCanvas)
+  - "[[texture-manager-class]]" # Implementation dependency (uses TextureManager)
+  - "[[character-data-schema]]" # Implementation dependency (works with character data structure)
+  - "[[../core/event-bus-class.mdmd]]" # Implementation dependency (uses EventBus for communication)
+  - "[[../Concepts/character-editor-module.mdmd]]" # Parent composition
+
+The CharacterEditor class manages the character creation interface, including the drawing canvas and control panels.
+
+```javascript
+import { DrawingCanvas } from './DrawingCanvas.js';
+import { TextureManager } from './TextureManager.js';
+// import { CharacterData } from './CharacterData.js'; // Schema/model, not a class to instantiate directly here
+
+export class CharacterEditor {
+    constructor(containerElement, eventBus) {
+        this.container = containerElement;
+        this.eventBus = eventBus;
+        this.drawingCanvas = null;
+        this.textureManager = null;
+        this.characterData = {}; // Holds the current character being edited
+
+        this._setupUI();
+    }
+
+    async init() {
+        this.textureManager = new TextureManager(this.eventBus);
+        await this.textureManager.init();
+
+        const canvasContainer = this.container.querySelector('#character-canvas-container');
+        this.drawingCanvas = new DrawingCanvas(canvasContainer, this.eventBus);
+        await this.drawingCanvas.init();
+
+        this._setupEventHandlers();
+        console.log('CharacterEditor initialized');
+    }
+
+    _setupUI() {
+        // Create or find UI elements for controls, layers, etc.
+        // Example: this.container.innerHTML = `... HTML structure ...`;
+        // For now, assumes HTML structure is in html-main-page
+    }
+
+    _setupEventHandlers() {
+        // Listen to events from DrawingCanvas (e.g., shape created, modified)
+        this.eventBus.on('canvas:object:modified', (fabricObject) => {
+            this.updateCharacterDataFromCanvas();
+        });
+
+        // Listen to events from UI controls (e.g., new layer, color change)
+        // document.getElementById('add-shape-button').addEventListener('click', () => { ... });
+
+        // Listen for project load events to populate editor
+        this.eventBus.on('state:project:loaded', (project) => {
+            if (project && project.characterData) {
+                this.loadCharacter(project.characterData);
+            }
+        });
+    }
+
+    loadCharacter(characterData) {
+        this.characterData = JSON.parse(JSON.stringify(characterData)); // Deep copy
+        this.drawingCanvas.loadFromJSON(this.characterData.fabricCanvas, () => {
+            this.drawingCanvas.render();
+        });
+        // Update UI controls based on loaded character data
+        this.eventBus.emit('character:loaded', this.characterData);
+    }
+
+    updateCharacterDataFromCanvas() {
+        const canvasJSON = this.drawingCanvas.toJSON();
+        this.characterData.fabricCanvas = canvasJSON; // Or a more structured representation
+        // Potentially extract more structured data from canvas objects if needed
+        this.eventBus.emit('data:character:changed', { fabricCanvas: canvasJSON /*, other parts */ });
+    }
+
+    getCurrentCharacterData() {
+        // Ensure it's up-to-date with canvas
+        this.updateCharacterDataFromCanvas(); 
+        return this.characterData;
+    }
+
+    onActivate() {
+        // Called when this editor becomes the active view
+        console.log('CharacterEditor activated');
+        if (this.drawingCanvas) {
+            this.drawingCanvas.resize(); // Ensure canvas is correctly sized
+            this.drawingCanvas.render();
+        }
+    }
+
+    dispose() {
+        // Clean up event listeners, resources
+        if (this.drawingCanvas) {
+            this.drawingCanvas.dispose();
+        }
+        // this.eventBus.off(...);
+        console.log('CharacterEditor disposed');
+    }
+}
+```
+:::

@@ -1,0 +1,661 @@
+```{unit}
+id: "enhanced-character-schema"
+title: "Enhanced Character Schema with Phase Support"
+unit-type: "json-schema-definition"
+source-ref: "../../src/character/EnhancedCharacterData.js"
+status: "draft"
+see-also:
+  - "[[phase-system-architecture]]"
+  - "[[character-data-schema]]"
+  - "[[humanoid-character-schema]]"
+  - "[[phase-manager-class]]"
+```
+
+## Overview
+
+The Enhanced Character Schema extends the base character data structure to support the Phase System. Each character can now have multiple phases, where each phase contains coordinated appearance, music, and animation data.
+
+## Schema Definition
+
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "EnhancedCharacterData",
+  "description": "Phase-aware character data schema for Open Sprunk Framework",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid", 
+      "description": "Unique identifier for the character"
+    },
+    "name": {
+      "type": "string",
+      "description": "User-defined name for the character"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updatedAt": {
+      "type": "string", 
+      "format": "date-time"
+    },
+    "characterType": {
+      "type": "string",
+      "enum": ["humanoid", "abstract", "creature"],
+      "default": "humanoid",
+      "description": "Type of character affecting available features"
+    },
+    "phases": {
+      "type": "object",
+      "description": "Map of phase ID to phase data",
+      "patternProperties": {
+        "^phase-": {
+          "type": "object",
+          "properties": {
+            "phaseId": {
+              "type": "string",
+              "description": "Unique identifier for this phase"
+            },
+            "name": {
+              "type": "string",
+              "description": "Human-readable name for the phase"
+            },
+            "isDefault": {
+              "type": "boolean",
+              "default": false,
+              "description": "Whether this is the default/starting phase"
+            },
+            "appearance": {
+              "type": "object",
+              "description": "Visual appearance data for this phase",
+              "properties": {
+                "fabricCanvas": {
+                  "type": "object",
+                  "description": "Serialized Fabric.js canvas state"
+                },
+                "bodyParts": {
+                  "type": "object",
+                  "description": "Body part specific appearance data",
+                  "properties": {
+                    "head": { "$ref": "#/definitions/bodyPartAppearance" },
+                    "body": { "$ref": "#/definitions/bodyPartAppearance" },
+                    "leftArm": { "$ref": "#/definitions/bodyPartAppearance" },
+                    "rightArm": { "$ref": "#/definitions/bodyPartAppearance" },
+                    "leftLeg": { "$ref": "#/definitions/bodyPartAppearance" },
+                    "rightLeg": { "$ref": "#/definitions/bodyPartAppearance" },
+                    "leftHand": { "$ref": "#/definitions/bodyPartAppearance" },
+                    "rightHand": { "$ref": "#/definitions/bodyPartAppearance" },
+                    "leftFoot": { "$ref": "#/definitions/bodyPartAppearance" },
+                    "rightFoot": { "$ref": "#/definitions/bodyPartAppearance" }
+                  }
+                },
+                "colorTints": {
+                  "type": "object",
+                  "description": "Color modifications for this phase",
+                  "properties": {
+                    "primary": { "type": "string", "format": "color" },
+                    "secondary": { "type": "string", "format": "color" },
+                    "accent": { "type": "string", "format": "color" },
+                    "saturation": { "type": "number", "minimum": 0, "maximum": 2 },
+                    "brightness": { "type": "number", "minimum": 0, "maximum": 2 }
+                  }
+                },
+                "effects": {
+                  "type": "array",
+                  "description": "Visual effects active in this phase",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "effectType": { 
+                        "type": "string",
+                        "enum": ["glow", "sparkle", "trail", "outline", "shadow", "distortion"]
+                      },
+                      "intensity": { "type": "number", "minimum": 0, "maximum": 1 },
+                      "color": { "type": "string", "format": "color" },
+                      "parameters": { "type": "object" }
+                    }
+                  }
+                },
+                "scale": {
+                  "type": "number",
+                  "minimum": 0.1,
+                  "maximum": 3.0,
+                  "default": 1.0,
+                  "description": "Overall scale multiplier for this phase"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0.0,
+                  "maximum": 1.0,
+                  "default": 1.0,
+                  "description": "Overall opacity for this phase"
+                }
+              },
+              "required": ["fabricCanvas"]
+            },
+            "musicLoop": {
+              "type": "object",
+              "description": "Audio content associated with this phase",
+              "properties": {
+                "audioId": {
+                  "type": "string",
+                  "description": "Reference to audio content"
+                },
+                "audioType": {
+                  "type": "string",
+                  "enum": ["synthesized", "sample", "recording", "generated"],
+                  "description": "Type of audio content"
+                },
+                "volume": {
+                  "type": "number",
+                  "minimum": 0.0,
+                  "maximum": 1.0,
+                  "default": 0.8
+                },
+                "loop": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "Whether the audio loops continuously"
+                },
+                "fadeInDuration": {
+                  "type": "number",
+                  "minimum": 0,
+                  "default": 0,
+                  "description": "Fade in duration in milliseconds"
+                },
+                "fadeOutDuration": {
+                  "type": "number", 
+                  "minimum": 0,
+                  "default": 0,
+                  "description": "Fade out duration in milliseconds"
+                },
+                "effects": {
+                  "type": "array",
+                  "description": "Audio effects applied in this phase",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "effectType": {
+                        "type": "string",
+                        "enum": ["reverb", "delay", "distortion", "filter", "chorus", "pitch"]
+                      },
+                      "parameters": { "type": "object" },
+                      "intensity": { "type": "number", "minimum": 0, "maximum": 1 }
+                    }
+                  }
+                },
+                "genre": {
+                  "type": "string",
+                  "description": "Musical genre classification for coordination"
+                },
+                "tempo": {
+                  "type": "number",
+                  "minimum": 60,
+                  "maximum": 200,
+                  "description": "Beats per minute"
+                },
+                "key": {
+                  "type": "string",
+                  "description": "Musical key (e.g., 'C', 'Am', 'F#')"
+                }
+              }
+            },
+            "animations": {
+              "type": "array",
+              "description": "Animation IDs active in this phase",
+              "items": {
+                "type": "string",
+                "description": "Reference to animation definition"
+              }
+            },
+            "instrumentAttachments": {
+              "type": "array",
+              "description": "Instruments attached in this phase",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "instrumentId": { "type": "string" },
+                  "attachmentPoint": { 
+                    "type": "string",
+                    "enum": ["leftHand", "rightHand", "both", "mouth", "body"]
+                  },
+                  "visible": { "type": "boolean", "default": true },
+                  "playingBehavior": {
+                    "type": "string",
+                    "enum": ["automatic", "manual", "reactive"]
+                  }
+                }
+              }
+            },
+            "coordinationTags": {
+              "type": "array",
+              "description": "Tags for coordinating with other entities",
+              "items": {
+                "type": "string",
+                "examples": ["energetic", "calm", "party", "solo", "group"]
+              }
+            },
+            "emotionalProfile": {
+              "type": "object",
+              "description": "Emotional characteristics for coordination",
+              "properties": {
+                "primary": {
+                  "type": "string",
+                  "enum": ["happy", "excited", "calm", "sad", "angry", "surprised", "focused"]
+                },
+                "energy": {
+                  "type": "string", 
+                  "enum": ["low", "medium", "high"]
+                },
+                "mood": {
+                  "type": "string",
+                  "enum": ["positive", "neutral", "negative"]
+                },
+                "intensity": {
+                  "type": "number",
+                  "minimum": 0.0,
+                  "maximum": 1.0
+                }
+              }
+            },
+            "transitionRules": {
+              "type": "array",
+              "description": "Rules for transitioning to other phases",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "targetPhaseId": { "type": "string" },
+                  "triggerType": {
+                    "type": "string",
+                    "enum": ["manual", "automatic", "musical", "conditional"]
+                  },
+                  "condition": { "type": "object" },
+                  "probability": { "type": "number", "minimum": 0, "maximum": 1 },
+                  "cooldown": { "type": "number", "minimum": 0 }
+                }
+              }
+            },
+            "metadata": {
+              "type": "object",
+              "description": "Phase-specific metadata",
+              "properties": {
+                "description": { "type": "string" },
+                "author": { "type": "string" },
+                "createdAt": { "type": "string", "format": "date-time" },
+                "version": { "type": "string" },
+                "tags": { 
+                  "type": "array",
+                  "items": { "type": "string" }
+                }
+              }
+            }
+          },
+          "required": ["phaseId", "name", "appearance"]
+        }
+      },
+      "minProperties": 1
+    },
+    "currentPhase": {
+      "type": "string",
+      "description": "ID of the currently active phase"
+    },
+    "defaultPhase": {
+      "type": "string", 
+      "description": "ID of the default phase to use on character creation"
+    },
+    "phaseHistory": {
+      "type": "array",
+      "description": "Recent phase activation history",
+      "items": {
+        "type": "object",
+        "properties": {
+          "phaseId": { "type": "string" },
+          "activatedAt": { "type": "string", "format": "date-time" },
+          "duration": { "type": "number" },
+          "triggerSource": { "type": "string" }
+        }
+      },
+      "maxItems": 50
+    },
+    "coordinationSettings": {
+      "type": "object",
+      "description": "Character-level coordination preferences",
+      "properties": {
+        "coordinationMode": {
+          "type": "string",
+          "enum": ["independent", "synchronized", "leader-follower", "conditional"],
+          "default": "independent"
+        },
+        "groupId": {
+          "type": "string",
+          "description": "ID of coordination group this character belongs to"
+        },
+        "priority": {
+          "type": "string",
+          "enum": ["low", "normal", "high"],
+          "default": "normal"
+        },
+        "respondToMusicEvents": {
+          "type": "boolean",
+          "default": true
+        },
+        "autoPhaseTransitions": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "constraints": {
+      "type": "object",
+      "description": "Character movement and behavior constraints",
+      "properties": {
+        "bodyPartConstraints": {
+          "type": "object",
+          "description": "Movement limits for body parts",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "minRotation": { "type": "number" },
+              "maxRotation": { "type": "number" },
+              "minScale": { "type": "number" },
+              "maxScale": { "type": "number" }
+            }
+          }
+        },
+        "collisionBounds": {
+          "type": "object",
+          "description": "Collision detection boundaries",
+          "properties": {
+            "width": { "type": "number" },
+            "height": { "type": "number" },
+            "offsetX": { "type": "number" },
+            "offsetY": { "type": "number" }
+          }
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "description": "General character metadata",
+      "properties": {
+        "description": { "type": "string" },
+        "author": { "type": "string" },
+        "version": { "type": "string" },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "shareSettings": {
+          "type": "object",
+          "properties": {
+            "public": { "type": "boolean", "default": false },
+            "allowRemix": { "type": "boolean", "default": true },
+            "license": { "type": "string" }
+          }
+        }
+      }
+    }
+  },
+  "required": ["id", "name", "phases", "currentPhase"],
+  "definitions": {
+    "bodyPartAppearance": {
+      "type": "object",
+      "description": "Appearance data for a specific body part",
+      "properties": {
+        "fabricObjectIds": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Fabric.js object IDs for this body part"
+        },
+        "baseColor": { "type": "string", "format": "color" },
+        "texture": { "type": "string" },
+        "scale": { "type": "number", "minimum": 0.1, "maximum": 3.0 },
+        "opacity": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "visible": { "type": "boolean", "default": true },
+        "effects": {
+          "type": "array",
+          "items": { "$ref": "#/properties/phases/patternProperties/^phase-/properties/appearance/properties/effects/items" }
+        }
+      }
+    }
+  }
+}
+```
+
+## JavaScript Implementation Helper
+
+```javascript
+/**
+ * Creates a new enhanced character with phase support
+ * @param {string} name - Character name
+ * @param {object} initialAppearance - Initial appearance data
+ * @returns {object} Enhanced character data object
+ */
+export function createEnhancedCharacter(name, initialAppearance = null) {
+    const characterId = self.crypto.randomUUID();
+    const defaultPhaseId = `phase-${characterId}-default`;
+    
+    const character = {
+        id: characterId,
+        name: name || 'New Character',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        characterType: 'humanoid',
+        phases: {
+            [defaultPhaseId]: {
+                phaseId: defaultPhaseId,
+                name: 'Default',
+                isDefault: true,
+                appearance: {
+                    fabricCanvas: initialAppearance || null,
+                    bodyParts: {},
+                    colorTints: {},
+                    effects: [],
+                    scale: 1.0,
+                    opacity: 1.0
+                },
+                musicLoop: null,
+                animations: [],
+                instrumentAttachments: [],
+                coordinationTags: [],
+                emotionalProfile: {
+                    primary: 'neutral',
+                    energy: 'medium',
+                    mood: 'neutral',
+                    intensity: 0.5
+                },
+                transitionRules: [],
+                metadata: {
+                    createdAt: new Date().toISOString(),
+                    version: '1.0'
+                }
+            }
+        },
+        currentPhase: defaultPhaseId,
+        defaultPhase: defaultPhaseId,
+        phaseHistory: [],
+        coordinationSettings: {
+            coordinationMode: 'independent',
+            priority: 'normal',
+            respondToMusicEvents: true,
+            autoPhaseTransitions: false
+        },
+        constraints: {
+            bodyPartConstraints: {},
+            collisionBounds: { width: 100, height: 200, offsetX: 0, offsetY: 0 }
+        },
+        metadata: {
+            version: '1.0',
+            tags: [],
+            shareSettings: {
+                public: false,
+                allowRemix: true
+            }
+        }
+    };
+    
+    return character;
+}
+
+/**
+ * Adds a new phase to an existing character
+ * @param {object} character - Enhanced character object
+ * @param {string} phaseName - Name for the new phase
+ * @param {object} phaseData - Phase data (appearance, music, animations)
+ * @returns {string} ID of created phase
+ */
+export function addPhaseToCharacter(character, phaseName, phaseData = {}) {
+    const phaseId = `phase-${character.id}-${Date.now()}`;
+    
+    // Get current phase as template
+    const currentPhase = character.phases[character.currentPhase];
+    
+    const newPhase = {
+        phaseId,
+        name: phaseName,
+        isDefault: false,
+        appearance: {
+            ...currentPhase.appearance,
+            ...phaseData.appearance
+        },
+        musicLoop: phaseData.musicLoop || null,
+        animations: phaseData.animations || [],
+        instrumentAttachments: phaseData.instrumentAttachments || [],
+        coordinationTags: phaseData.coordinationTags || [],
+        emotionalProfile: {
+            ...currentPhase.emotionalProfile,
+            ...phaseData.emotionalProfile
+        },
+        transitionRules: phaseData.transitionRules || [],
+        metadata: {
+            createdAt: new Date().toISOString(),
+            version: '1.0',
+            description: phaseData.description || ''
+        }
+    };
+    
+    character.phases[phaseId] = newPhase;
+    character.updatedAt = new Date().toISOString();
+    
+    return phaseId;
+}
+
+/**
+ * Validates enhanced character data
+ * @param {object} characterData - Character data to validate
+ * @returns {object} Validation result with success/errors
+ */
+export function validateEnhancedCharacter(characterData) {
+    const errors = [];
+    
+    if (!characterData || typeof characterData !== 'object') {
+        return { valid: false, errors: ['Character data must be an object'] };
+    }
+    
+    // Required fields
+    if (!characterData.id || typeof characterData.id !== 'string') {
+        errors.push('Character must have a valid ID');
+    }
+    
+    if (!characterData.name || typeof characterData.name !== 'string') {
+        errors.push('Character must have a valid name');
+    }
+    
+    if (!characterData.phases || typeof characterData.phases !== 'object') {
+        errors.push('Character must have phases object');
+    } else {
+        // Validate phases
+        const phaseCount = Object.keys(characterData.phases).length;
+        if (phaseCount === 0) {
+            errors.push('Character must have at least one phase');
+        }
+        
+        // Validate current phase exists
+        if (!characterData.currentPhase || !characterData.phases[characterData.currentPhase]) {
+            errors.push('Current phase must reference an existing phase');
+        }
+        
+        // Validate each phase
+        for (const [phaseId, phase] of Object.entries(characterData.phases)) {
+            if (!phase.appearance || !phase.appearance.fabricCanvas) {
+                errors.push(`Phase ${phaseId} must have appearance with fabricCanvas`);
+            }
+        }
+    }
+    
+    return {
+        valid: errors.length === 0,
+        errors
+    };
+}
+
+/**
+ * Converts legacy character data to enhanced format
+ * @param {object} legacyCharacter - Original character data
+ * @returns {object} Enhanced character data
+ */
+export function convertLegacyCharacter(legacyCharacter) {
+    const enhanced = createEnhancedCharacter(legacyCharacter.name);
+    
+    // Update default phase with legacy data
+    const defaultPhase = enhanced.phases[enhanced.defaultPhase];
+    defaultPhase.appearance.fabricCanvas = legacyCharacter.fabricCanvas;
+    
+    if (legacyCharacter.parts) {
+        // Convert legacy parts to body parts structure
+        for (const part of legacyCharacter.parts) {
+            defaultPhase.appearance.bodyParts[part.name] = {
+                fabricObjectIds: part.fabricObjectIds || [],
+                visible: true
+            };
+        }
+    }
+    
+    // Preserve metadata
+    enhanced.metadata = {
+        ...enhanced.metadata,
+        ...legacyCharacter.metadata
+    };
+    
+    enhanced.createdAt = legacyCharacter.createdAt || enhanced.createdAt;
+    enhanced.updatedAt = new Date().toISOString();
+    
+    return enhanced;
+}
+```
+
+## Schema Features
+
+### Phase-Centric Design
+- Each character has multiple phases combining appearance, music, and animation
+- Phases can be independently created, modified, and activated
+- Rich metadata and coordination support for each phase
+
+### Advanced Appearance System
+- Body-part-specific appearance data for humanoid characters
+- Color tinting and visual effects per phase
+- Scale and opacity controls for dramatic phase changes
+
+### Musical Integration
+- Music loops with genre, tempo, and key information for coordination
+- Audio effects and volume control per phase
+- Support for different audio types (synthesis, samples, recordings)
+
+### Animation Coordination
+- Animation IDs linked to specific phases
+- Instrument attachment system with playing behaviors
+- Transition rules for automatic phase changes
+
+### Multi-Entity Coordination
+- Coordination tags for grouping related phases
+- Emotional profiles for intelligent phase matching
+- Support for synchronized and conditional phase changes
+
+### Constraint System
+- Body part movement constraints for realistic animation
+- Collision bounds for interaction detection
+- Flexible constraint configuration per character
+
+This enhanced schema provides the foundation for Open Sprunk Framework's sophisticated phase system while maintaining compatibility with existing character data through conversion utilities.

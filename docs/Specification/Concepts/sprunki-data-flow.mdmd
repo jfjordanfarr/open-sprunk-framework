@@ -1,0 +1,46 @@
+<!-- filepath: docs/Compositions/sprunki-data-flow.mdmd -->
+::: {composition}
+id: "sprunki-data-flow"
+title: "Sprunki Data Flow"
+composition-type: "data-flow-diagram"
+status: "draft"
+version: "0.2" 
+brief: "Shows how data flows between modules and the structure of core data types."
+see-also:
+  - "[[../../Definition/Requirements/project-saving-requirement.mdmd]]"
+  - "[[../../Definition/Requirements/html5-export-requirement.mdmd]]"
+  - "[[../Implementations/character/character-data-schema.mdmd]]"
+  - "[[../Implementations/music/music-data-schema.mdmd]]"
+  - "[[../Implementations/animation/animation-data-schema.mdmd]]"
+  - "[[../Implementations/data/project-file-schema.mdmd]]"
+  - "[[../Implementations/data/data-manager-class.mdmd]]"
+  - "[[../Implementations/core/event-bus-class.mdmd]]"
+  - "[[../Implementations/stage/character-renderer-class.mdmd]]"
+  - "[[../Implementations/music/audio-engine-class.mdmd]]"
+
+The application manages three primary data types that flow between modules, supporting `[[../../Definition/Requirements/project-saving-requirement.mdmd]]` and `[[../../Definition/Requirements/html5-export-requirement.mdmd]]`:
+
+```mermaid
+flowchart TD
+    CharEditor[Character Editor] --> CharData[Character Data<br/>[[../Implementations/character/character-data-schema.mdmd]]]
+    MusicEditor[Music Editor] --> MusicData[Music Data<br/>[[../Implementations/music/music-data-schema.mdmd]]]
+    AnimEditor[Animation Editor] --> AnimData[Animation Data<br/>[[../Implementations/animation/animation-data-schema.mdmd]]]
+    
+    CharData --> ProjectFile[Project File<br/>[[../Implementations/data/project-file-schema.mdmd]]]
+    MusicData --> ProjectFile
+    AnimData --> ProjectFile
+    
+    ProjectFile --> DataManager[Data Manager<br/>[[../Implementations/data/data-manager-class.mdmd]]]
+    DataManager --> LocalStorage[Browser Storage]
+    DataManager --> FileSystem[File Export/Import]
+    
+    CharData --> Stage[Performance Stage]
+    MusicData --> Stage
+    AnimData --> Stage
+    
+    Stage --> CharRenderer[Character Renderer<br/>[[../Implementations/stage/character-renderer-class.mdmd]]]
+    Stage --> AudioEngine[Audio Engine<br/>[[../Implementations/music/audio-engine-class.mdmd]]]
+```
+
+Data synchronization is handled through the `[[../Implementations/core/event-bus-class.mdmd]]` which ensures all modules stay updated when data changes.
+:::

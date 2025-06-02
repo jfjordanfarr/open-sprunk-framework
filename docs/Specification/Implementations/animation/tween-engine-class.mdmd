@@ -1,0 +1,20 @@
+<!-- filepath: docs/Units/animation/tween-engine-class.mdmd -->
+::: {unit}
+id: "tween-engine-class"
+title: "Tween Engine Class"
+unit-type: "javascript-class-definition"
+language: "javascript"
+status: "draft"
+version: "0.2"
+brief: "Handles interpolation and easing for animations."
+source-ref: "../../src/animation/TweenEngine.js"
+see-also:
+  - "[[../utils/vector2d-utils.mdmd]]" # Implementation dependency (uses for coordinate interpolation)
+  - "[[../Concepts/animation-editor-module.mdmd]]" # Parent composition
+
+Provides smooth interpolation and easing functions for animation between keyframes.
+
+```javascript
+// Tween Engine implementation placeholder
+```
+:::

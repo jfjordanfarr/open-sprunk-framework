@@ -1,0 +1,519 @@
+<!-- filepath: do../Implementations/character/instrument-attachment-system-class.mdmd -->
+::: {unit}
+id: "instrument-attachment-system-class"
+title: "Instrument Attachment System"
+unit-type: "javascript-class-definition"
+language: "javascript"
+status: "draft"
+version: "0.1"
+brief: "System for attaching and animating musical instruments as part of character design."
+source-ref: "../../src/character/InstrumentAttachmentSystem.js"
+see-also:
+  - "[[../../Definition/Requirements/humanoid-character-animation-requirement]]" # Implements instrument integration requirement
+  - "[[humanoid-character-schema]]" # Character schema with instrument support
+  - "[[../animation/humanoid-animation-schema]]" # Animation schema with instrument data
+  - "[[../core/event-bus-class]]" # Event communication
+  - "[[../Concepts/character-editor-module]]" # Parent composition
+
+System for managing musical instrument attachments to humanoid characters, including visual integration, animation constraints, and performance behaviors.
+
+```javascript
+/**
+ * Instrument Attachment System
+ * 
+ * Manages the integration of musical instruments with humanoid characters,
+ * including visual attachment, animation constraints for realistic playing,
+ * and performance behaviors synchronized with audio.
+ * 
+ * Key Features:
+ * - Dynamic instrument attachment to body parts
+ * - Animation constraints for realistic instrument playing
+ * - Pre-defined instrument templates (trumpet, piano, guitar, etc.)
+ * - Custom instrument support
+ * - Performance animation behaviors
+ */
+class InstrumentAttachmentSystem {
+    constructor(eventBus, options = {}) {
+        this.eventBus = eventBus;
+        this.options = {
+            enablePhysics: false,
+            showAttachmentPoints: true,
+            autoConstraints: true,
+            defaultInstrumentScale: 1.0,
+            ...options
+        };
+
+        // Instrument management
+        this.instrumentTemplates = new Map();
+        this.attachedInstruments = new Map();
+        this.activePerformances = new Map();
+        
+        // Visual rendering
+        this.instrumentRenderer = null;
+        this.attachmentVisualizer = null;
+        
+        this.initializeInstrumentTemplates();
+        this.setupEventListeners();
+    }
+
+    /**
+     * Initialize pre-defined instrument templates
+     */
+    initializeInstrumentTemplates() {
+        // Piano/Keyboard Template
+        this.instrumentTemplates.set('piano', {
+            id: 'piano',
+            name: 'Piano/Keyboard',
+            category: 'keyboard',
+            attachmentPoints: ['leftHand', 'rightHand'],
+            visualProperties: {
+                defaultScale: 0.8,
+                anchorPoint: { x: 0.5, y: 0.7 },
+                baseSize: { width: 200, height: 80 }
+            },
+            playingConstraints: {
+                handPositions: {
+                    left: { x: -60, y: 0, minY: -20, maxY: 20 },
+                    right: { x: 60, y: 0, minY: -20, maxY: 20 }
+                },
+                bodyPosture: {
+                    body: { rotation: 0, posture: 'upright' },
+                    arms: { shoulderAngle: { min: -30, max: 30 } }
+                }
+            },
+            animations: {
+                keyPress: {
+                    duration: 0.1,
+                    handMovement: { y: 15 },
+                    intensity: 'note-velocity'
+                },
+                chordPress: {
+                    duration: 0.15,
+                    handMovement: { y: 20, spread: 10 },
+                    intensity: 'chord-complexity'
+                }
+            }
+        });
+
+        // Trumpet Template
+        this.instrumentTemplates.set('trumpet', {
+            id: 'trumpet',
+            name: 'Trumpet',
+            category: 'brass',
+            attachmentPoints: ['leftHand', 'rightHand', 'head'],
+            visualProperties: {
+                defaultScale: 0.9,
+                anchorPoint: { x: 0.2, y: 0.5 },
+                baseSize: { width: 120, height: 30 }
+            },
+            playingConstraints: {
+                handPositions: {
+                    left: { x: -40, y: -10, rotation: 15 },
+                    right: { x: 40, y: 0, rotation: -10 }
+                },
+                bodyPosture: {
+                    head: { rotation: 5, mouthPosition: 'mouthpiece' },
+                    body: { posture: 'slight-lean-back' }
+                }
+            },
+            animations: {
+                playing: {
+                    duration: 'note-length',
+                    breathing: { intensity: 'note-volume' },
+                    valvePress: { fingers: [1, 2, 3], timing: 'note-start' }
+                },
+                breath: {
+                    duration: 0.5,
+                    bodyMovement: { chest: 'expand', head: 'slight-back' }
+                }
+            }
+        });
+
+        // Guitar Template
+        this.instrumentTemplates.set('guitar', {
+            id: 'guitar',
+            name: 'Guitar',
+            category: 'string',
+            attachmentPoints: ['leftHand', 'rightHand', 'body'],
+            visualProperties: {
+                defaultScale: 1.1,
+                anchorPoint: { x: 0.3, y: 0.8 },
+                baseSize: { width: 80, height: 200 }
+            },
+            playingConstraints: {
+                handPositions: {
+                    left: { x: -30, y: -80, role: 'fretting' },
+                    right: { x: 30, y: 20, role: 'strumming' }
+                },
+                bodyPosture: {
+                    body: { rotation: -10, guitar: 'against-body' },
+                    leftArm: { extended: true, fingers: 'fretting' },
+                    rightArm: { position: 'strumming' }
+                }
+            },
+            animations: {
+                strum: {
+                    duration: 0.2,
+                    rightHand: { movement: 'downward-sweep', distance: 30 }
+                },
+                chord: {
+                    duration: 'chord-length',
+                    leftHand: { fingers: 'chord-shape', pressure: 'chord-complexity' }
+                }
+            }
+        });
+
+        // Drums Template
+        this.instrumentTemplates.set('drums', {
+            id: 'drums',
+            name: 'Drums',
+            category: 'percussion',
+            attachmentPoints: ['leftHand', 'rightHand'],
+            visualProperties: {
+                defaultScale: 1.2,
+                anchorPoint: { x: 0.5, y: 0.9 },
+                baseSize: { width: 150, height: 100 },
+                drumsticks: true
+            },
+            playingConstraints: {
+                handPositions: {
+                    left: { x: -50, y: -30, tool: 'drumstick' },
+                    right: { x: 50, y: -30, tool: 'drumstick' }
+                },
+                bodyPosture: {
+                    body: { posture: 'seated', energy: 'dynamic' },
+                    arms: { movement: 'drumming', range: 'full' }
+                }
+            },
+            animations: {
+                hit: {
+                    duration: 0.1,
+                    hand: 'active-hand',
+                    movement: { down: 20, up: 15, intensity: 'hit-velocity' }
+                },
+                roll: {
+                    duration: 'roll-length',
+                    alternating: { speed: 'roll-speed', intensity: 'volume' }
+                }
+            }
+        });
+    }
+
+    /**
+     * Attach an instrument to a character
+     */
+    attachInstrument(characterId, instrumentType, customizations = {}) {
+        const template = this.instrumentTemplates.get(instrumentType);
+        if (!template) {
+            throw new Error(`Unknown instrument type: ${instrumentType}`);
+        }
+
+        const instrumentId = `${characterId}_${instrumentType}_${Date.now()}`;
+        
+        const attachedInstrument = {
+            id: instrumentId,
+            characterId: characterId,
+            type: instrumentType,
+            template: { ...template },
+            customizations: customizations,
+            attachmentState: 'detached',
+            visualData: this.createInstrumentVisual(template, customizations),
+            constraints: this.compileConstraints(template, customizations),
+            isActive: false
+        };
+
+        this.attachedInstruments.set(instrumentId, attachedInstrument);
+
+        // Apply attachment to character
+        this.performAttachment(attachedInstrument);
+
+        this.eventBus.publish('instrument.attached', {
+            instrumentId,
+            characterId,
+            instrumentType,
+            attachmentPoints: template.attachmentPoints
+        });
+
+        return instrumentId;
+    }
+
+    /**
+     * Perform the visual and logical attachment of instrument to character
+     */
+    performAttachment(instrument) {
+        const character = this.getCharacter(instrument.characterId);
+        if (!character) return;
+
+        // Update character schema with instrument data
+        if (!character.instruments) {
+            character.instruments = [];
+        }
+
+        character.instruments.push({
+            id: instrument.id,
+            type: instrument.type,
+            attachmentPoint: this.determineOptimalAttachmentPoint(instrument),
+            visualData: instrument.visualData,
+            constraints: instrument.constraints
+        });
+
+        // Apply visual attachment
+        this.attachVisualInstrument(character, instrument);
+
+        // Apply animation constraints
+        this.applyInstrumentConstraints(character, instrument);
+
+        instrument.attachmentState = 'attached';
+    }
+
+    /**
+     * Create visual representation of instrument
+     */
+    createInstrumentVisual(template, customizations) {
+        const visual = {
+            fabricObjects: [],
+            scale: customizations.scale || template.visualProperties.defaultScale,
+            offset: customizations.offset || { x: 0, y: 0 },
+            rotation: customizations.rotation || 0
+        };
+
+        // Generate instrument visuals based on type
+        switch (template.category) {
+            case 'keyboard':
+                visual.fabricObjects = this.createKeyboardVisual(template, customizations);
+                break;
+            case 'brass':
+                visual.fabricObjects = this.createBrassVisual(template, customizations);
+                break;
+            case 'string':
+                visual.fabricObjects = this.createStringVisual(template, customizations);
+                break;
+            case 'percussion':
+                visual.fabricObjects = this.createPercussionVisual(template, customizations);
+                break;
+        }
+
+        return visual;
+    }
+
+    /**
+     * Generate playing animation for specific instrument and musical event
+     */
+    generatePlayingAnimation(instrumentId, musicEvent, options = {}) {
+        const instrument = this.attachedInstruments.get(instrumentId);
+        if (!instrument) return null;
+
+        const template = instrument.template;
+        const animationType = this.determineAnimationType(musicEvent, template);
+        const animationTemplate = template.animations[animationType];
+
+        if (!animationTemplate) return null;
+
+        const animation = {
+            id: `${instrumentId}_${animationType}_${Date.now()}`,
+            instrumentId: instrumentId,
+            type: animationType,
+            startTime: musicEvent.timestamp,
+            duration: this.calculateAnimationDuration(animationTemplate, musicEvent),
+            bodyPartAnimations: this.generateBodyPartAnimations(animationTemplate, musicEvent, instrument),
+            intensity: this.calculateIntensity(musicEvent),
+            synchronization: {
+                musicEventId: musicEvent.id,
+                syncType: musicEvent.type,
+                accuracy: options.syncAccuracy || 'beat'
+            }
+        };
+
+        return animation;
+    }
+
+    /**
+     * Generate body part animations for instrument playing
+     */
+    generateBodyPartAnimations(animationTemplate, musicEvent, instrument) {
+        const bodyPartAnimations = {};
+
+        // Process hand animations
+        if (animationTemplate.handMovement) {
+            const movement = animationTemplate.handMovement;
+            
+            // Left hand animation
+            if (instrument.template.attachmentPoints.includes('leftHand')) {
+                bodyPartAnimations.leftHand = this.createHandAnimation(
+                    'left', movement, musicEvent, instrument
+                );
+            }
+
+            // Right hand animation  
+            if (instrument.template.attachmentPoints.includes('rightHand')) {
+                bodyPartAnimations.rightHand = this.createHandAnimation(
+                    'right', movement, musicEvent, instrument
+                );
+            }
+        }
+
+        // Process breathing animations (for wind instruments)
+        if (animationTemplate.breathing) {
+            bodyPartAnimations.body = this.createBreathingAnimation(
+                animationTemplate.breathing, musicEvent
+            );
+            bodyPartAnimations.head = this.createHeadAnimation(
+                animationTemplate.breathing, musicEvent
+            );
+        }
+
+        // Process posture changes
+        if (animationTemplate.bodyMovement) {
+            Object.assign(bodyPartAnimations, 
+                this.createPostureAnimation(animationTemplate.bodyMovement, musicEvent));
+        }
+
+        return bodyPartAnimations;
+    }
+
+    /**
+     * Create hand animation for instrument playing
+     */
+    createHandAnimation(hand, movement, musicEvent, instrument) {
+        const basePosition = instrument.constraints.handPositions[hand];
+        const intensity = this.calculateIntensity(musicEvent);
+
+        return {
+            keyframes: [
+                {
+                    timestamp: musicEvent.timestamp,
+                    transform: {
+                        position: { x: basePosition.x, y: basePosition.y },
+                        rotation: basePosition.rotation || 0
+                    },
+                    easing: 'ease-out'
+                },
+                {
+                    timestamp: musicEvent.timestamp + (movement.duration || 0.1),
+                    transform: {
+                        position: {
+                            x: basePosition.x + (movement.x || 0) * intensity,
+                            y: basePosition.y + (movement.y || 0) * intensity
+                        },
+                        rotation: (basePosition.rotation || 0) + (movement.rotation || 0) * intensity
+                    },
+                    easing: 'ease-in-out'
+                },
+                {
+                    timestamp: musicEvent.timestamp + (movement.duration || 0.1) * 2,
+                    transform: {
+                        position: { x: basePosition.x, y: basePosition.y },
+                        rotation: basePosition.rotation || 0
+                    },
+                    easing: 'ease-in'
+                }
+            ]
+        };
+    }
+
+    /**
+     * Apply real-time performance animation based on live audio input
+     */
+    updatePerformanceAnimation(instrumentId, audioData) {
+        const instrument = this.attachedInstruments.get(instrumentId);
+        if (!instrument || !instrument.isActive) return;
+
+        // Analyze audio for performance cues
+        const performanceCues = this.analyzeAudioForPerformance(audioData, instrument.type);
+
+        // Generate responsive animations
+        const animations = this.generateRealtimeAnimations(performanceCues, instrument);
+
+        // Apply animations to character
+        animations.forEach(animation => {
+            this.eventBus.publish('animation.realtimeUpdate', {
+                characterId: instrument.characterId,
+                bodyPartId: animation.bodyPart,
+                transform: animation.transform,
+                duration: animation.duration
+            });
+        });
+    }
+
+    /**
+     * Get optimal attachment point for instrument
+     */
+    determineOptimalAttachmentPoint(instrument) {
+        const template = instrument.template;
+        
+        // For single attachment point instruments
+        if (template.attachmentPoints.length === 1) {
+            return template.attachmentPoints[0];
+        }
+
+        // For multi-point instruments, choose primary attachment
+        switch (template.category) {
+            case 'keyboard': return 'body'; // Piano sits in front of body
+            case 'brass': return 'head'; // Wind instruments attach to mouth
+            case 'string': return 'body'; // Guitars rest against body
+            case 'percussion': return 'body'; // Drums in front of player
+            default: return template.attachmentPoints[0];
+        }
+    }
+
+    /**
+     * Calculate animation intensity based on musical event properties
+     */
+    calculateIntensity(musicEvent) {
+        let intensity = 0.5; // Default medium intensity
+
+        if (musicEvent.velocity) {
+            intensity = musicEvent.velocity / 127; // MIDI velocity to 0-1
+        } else if (musicEvent.volume) {
+            intensity = musicEvent.volume;
+        }
+
+        return Math.max(0.1, Math.min(1.0, intensity));
+    }
+
+    // Event handlers
+    setupEventListeners() {
+        this.eventBus.subscribe('music.noteOn', this.handleNoteOn.bind(this));
+        this.eventBus.subscribe('music.noteOff', this.handleNoteOff.bind(this));
+        this.eventBus.subscribe('music.chordChange', this.handleChordChange.bind(this));
+        this.eventBus.subscribe('character.loaded', this.handleCharacterLoaded.bind(this));
+        this.eventBus.subscribe('animation.play', this.handleAnimationPlay.bind(this));
+    }
+
+    handleNoteOn(event) {
+        // Generate playing animation for active instruments
+        this.attachedInstruments.forEach(instrument => {
+            if (instrument.isActive && instrument.characterId === event.characterId) {
+                const animation = this.generatePlayingAnimation(instrument.id, event);
+                if (animation) {
+                    this.eventBus.publish('animation.instrumentAnimation', animation);
+                }
+            }
+        });
+    }
+
+    // ... additional methods for visual creation, constraint application, etc.
+}
+
+export default InstrumentAttachmentSystem;
+```
+
+This system provides:
+
+1. **Pre-defined Instruments**: Templates for common instruments (piano, trumpet, guitar, drums)
+2. **Dynamic Attachment**: Runtime attachment of instruments to characters
+3. **Animation Constraints**: Realistic playing positions and movements
+4. **Performance Animation**: Real-time animation generation from musical events
+5. **Visual Integration**: Proper visual rendering and positioning
+6. **Extensibility**: Support for custom instruments and behaviors
+
+Key features:
+- **Template System**: Reusable instrument definitions with playing constraints
+- **Multi-Point Attachment**: Instruments can attach to multiple body parts
+- **Performance Behaviors**: Automatic animation generation from musical input
+- **Constraint Integration**: Realistic playing positions and movement limits
+- **Real-time Response**: Live animation updates based on audio analysis
+
+This completes the comprehensive humanoid character animation system! The documentation now provides a complete framework for intuitive, educational, and musically-integrated character animation.
+
+:::

@@ -1,9 +1,0 @@
-<!-- filepath: docs/Units/stage/performance-stage-class.mdmd -->
-```{unit} Performance Stage Class
-id: performance-stage-class
-source-ref: ../../src/stage/PerformanceStage.js
-source-type: javascript-class
-spec-version: 0.1.0
----
-Renders the final animated performance.
-```

@@ -1,0 +1,345 @@
+```{unit}
+id: "configurable-transition-controller-class"
+title: "Configurable Transition Controller Class"
+unit-type: "javascript-class-definition"
+status: "in-progress"
+source-ref: "../../src/phase/ConfigurableTransitionController.js"
+see-also:
+  - "[[phase-centric-core-architecture]]"
+  - "[[phase-transition-engine-class]]"
+  - "[[phase-aware-performance-stage-class]]"
+```
+
+# Configurable Transition Controller Class
+
+## Purpose
+Provides player-configurable control over phase transition behaviors, supporting both traditional hard transitions and innovative natural transitions. Allows complete customization of what triggers phase changes and how those transitions are executed.
+
+## Core Responsibilities
+- **Transition Behavior Configuration**: Hard vs Natural transition modes
+- **Trigger System Management**: Multiple configurable trigger sources
+- **Player Preference Persistence**: Save and restore transition settings
+- **Runtime Transition Coordination**: Execute configured transition behaviors
+- **Performance Optimization**: Efficient transition execution based on settings
+
+## Class Interface
+
+```javascript
+class ConfigurableTransitionController {
+    constructor(phaseManager, performanceStage, eventBus) {
+        this.phaseManager = phaseManager;
+        this.performanceStage = performanceStage;
+        this.eventBus = eventBus;
+        
+        // Player-configurable settings
+        this.transitionMode = 'natural'; // 'hard' | 'natural'
+        this.triggerSources = new Set(['manual', 'special-character']);
+        this.advancedSettings = {
+            naturalTransition: {
+                animationBridging: true,
+                audioCrossfade: true,
+                positionPreservation: true,
+                momentumCarryover: true
+            },
+            hardTransition: {
+                deactivateAll: true,
+                clearState: true,
+                instantSwitch: true
+            },
+            triggers: {
+                manual: { enabled: true },
+                specialCharacter: { enabled: true },
+                timed: { enabled: false, interval: 8000 },
+                performance: { enabled: false, cueType: 'beat' },
+                interaction: { enabled: false, threshold: 3 }
+            }
+        };
+    }
+
+    // Configuration Methods
+    setTransitionMode(mode) { /* 'hard' | 'natural' */ }
+    enableTrigger(triggerType, config = {}) { /* Add trigger source */ }
+    disableTrigger(triggerType) { /* Remove trigger source */ }
+    updateAdvancedSettings(category, settings) { /* Fine-tune behaviors */ }
+    
+    // Trigger Registration
+    registerTriggerHandler(triggerType, handler) { /* Custom trigger logic */ }
+    unregisterTriggerHandler(triggerType) { /* Remove custom trigger */ }
+    
+    // Transition Execution
+    executePhaseTransition(fromPhase, toPhase, triggerContext) { /* Main transition logic */ }
+    executeHardTransition(fromPhase, toPhase) { /* Traditional mode */ }
+    executeNaturalTransition(fromPhase, toPhase, context) { /* Smooth mode */ }
+    
+    // Player Settings
+    savePlayerPreferences() { /* Persist to localStorage */ }
+    loadPlayerPreferences() { /* Restore from localStorage */ }
+    resetToDefaults() { /* Clear custom settings */ }
+    
+    // Runtime Status
+    getCurrentMode() { /* Get active transition mode */ }
+    getActiveTriggers() { /* List enabled trigger sources */ }
+    getTransitionCapabilities() { /* Available features for current mode */ }
+}
+```
+
+## Transition Modes
+
+### Hard Transition Mode (Traditional)
+**Behavior:**
+- All active characters are immediately deactivated
+- Performance stage is cleared to neutral state
+- New phase is loaded with fresh state
+- Instant visual switch with no bridging
+- Audio stops and new audio begins from start
+
+**Configuration Options:**
+```javascript
+hardTransition: {
+    deactivateAll: true,          // Deactivate all characters
+    clearState: true,             // Reset performance state
+    instantSwitch: true,          // No transition animation
+    fadeOutDuration: 0,           // Audio fade out time (ms)
+    fadeInDuration: 0,            // Audio fade in time (ms)
+    preserveVolume: false,        // Maintain user volume settings
+    resetPositions: true          // Reset character positions
+}
+```
+
+### Natural Transition Mode (Innovative - DEFAULT)
+**Behavior:**
+- Active characters remain active during transition
+- Smooth animation bridging between phase states
+- Audio crossfading or beat-synchronized switching
+- Position and momentum preservation
+- Continuous performance flow
+
+**Configuration Options:**
+```javascript
+naturalTransition: {
+    animationBridging: true,      // Smooth animation transitions
+    audioCrossfade: true,         // Overlap audio during transition
+    positionPreservation: true,   // Keep character positions
+    momentumCarryover: true,      // Maintain movement momentum
+    transitionDuration: 1000,     // Transition time (ms)
+    crossfadeDuration: 500,       // Audio overlap time (ms)
+    beatAlignment: true,          // Align transitions to beats
+    energyMatching: true          // Match energy levels between phases
+}
+```
+
+## Trigger Sources
+
+### Manual Control
+```javascript
+triggers.manual: {
+    enabled: true,
+    method: 'click',              // 'click' | 'key' | 'gesture'
+    target: 'next-button',        // UI element identifier
+    direction: 'forward',         // 'forward' | 'backward' | 'both'
+    confirmation: false           // Require confirmation for transitions
+}
+```
+
+### Special Character Triggers (Traditional)
+```javascript
+triggers.specialCharacter: {
+    enabled: true,
+    dragThreshold: 10,            // Pixels of drag to trigger
+    dropZone: 'active-area',      // Where drops are valid
+    autoAdvance: true,            // Auto-advance after drop
+    visualFeedback: true          // Show drop indicators
+}
+```
+
+### Timed Progression
+```javascript
+triggers.timed: {
+    enabled: false,
+    interval: 8000,               // Milliseconds between advances
+    pauseOnInteraction: true,     // Pause timer when user interacts
+    showCountdown: false,         // Visual countdown indicator
+    respectAudioLoops: true       // Wait for audio loop completion
+}
+```
+
+### Performance Events
+```javascript
+triggers.performance: {
+    enabled: false,
+    cueType: 'beat',              // 'beat' | 'phrase' | 'section'
+    beatCount: 16,                // Beats before advance
+    energyThreshold: 0.7,         // Energy level to trigger
+    musicalContext: true          // Consider musical phrase structure
+}
+```
+
+### Interaction-Based
+```javascript
+triggers.interaction: {
+    enabled: false,
+    threshold: 3,                 // Number of interactions to advance
+    interactionTypes: ['click', 'drag', 'hover'],
+    timeWindow: 10000,            // Time window for counting interactions
+    resetOnAdvance: true          // Reset counter after phase change
+}
+```
+
+## Transition Execution Pipeline
+
+### 1. **Trigger Detection**
+```javascript
+// Detect and validate trigger conditions
+detectTrigger(triggerType, triggerData) {
+    if (!this.triggerSources.has(triggerType)) return false;
+    
+    const config = this.advancedSettings.triggers[triggerType];
+    if (!config?.enabled) return false;
+    
+    return this.validateTriggerConditions(triggerType, triggerData, config);
+}
+```
+
+### 2. **Phase Resolution**
+```javascript
+// Determine target phase based on trigger context
+resolveTargetPhase(currentPhase, triggerContext) {
+    const direction = triggerContext.direction || 'forward';
+    const character = triggerContext.character;
+    
+    return this.phaseManager.getNextPhase(currentPhase, character, direction);
+}
+```
+
+### 3. **Transition Preparation**
+```javascript
+// Prepare both phases for transition
+prepareTransition(fromPhase, toPhase, mode) {
+    // Pre-load target phase resources
+    this.phaseManager.preloadPhase(toPhase);
+    
+    // Analyze transition requirements
+    const analysis = this.analyzeTransitionRequirements(fromPhase, toPhase);
+    
+    // Configure transition based on mode and analysis
+    return this.configureTransitionPlan(mode, analysis);
+}
+```
+
+### 4. **Mode-Specific Execution**
+
+#### Hard Transition Execution
+```javascript
+executeHardTransition(fromPhase, toPhase) {
+    // 1. Deactivate all characters
+    this.performanceStage.deactivateAllCharacters();
+    
+    // 2. Stop current audio
+    this.audioEngine.stopAll();
+    
+    // 3. Clear stage state
+    this.performanceStage.clearState();
+    
+    // 4. Load new phase
+    this.phaseManager.activatePhase(toPhase);
+    
+    // 5. Emit transition complete
+    this.eventBus.emit('phase-transition-complete', { 
+        from: fromPhase, 
+        to: toPhase, 
+        mode: 'hard' 
+    });
+}
+```
+
+#### Natural Transition Execution
+```javascript
+executeNaturalTransition(fromPhase, toPhase, context) {
+    const plan = this.createNaturalTransitionPlan(fromPhase, toPhase);
+    
+    // 1. Begin audio crossfade
+    if (plan.audioCrossfade) {
+        this.audioEngine.crossfadeToPhase(toPhase, plan.crossfadeDuration);
+    }
+    
+    // 2. Start animation bridging for active characters
+    if (plan.animationBridging) {
+        this.animationEngine.bridgeToPhase(toPhase, plan.transitionDuration);
+    }
+    
+    // 3. Preserve positions and momentum
+    if (plan.positionPreservation) {
+        this.performanceStage.preserveCharacterStates();
+    }
+    
+    // 4. Execute gradual transition
+    this.executeGradualTransition(plan);
+}
+```
+
+## Player Configuration Interface
+
+### Settings Menu Integration
+```javascript
+// Generate configuration UI based on current capabilities
+generateConfigUI() {
+    return {
+        transitionMode: {
+            type: 'radio',
+            options: ['hard', 'natural'],
+            default: 'natural',
+            description: 'How phase changes behave'
+        },
+        triggerSources: {
+            type: 'checkboxes',
+            options: this.getAvailableTriggers(),
+            description: 'What can cause phase changes'
+        },
+        advancedSettings: {
+            type: 'accordion',
+            sections: this.generateAdvancedSettingsSections()
+        }
+    };
+}
+```
+
+### Real-Time Preview
+```javascript
+// Show transition preview without committing changes
+previewTransition(settings, fromPhase, toPhase) {
+    const tempController = this.createTemporaryController(settings);
+    return tempController.simulateTransition(fromPhase, toPhase);
+}
+```
+
+## Performance Optimization
+
+### Transition Mode Optimization
+```javascript
+// Optimize performance based on selected mode
+optimizeForMode(mode) {
+    if (mode === 'hard') {
+        // Disable smooth transition calculations
+        this.animationEngine.disableBridging();
+        this.audioEngine.disableCrossfading();
+    } else {
+        // Enable natural transition features
+        this.animationEngine.enableBridging();
+        this.audioEngine.enableCrossfading();
+    }
+}
+```
+
+### Resource Pre-loading
+```javascript
+// Pre-load transition resources based on enabled triggers
+preloadTransitionResources() {
+    if (this.triggerSources.has('timed')) {
+        // Pre-load next phase for timed transitions
+        const nextPhase = this.phaseManager.getUpcomingPhase();
+        this.phaseManager.preloadPhase(nextPhase);
+    }
+}
+```
+
+This controller provides complete player control over phase transition behaviors while maintaining excellent performance and supporting both traditional and innovative transition modes.

@@ -1,0 +1,34 @@
+<!-- filepath: docs/Definition/Requirements/client-side-architecture-requirement.mdmd -->
+::: {unit}
+id: "client-side-architecture-requirement"
+title: "Client-Side Architecture Requirement"
+unit-type: "non-functional-requirement"
+status: "accepted"
+version: "0.1"
+brief: "The application must run entirely on the client-side in a modern web browser."
+see-also:
+  - "[[../Definition/Vision/Idea.md#core-tenets]]"
+  - "[[../Definition/Vision/Idea.md#layer-2-system-architecture--technology-choices-the-how---broad-strokes]]"
+  - "[[../Definition/Vision/OriginatingPrompt.md]]"
+  - "[[../../Specification/Concepts/sprunki-core-architecture.mdmd]]" # Added
+  - "[[../../Specification/Concepts/sprunki-module-structure.mdmd]]" # Added
+# Conventional Requirement Fields:
+priority: "must-have"
+owner: "system-architect"
+verification-method: "deployment-test"
+
+**Description:**
+The Open Sprunk Framework application, including all its core features (character creation, music composition, animation, and performance stage), must operate entirely within the user's web browser. There should be no mandatory server-side components for the core functionality to work. This aligns with the "Client-Side Simplicity" tenet outlined in `[[../Definition/Vision/Idea.md#core-tenets]]` and the initial direction from the `[[../Definition/Vision/OriginatingPrompt.md]]`. This requirement is primarily addressed by the overall `[[../../Specification/Concepts/sprunki-core-architecture.mdmd]]` and the planned `[[../../Specification/Concepts/sprunki-module-structure.mdmd]]`.
+
+**Rationale:**
+*   Ensures maximum accessibility for users (no server accounts needed).
+*   Simplifies deployment (can be hosted as static files).
+*   Enhances user privacy as no project data is transmitted to a server by default.
+*   Reduces operational costs and complexity for maintainers.
+
+**Acceptance Criteria:**
+1.  The application can be loaded and used from a `file:///` URL or a static web server.
+2.  All creative tools (character, music, animation editors) are fully functional without an active internet connection after initial asset loading.
+3.  Project saving and loading mechanisms (e.g., to local files or browser storage) operate client-side.
+4.  HTML5 export functionality operates client-side.
+:::

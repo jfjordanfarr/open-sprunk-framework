@@ -1,0 +1,35 @@
+<!-- filepath: docs/Compositions/music-editor-module.mdmd -->
+::: {composition}
+id: "music-editor-module"
+title: "Music Editor Module"
+composition-type: "software-module-definition"
+status: "draft"
+version: "0.2"
+brief: "Module for music loop composition using a piano roll and Tone.js."
+see-also:
+  - "[[sprunki-core-architecture]]"
+  - "[[../../Definition/Requirements/client-side-architecture-requirement.mdmd]]"
+  - "[[core-system-requirements]]"
+  - "[[../../Definition/Requirements/undo-redo-requirement.mdmd]]"
+  - "[[../../Definition/Requirements/project-saving-requirement.mdmd]]"
+  - "[[../../Definition/Requirements/project-autosave-requirement.mdmd]]"
+  - "[[../../Definition/Requirements/html5-export-requirement.mdmd]]"
+  - "[[../../Definition/Requirements/unified-timeline-requirement.mdmd]]"
+  - "[[animation-editor-module]]" # Cross-domain integration (unified timeline)
+  - "[[../Implementations/music/music-editor-class.mdmd]]"
+  - "[[../Implementations/music/piano-roll-class.mdmd]]"
+  - "[[../Implementations/music/instrument-selector-class.mdmd]]"
+  - "[[../Implementations/music/audio-engine-class.mdmd]]"
+  - "[[../Implementations/music/music-data-schema.mdmd]]"
+
+The Music Editor module allows users to compose music loops, another key creative feature supporting `[[../../Definition/Requirements/CoreSystemRequirements.mdmd]]`. It must adhere to `[[../../Definition/Requirements/client-side-architecture-requirement.mdmd]]` by running entirely in the browser. This module implements the music portion of `[[../../Definition/Requirements/unified-timeline-requirement.mdmd]]`, providing temporal editing capabilities that synchronize with animation through a shared timeline interface. User interactions should be undoable/redoable ( `[[../../Definition/Requirements/undo-redo-requirement.mdmd]]`), and the created music data will be managed by `[[../../Definition/Requirements/project-saving-requirement.mdmd]]` and `[[../../Definition/Requirements/project-autosave-requirement.mdmd]]`, and included in the `[[../../Definition/Requirements/html5-export-requirement.mdmd]]`.
+
+The module is implemented through the main `[[../Implementations/music/music-editor-class.mdmd]]` interface and its supporting components.
+
+The Music Editor module enables users to:
+
+- **Compose Melodies**: Using a piano roll interface `[[../Implementations/music/piano-roll-class.mdmd]]`
+- **Select Instruments**: Choose from various synthesized instruments `[[../Implementations/music/instrument-selector-class.mdmd]]`
+- **Control Playback**: Manage tempo, looping, and playback via `[[../Implementations/music/audio-engine-class.mdmd]]`
+- **Save/Load Music**: Persist musical compositions `[[../Implementations/music/music-data-schema.mdmd]]`
+:::

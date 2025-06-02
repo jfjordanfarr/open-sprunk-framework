@@ -1,0 +1,155 @@
+```{composition}
+id: "phase-centric-core-architecture"
+title: "Phase-Centric Core Architecture"
+composition-type: "software-architecture-overview"
+status: "in-progress"
+see-also:
+  - "[[phase-system-requirement]]"
+  - "[[sprunki-core-architecture]]"
+  - "[[phase-system-architecture]]"
+```
+
+# Phase-Centric Core Architecture
+
+## Overview
+
+This composition defines the foundational architecture where **phases are the primary creative units** while **characters serve as convenient organizational wrappers**. Every phase must be a complete tri-modal experience (visual + kinetic + sonic), and the system supports configurable transition behaviors from traditional hard cuts to innovative natural transitions.
+
+## Architectural Principles
+
+### 1. **Phase as Foundational Unit**
+- **Core Creative Atom**: Phases are the smallest complete creative units
+- **Tri-Modal Requirement**: Every phase MUST contain complete visual, kinetic, and sonic definitions
+- **Self-Contained**: Each phase can function independently without external dependencies
+- **Character-Agnostic**: Phase definitions are reusable across different character contexts
+
+### 2. **Character as Organizational Wrapper**
+- **Phase Collection**: Characters are convenient containers for related phases
+- **Cross-Phase Identity**: Characters maintain identity and continuity across multiple phases
+- **Organizational Convenience**: Characters provide user-friendly grouping and management
+- **Multi-Phase Spanning**: Characters naturally span and transition between phases
+
+### 3. **Configurable Transition System**
+- **Player Agency**: Users control phase transition triggers and behaviors
+- **Innovation Optional**: Advanced natural transitions available but not required
+- **Traditional Support**: Classic hard transitions remain fully supported
+- **Seamless Defaults**: Natural transitions are the default for enhanced experience
+
+## Core Data Flow
+
+```mermaid
+graph TD
+    A[Phase Library] --> B[Character Wrapper]
+    B --> C[Performance Context]
+    C --> D[Transition Controller]
+    D --> E[Active Phase State]
+    
+    F[User Input] --> G[Transition Trigger]
+    G --> D
+    
+    H[Phase Template System] --> A
+    I[Tri-Modal Editor Suite] --> A
+    
+    E --> J[Visual Renderer]
+    E --> K[Kinetic Engine]
+    E --> L[Sonic Engine]
+    
+    J --> M[Performance Output]
+    K --> M
+    L --> M
+```
+
+## Architecture Components
+
+### Core Phase System
+- **[[phase-manager-class]]**: Central orchestration of phase lifecycle
+- **[[phase-data-store-class]]**: Persistent storage for phase definitions
+- **[[phase-template-system-class]]**: Template-based phase creation
+- **[[phase-transition-engine-class]]**: Configurable transition behaviors
+
+### Character Management
+- **[[enhanced-character-schema]]**: Character wrapper with phase collections
+- **[[phase-aware-character-editor-class]]**: Character-centric phase authoring
+- **[[character-phase-coordinator]]**: Cross-phase character state management
+
+### Tri-Modal Editors
+- **[[tri-modal-content-creation-workflow]]**: Unified creation process
+- **[[phase-aware-animation-editor-class]]**: Kinetic modality editor
+- **[[phase-aware-music-editor-class]]**: Sonic modality editor
+- **Visual Editor**: (Enhanced character editor for appearance modality)
+
+### Performance System
+- **[[phase-aware-performance-stage-class]]**: Runtime phase coordination
+- **[[configurable-transition-controller]]**: Player-controlled transition behaviors
+- **[[background-phase-system-class]]**: Environmental phase participation
+
+## Key Innovations
+
+### 1. **Tri-Modal Completeness Enforcement**
+Every phase creation workflow ensures all three modalities are addressed:
+- **Template Starting Points**: Begin with complete tri-modal templates
+- **Smart Default Generation**: Auto-generate reasonable defaults for missing modalities
+- **Validation Gates**: Prevent incomplete phases from entering the system
+- **Guided Workflows**: Editor experiences that naturally lead to complete phases
+
+### 2. **Configurable Transition Behaviors**
+
+#### Traditional Mode (Hard Transitions)
+- All active characters are deactivated
+- Instant switch to new phase state
+- Clear visual break between phases
+- Familiar Sprunki-style experience
+
+#### Natural Mode (Smooth Transitions - DEFAULT)
+- Active characters remain active during transition
+- Smooth animation bridging between phase states
+- Audio crossfading or beat-synchronized transitions
+- Continuous performance flow
+- Position and momentum preservation
+
+### 3. **Flexible Trigger System**
+Player-configurable phase advancement:
+- **Manual Control**: Click/tap to advance phases
+- **Special Character Triggers**: Traditional drag-and-drop activation
+- **Timed Progression**: Automatic advancement based on musical timing
+- **Performance Events**: Phase changes triggered by musical cues
+- **Interaction-Based**: User actions trigger phase evolution
+
+## Implementation Strategy
+
+### Phase 1: Core Foundation
+1. Implement **[[phase-manager-class]]** with tri-modal validation
+2. Create **[[tri-modal-content-creation-workflow]]** specification
+3. Build **[[configurable-transition-controller]]** with hard/natural modes
+
+### Phase 2: Character Integration
+1. Enhance character schema to be phase-collection wrapper
+2. Update character editor for phase-aware authoring
+3. Implement cross-phase character state management
+
+### Phase 3: Advanced Features
+1. Deploy natural transition system with animation bridging
+2. Implement configurable trigger system
+3. Add template system for rapid phase creation
+
+## Benefits
+
+### For Creators
+- **Complete Creative Control**: Every phase is a full tri-modal experience
+- **Flexible Workflow**: Start with any modality and build outward
+- **Template Acceleration**: Rapid content creation through smart templates
+- **Character Continuity**: Maintain character identity across phase evolution
+
+### For Players
+- **Configurable Experience**: Choose between traditional and innovative behaviors
+- **Seamless Performance**: Natural transitions create fluid experiences
+- **Progressive Complexity**: Start simple, add sophistication as desired
+- **Familiar Foundation**: Traditional modes preserve classic Sprunki feel
+
+### For the Framework
+- **Architectural Clarity**: Clear separation between foundational units and organizational wrappers
+- **Extensibility**: Phase-centric design supports unlimited creative expansion
+- **Performance Optimization**: Well-defined units enable targeted optimization
+- **Innovation Platform**: Foundation for advanced transition and coordination features
+
+This architecture establishes phases as the creative foundation while preserving the convenience and familiarity of character-based organization, creating a system that is both innovative and accessible.

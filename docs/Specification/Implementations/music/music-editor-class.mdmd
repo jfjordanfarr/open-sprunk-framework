@@ -1,0 +1,144 @@
+<!-- filepath: docs/Units/music/music-editor-class.mdmd -->
+::: {unit}
+id: "music-editor-class"
+title: "Music Editor Class"
+unit-type: "javascript-class-definition"
+language: "javascript"
+status: "draft"
+version: "0.2"
+brief: "Main class for the Music Editor module, handling UI and Tone.js interaction."
+source-ref: "../../src/music/MusicEditor.js"
+see-also:
+  - "[[piano-roll-class]]" # Implementation dependency (uses PianoRoll)
+  - "[[instrument-selector-class]]" # Implementation dependency (uses InstrumentSelector)
+  - "[[audio-engine-class]]" # Implementation dependency (uses AudioEngine)
+  - "[[music-data-schema]]" # Implementation dependency (works with music data structure)
+  - "[[../core/event-bus-class.mdmd]]" # Implementation dependency (uses EventBus for communication)
+  - "[[../Concepts/music-editor-module.mdmd]]" # Parent composition
+
+The MusicEditor class manages the music composition interface, including the piano roll, instrument selection, and playback controls.
+
+```javascript
+import { PianoRoll } from './PianoRoll.js';
+import { InstrumentSelector } from './InstrumentSelector.js';
+import { AudioEngine } from './AudioEngine.js';
+// import { MusicData } from './MusicData.js'; // Schema/model
+
+export class MusicEditor {
+    constructor(containerElement, eventBus) {
+        this.container = containerElement;
+        this.eventBus = eventBus;
+        this.pianoRoll = null;
+        this.instrumentSelector = null;
+        this.audioEngine = null; // Shared or local instance?
+        this.musicData = {}; // Current music composition
+
+        this._setupUI();
+    }
+
+    async init() {
+        // AudioEngine might be global or instantiated per editor. Assume global for now via EventBus or AppCore.
+        // If local: this.audioEngine = new AudioEngine(this.eventBus);
+        // await this.audioEngine.init(); 
+        // For this example, let's assume AudioEngine is obtained from AppCore or similar
+        this.eventBus.on('audioengine:ready', (engine) => {
+            this.audioEngine = engine;
+        });
+        // Request AudioEngine if not already available
+        this.eventBus.emit('audioengine:request'); 
+
+        const pianoRollContainer = this.container.querySelector('#piano-roll-container');
+        this.pianoRoll = new PianoRoll(pianoRollContainer, this.eventBus);
+        await this.pianoRoll.init();
+
+        const instrumentControlsContainer = this.container.querySelector('#instrument-controls');
+        this.instrumentSelector = new InstrumentSelector(instrumentControlsContainer, this.eventBus);
+        await this.instrumentSelector.init();
+        
+        this._setupEventHandlers();
+        console.log('MusicEditor initialized');
+    }
+
+    _setupUI() {
+        // Setup playback controls, tempo, etc.
+        // Assumes HTML structure is in html-main-page
+        const musicControls = this.container.querySelector('#music-controls');
+        // Example: musicControls.innerHTML = `<button id="play-music">Play</button> ...`;
+    }
+
+    _setupEventHandlers() {
+        this.eventBus.on('pianoroll:notes:changed', (notes) => {
+            this.musicData.notes = notes;
+            this.updateMusicData();
+        });
+
+        this.eventBus.on('instrument:selected', (instrumentName) => {
+            this.musicData.instrument = instrumentName;
+            if (this.audioEngine) {
+                this.audioEngine.setInstrument(instrumentName);
+            }
+            this.updateMusicData();
+        });
+
+        // Playback controls
+        const playButton = this.container.querySelector('#play-music'); // Assuming an ID
+        if(playButton) playButton.addEventListener('click', () => this.play());
+        
+        // Listen for project load events
+        this.eventBus.on('state:project:loaded', (project) => {
+            if (project && project.musicData) {
+                this.loadMusic(project.musicData);
+            }
+        });
+    }
+
+    loadMusic(musicData) {
+        this.musicData = JSON.parse(JSON.stringify(musicData)); // Deep copy
+        this.pianoRoll.setNotes(this.musicData.notes || []);
+        this.instrumentSelector.selectInstrument(this.musicData.instrument || 'synth');
+        if (this.audioEngine) {
+            this.audioEngine.loadSequence(this.musicData);
+        }
+        this.eventBus.emit('music:loaded', this.musicData);
+    }
+
+    updateMusicData() {
+        // Consolidate data from components
+        this.musicData.notes = this.pianoRoll.getNotes();
+        this.musicData.instrument = this.instrumentSelector.getSelectedInstrument();
+        // Add other properties like tempo, time signature from UI controls if any
+        this.eventBus.emit('data:music:changed', this.musicData);
+    }
+
+    getCurrentMusicData() {
+        this.updateMusicData(); // Ensure it's current
+        return this.musicData;
+    }
+
+    play() {
+        if (this.audioEngine) {
+            this.updateMusicData(); // Ensure latest notes are sent to engine
+            this.audioEngine.playSequence(this.musicData);
+        }
+    }
+
+    stop() {
+        if (this.audioEngine) {
+            this.audioEngine.stop();
+        }
+    }
+
+    onActivate() {
+        console.log('MusicEditor activated');
+        // Potentially resume audio context or refresh UI elements
+    }
+
+    dispose() {
+        if (this.pianoRoll) this.pianoRoll.dispose();
+        if (this.instrumentSelector) this.instrumentSelector.dispose();
+        // If AudioEngine was local: if (this.audioEngine) this.audioEngine.dispose();
+        console.log('MusicEditor disposed');
+    }
+}
+```
+:::

@@ -1,0 +1,120 @@
+<!-- filepath: docs/Units/character/character-data-schema.mdmd -->
+::: {unit}
+id: "character-data-schema"
+title: "Character Data Schema"
+unit-type: "json-schema-definition"
+language: "json"
+status: "draft"
+version: "0.2"
+brief: "Defines the JSON structure for storing character data."
+source-ref: "../../src/character/CharacterData.js"
+see-also:
+  - "[[../Concepts/character-editor-module.mdmd]]" # Parent composition
+  - "[[project-file-schema]]" # Architectural association (used by project schema)
+
+This unit describes the data structure for a character. It will likely be a JSON object that can be serialized/deserialized.
+Note: The `source-ref` points to `CharacterData.js`, which might be a module exporting this schema or a class that works with this data structure.
+
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CharacterData",
+  "description": "Schema for Sprunki character data",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique identifier for the character"
+    },
+    "name": {
+      "type": "string",
+      "description": "User-defined name for the character"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of character creation"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of last character update"
+    },
+    "fabricCanvas": {
+      "type": "object",
+      "description": "Serialized Fabric.js canvas state representing the character visuals. See http://fabricjs.com/docs/fabric.Canvas.html#toObject"
+      // Specific properties of fabric.js serialization are numerous and complex,
+      // so we keep this generic. It typically includes 'version', 'objects', 'background'.
+    },
+    "parts": {
+      "type": "array",
+      "description": "Optional structured hierarchy of character parts, if not solely relying on Fabric groups.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "partId": { "type": "string" },
+          "name": { "type": "string" },
+          "fabricObjectIds": { 
+            "type": "array", 
+            "items": { "type": "string" },
+            "description": "IDs of Fabric.js objects belonging to this part"
+          },
+          "transform": { "type": "object", "description": "Relative transform if hierarchical" }
+          // Add other part-specific metadata
+        }
+      }
+    },
+    "metadata": {
+        "type": "object",
+        "description": "Any other custom metadata for the character"
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "fabricCanvas"
+  ]
+}
+```
+
+A corresponding JavaScript file (`src/character/CharacterData.js`) might look like this:
+
+```javascript
+// src/character/CharacterData.js
+
+/**
+ * Generates a new character data object with default values.
+ * @param {string} name - The name of the character.
+ * @returns {object} A new character data object.
+ */
+export function createNewCharacterData(name) {
+    return {
+        id: self.crypto.randomUUID(), // Browser environment
+        name: name || 'New Character',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        fabricCanvas: null, // To be populated by Fabric.js toJSON()
+        parts: [],
+        metadata: {}
+    };
+}
+
+/**
+ * Validates character data against the schema (basic validation example).
+ * @param {object} characterData - The character data to validate.
+ * @returns {boolean} True if valid, false otherwise.
+ */
+export function isValidCharacterData(characterData) {
+    if (!characterData || typeof characterData !== 'object') return false;
+    if (typeof characterData.id !== 'string') return false;
+    if (typeof characterData.name !== 'string') return false;
+    if (typeof characterData.fabricCanvas !== 'object') return false; // Could be null initially
+    return true;
+}
+
+// Potentially, a CharacterData class could also be defined here to wrap the object
+// and provide methods for manipulation, if preferred over plain utility functions.
+```
+
+:::

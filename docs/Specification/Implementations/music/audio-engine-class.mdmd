@@ -1,0 +1,652 @@
+<!-- filepath: docs/Units/music/audio-engine-class.mdmd -->
+::: {unit}
+id: "audio-engine-class"
+title: "Audio Engine Class"
+unit-type: "javascript-class-definition"
+language: "javascript"
+status: "draft"
+version: "0.2"
+brief: "Wrapper for Tone.js library to handle sound generation and playback."
+source-ref: "../../src/music/AudioEngine.js"
+see-also:
+  - "[[music-data-schema]]" # Implementation dependency (plays music data structure)
+  - "[[../core/event-bus-class.mdmd]]" # Implementation dependency (uses EventBus for audio events)
+  - "[[../animation/timeline-class]]" # Implementation dependency (synchronizes with unified timeline)
+  - "[[../../Definition/Requirements/unified-timeline-requirement]]" # Traceability (implements timing synchronization)
+  - "[[../../Definition/Requirements/multi-modal-audio-input-requirement]]" # Traceability (implements audio input capabilities)
+  - "[[../Concepts/music-editor-module.mdmd]]" # Parent composition
+
+This class encapsulates Tone.js functionalities for sound synthesis, sequencing, effects, and multi-modal audio input including microphone recording and sample playback.
+
+```javascript
+// Assumes Tone.js is loaded globally or imported
+// import * as Tone from 'tone'; // If using npm package
+
+export class AudioEngine {
+    constructor(eventBus) {
+        this.eventBus = eventBus;
+        this.instrument = null;
+        this.currentSequence = null;
+        this.isToneStarted = false;
+        this.defaultInstrumentType = 'Synth';
+        this.defaultInstrumentConfig = { oscillator: { type: 'triangle' }, envelope: { attack: 0.01, decay: 0.1, sustain: 0.5, release: 0.8 } };
+        
+        // Multi-modal audio capabilities
+        this.sampleLibrary = new Map(); // Store user samples by ID
+        this.microphoneStream = null;
+        this.recorder = null;
+        this.recordingBuffers = [];
+        this.isRecording = false;
+        this.samplers = new Map(); // Tone.js Sampler instances for sample playback
+        
+        // Advanced synthesis
+        this.wavetables = new Map(); // Custom wavetables
+        this.effectsChain = [];
+        this.masterGain = null;
+    }
+
+    async init() {
+        if (typeof Tone === 'undefined') {
+            console.error('Tone.js is not loaded!');
+            return;
+        }
+        
+        // Initialize master gain for volume control
+        this.masterGain = new Tone.Gain(0.8).toDestination();
+        
+        // Initialize default instrument
+        this.setInstrument('synth', this.defaultInstrumentConfig, this.defaultInstrumentType);
+        
+        // Set up event listeners
+        this.eventBus.on('instrument:selected', (instrumentId, instrumentData) => {
+            if (instrumentData && instrumentData.config) {
+                this.setInstrument(instrumentId, instrumentData.config, instrumentData.type || 'Synth');
+            } else {
+                this.setInstrument(instrumentId, this.defaultInstrumentConfig, this.defaultInstrumentType);
+            }
+        });
+
+        // Microphone recording events
+        this.eventBus.on('audio:start_recording', () => this.startRecording());
+        this.eventBus.on('audio:stop_recording', () => this.stopRecording());
+        this.eventBus.on('audio:upload_sample', (file) => this.uploadAudioFile(file));
+        
+        // Initialize microphone access (with user permission)
+        await this.initializeMicrophone();
+        
+        this.eventBus.emit('audioengine:ready', this);
+        console.log('AudioEngine initialized with multi-modal capabilities');
+    }
+    
+    async _startTone() {
+        if (!this.isToneStarted && Tone && Tone.context.state !== 'running') {
+            await Tone.start();
+            this.isToneStarted = true;
+            console.log('Tone.js AudioContext started.');
+        }
+    }
+
+    setInstrument(instrumentId, config, type = 'Synth') {
+        if (this.instrument && typeof this.instrument.dispose === 'function') {
+            this.instrument.dispose();
+        }
+
+        const instrumentType = type || 'Synth'; // Default to Tone.Synth
+        if (Tone[instrumentType]) {
+            this.instrument = new Tone[instrumentType](config).toDestination();
+        } else {
+            console.warn(`Tone.${instrumentType} not found. Defaulting to Synth.`);
+            this.instrument = new Tone.Synth(config).toDestination();
+        }
+        console.log(`Instrument set to ${instrumentId} (Type: ${instrumentType})`);
+    }
+
+    playNote(note, duration = '8n', time = Tone.now()) {
+        this._startTone(); // Ensure context is running
+        if (this.instrument) {
+            // For MembraneSynth (like kick) or NoiseSynth, triggerAttackRelease takes velocity as 3rd arg
+            if (this.instrument instanceof Tone.MembraneSynth || this.instrument instanceof Tone.NoiseSynth) {
+                 this.instrument.triggerAttackRelease(note.velocity || 0.8, duration, time);
+            } else { // For regular synths, pitch is the first arg
+                 this.instrument.triggerAttackRelease(Tone.Frequency(note.pitch, "midi").toNote(), duration, time, note.velocity || 0.8);
+            }
+        }
+    }
+
+    loadSequence(musicData) {
+        this._startTone();
+        if (!musicData || !musicData.notes || musicData.notes.length === 0) {
+            if (this.currentSequence) {
+                this.currentSequence.clear();
+            }
+            return;
+        }
+
+        if (this.currentSequence) {
+            this.currentSequence.clear();
+            this.currentSequence.dispose();
+        }
+
+        const events = musicData.notes.map(note => {
+            return [note.time, note]; // Tone.Part expects [time, value]
+        });
+
+        this.currentSequence = new Tone.Part((time, note) => {
+            // Convert MIDI pitch to note name if instrument expects it
+            const noteName = Tone.Frequency(note.pitch, "midi").toNote();
+            const durationInBeats = note.duration || (1 / (musicData.stepsPerBeat || 4));
+            const durationNotation = `${durationInBeats * (musicData.beats || 4)}n`; // e.g. 4n, 8n, 16n
+            
+            if (this.instrument instanceof Tone.MembraneSynth || this.instrument instanceof Tone.NoiseSynth) {
+                this.instrument.triggerAttackRelease(note.velocity || 0.8, `${durationInBeats}b`, time); // duration in beats
+            } else {
+                this.instrument.triggerAttackRelease(noteName, `${durationInBeats}b`, time, note.velocity || 0.8);
+            }
+
+        }, events);
+
+        this.currentSequence.loop = true;
+        this.currentSequence.loopEnd = musicData.beats || 4; // Loop length in measures/beats
+        Tone.Transport.bpm.value = musicData.tempo || 120;
+    }
+
+    playSequence(musicData) {
+        this._startTone();
+        if (musicData) {
+            this.loadSequence(musicData);
+        }
+        if (this.currentSequence && this.currentSequence.length > 0) {
+            Tone.Transport.start();
+            this.currentSequence.start(0);
+            this.eventBus.emit('playback:started');
+        } else {
+            console.warn('No sequence loaded or sequence is empty.');
+        }
+    }
+
+    stop() {
+        Tone.Transport.stop();
+        if (this.currentSequence) {
+            this.currentSequence.stop(0);
+        }
+        this.eventBus.emit('playback:stopped');
+    }    setTempo(bpm) {
+        Tone.Transport.bpm.value = bpm;
+        this.eventBus.emit('tempo:changed', bpm);
+        
+        // Notify timeline for animation synchronization
+        this.eventBus.emit('audio:tempo_changed', bpm);
+    }
+
+    /**
+     * UNIFIED TIMELINE SYNCHRONIZATION METHODS
+     * Implements requirements for timeline coordination with animation system
+     */
+    
+    // Start playback at specific timeline position
+    async startPlayback(startTime = 0) {
+        await this._startTone();
+        
+        if (startTime > 0) {
+            // Seek to position before starting
+            Tone.Transport.seconds = startTime;
+        }
+        
+        Tone.Transport.start();
+        this.eventBus.emit('audio:playback_started', { startTime });
+    }
+    
+    // Pause playback while maintaining position
+    pausePlayback() {
+        Tone.Transport.pause();
+        this.eventBus.emit('audio:playback_paused', { 
+            currentTime: Tone.Transport.seconds 
+        });
+    }
+    
+    // Stop playback and reset position
+    stopPlayback() {
+        Tone.Transport.stop();
+        this.eventBus.emit('audio:playback_stopped');
+    }
+    
+    // Seek to specific timeline position (for scrubbing)
+    seekTo(time) {
+        const wasPlaying = Tone.Transport.state === 'started';
+        
+        if (wasPlaying) {
+            Tone.Transport.pause();
+        }
+        
+        Tone.Transport.seconds = time;
+        
+        if (wasPlaying) {
+            Tone.Transport.start();
+        }
+        
+        this.eventBus.emit('audio:seek', { time, wasPlaying });
+    }
+    
+    // Get current playback position for timeline synchronization
+    getCurrentTime() {
+        return Tone.Transport.seconds;
+    }
+    
+    // Get current tempo for timeline calculations
+    getCurrentTempo() {
+        return Tone.Transport.bpm.value;
+    }
+    
+    // Register callback for precise timing events (for animation sync)
+    scheduleCallback(time, callback) {
+        return Tone.Transport.schedule(callback, time);
+    }
+    
+    // Cancel scheduled callback
+    cancelCallback(callbackId) {
+        Tone.Transport.cancel(callbackId);
+    }
+    
+    // Schedule repeating callback (for beat sync)
+    scheduleRepeat(callback, interval, startTime = 0) {
+        return Tone.Transport.scheduleRepeat(callback, interval, startTime);
+    }
+    
+    // Set up beat callback for timeline synchronization
+    setupBeatSync(beatCallback) {
+        // Schedule callback every quarter note for beat synchronization
+        const beatInterval = "4n"; // Quarter note
+        
+        this.beatSyncId = this.scheduleRepeat((time) => {
+            const currentBeat = Tone.Transport.position;
+            const currentTime = Tone.Transport.seconds;
+            
+            beatCallback({
+                beat: currentBeat,
+                time: currentTime,
+                tempo: this.getCurrentTempo()
+            });
+            
+            // Emit for timeline coordination
+            this.eventBus.emit('audio:beat', {
+                beat: currentBeat,
+                time: currentTime,
+                tempo: this.getCurrentTempo()
+            });
+        }, beatInterval);
+        
+        return this.beatSyncId;
+    }
+    
+    // Remove beat synchronization
+    removeBeatSync() {
+        if (this.beatSyncId) {
+            this.cancelCallback(this.beatSyncId);
+            this.beatSyncId = null;
+        }
+    }
+    
+    // Enable looping between specific times
+    setLoop(startTime, endTime) {
+        Tone.Transport.loopStart = startTime;
+        Tone.Transport.loopEnd = endTime;
+        Tone.Transport.loop = true;
+        
+        this.eventBus.emit('audio:loop_set', { startTime, endTime });
+    }
+    
+    // Disable looping
+    clearLoop() {
+        Tone.Transport.loop = false;
+        this.eventBus.emit('audio:loop_cleared');
+    }
+
+    // Microphone input handling
+    async initializeMicrophone() {
+        try {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                console.warn('Microphone not supported in this browser');
+                return false;
+            }
+            
+            // Don't request permission until user actually wants to record
+            this.microphoneAvailable = true;
+            this.eventBus.emit('microphone:available');
+            return true;
+        } catch (error) {
+            console.error('Error checking microphone availability:', error);
+            this.eventBus.emit('microphone:unavailable', error);
+            return false;
+        }
+    }
+    
+    async startRecording() {
+        if (this.isRecording) {
+            console.warn('Already recording');
+            return;
+        }
+        
+        try {
+            // Request microphone permission
+            this.microphoneStream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    sampleRate: 44100,
+                    channelCount: 1,
+                    echoCancellation: true,
+                    noiseSuppression: true
+                }
+            });
+            
+            // Create MediaRecorder for recording
+            this.recorder = new MediaRecorder(this.microphoneStream, {
+                mimeType: 'audio/webm'
+            });
+            
+            this.recordingBuffers = [];
+            
+            this.recorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    this.recordingBuffers.push(event.data);
+                }
+            };
+            
+            this.recorder.onstop = () => {
+                this.processRecording();
+            };
+            
+            this.recorder.start(100); // Collect data every 100ms
+            this.isRecording = true;
+            
+            this.eventBus.emit('recording:started');
+            console.log('Microphone recording started');
+            
+        } catch (error) {
+            console.error('Error starting recording:', error);
+            this.eventBus.emit('recording:error', error);
+        }
+    }
+    
+    async stopRecording() {
+        if (!this.isRecording || !this.recorder) {
+            return;
+        }
+        
+        this.recorder.stop();
+        this.isRecording = false;
+        
+        // Stop microphone stream
+        if (this.microphoneStream) {
+            this.microphoneStream.getTracks().forEach(track => track.stop());
+            this.microphoneStream = null;
+        }
+        
+        this.eventBus.emit('recording:stopped');
+        console.log('Microphone recording stopped');
+    }
+    
+    async processRecording() {
+        if (this.recordingBuffers.length === 0) {
+            console.warn('No recording data to process');
+            return;
+        }
+        
+        try {
+            // Combine all recorded chunks
+            const blob = new Blob(this.recordingBuffers, { type: 'audio/webm' });
+            
+            // Convert to audio buffer
+            const arrayBuffer = await blob.arrayBuffer();
+            const audioContext = Tone.getContext().rawContext;
+            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+            
+            // Generate unique ID for this recording
+            const recordingId = `recording_${Date.now()}`;
+            
+            // Store in sample library
+            this.sampleLibrary.set(recordingId, {
+                buffer: audioBuffer,
+                name: `Recording ${new Date().toLocaleTimeString()}`,
+                type: 'recording',
+                duration: audioBuffer.duration
+            });
+            
+            // Create Tone.js buffer for playback
+            const toneBuffer = new Tone.ToneAudioBuffer(audioBuffer);
+            
+            this.eventBus.emit('recording:processed', {
+                id: recordingId,
+                buffer: toneBuffer,
+                duration: audioBuffer.duration
+            });
+            
+            console.log(`Recording processed: ${recordingId}`);
+            
+        } catch (error) {
+            console.error('Error processing recording:', error);
+            this.eventBus.emit('recording:error', error);
+        }
+    }
+    
+    /**
+     * AUDIO FILE UPLOAD CAPABILITIES
+     */
+    
+    async uploadAudioFile(file) {
+        if (!file) return;
+        
+        // Validate file type
+        const supportedTypes = ['audio/wav', 'audio/mp3', 'audio/mpeg', 'audio/ogg', 'audio/m4a'];
+        if (!supportedTypes.includes(file.type)) {
+            this.eventBus.emit('upload:error', 'Unsupported file type');
+            return;
+        }
+        
+        // Validate file size (10MB limit)
+        const maxSize = 10 * 1024 * 1024;
+        if (file.size > maxSize) {
+            this.eventBus.emit('upload:error', 'File too large (max 10MB)');
+            return;
+        }
+        
+        try {
+            this.eventBus.emit('upload:started', file.name);
+            
+            // Read file as array buffer
+            const arrayBuffer = await file.arrayBuffer();
+            
+            // Decode audio data
+            const audioContext = Tone.getContext().rawContext;
+            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+            
+            // Generate unique ID
+            const uploadId = `upload_${Date.now()}`;
+            
+            // Store in sample library
+            this.sampleLibrary.set(uploadId, {
+                buffer: audioBuffer,
+                name: file.name,
+                type: 'upload',
+                duration: audioBuffer.duration
+            });
+            
+            // Create Tone.js buffer
+            const toneBuffer = new Tone.ToneAudioBuffer(audioBuffer);
+            
+            this.eventBus.emit('upload:completed', {
+                id: uploadId,
+                name: file.name,
+                buffer: toneBuffer,
+                duration: audioBuffer.duration
+            });
+            
+            console.log(`Audio file uploaded: ${uploadId}`);
+            
+        } catch (error) {
+            console.error('Error uploading audio file:', error);
+            this.eventBus.emit('upload:error', error.message);
+        }
+    }
+    
+    /**
+     * SAMPLE PLAYBACK CAPABILITIES
+     */
+    
+    createSampleInstrument(sampleId, options = {}) {
+        const sample = this.sampleLibrary.get(sampleId);
+        if (!sample) {
+            console.error(`Sample not found: ${sampleId}`);
+            return null;
+        }
+        
+        // Create Tone.js Sampler or Player based on use case
+        let instrument;
+        
+        if (options.chromatic) {
+            // For pitched samples that can be played at different pitches
+            const urls = {};
+            urls[options.rootNote || 'C4'] = sample.buffer;
+            
+            instrument = new Tone.Sampler(urls, {
+                attack: options.attack || 0,
+                release: options.release || 0.1
+            }).connect(this.masterGain);
+            
+        } else {
+            // For one-shot samples (percussion, effects)
+            instrument = new Tone.Player(sample.buffer).connect(this.masterGain);
+            
+            if (options.loop) {
+                instrument.loop = true;
+            }
+        }
+        
+        this.samplers.set(sampleId, instrument);
+        return instrument;
+    }
+    
+    playSample(sampleId, note = 'C4', time = Tone.now(), options = {}) {
+        let instrument = this.samplers.get(sampleId);
+        
+        if (!instrument) {
+            instrument = this.createSampleInstrument(sampleId, options);
+        }
+        
+        if (!instrument) return;
+        
+        if (instrument instanceof Tone.Sampler) {
+            instrument.triggerAttackRelease(note, options.duration || '8n', time, options.velocity || 0.8);
+        } else {
+            instrument.start(time);
+        }
+    }
+
+    // Advanced synthesis methods
+    createWavetable(name, periodicFunction, options = {}) {
+        const wavetable = new Tone.WaveTable({
+            frameCount: 2048,
+            // Add more customization options as needed
+        });
+        
+        // Fill wavetable with custom function
+        for (let i = 0; i < wavetable.length; i++) {
+            const x = i / wavetable.length;
+            const y = periodicFunction(x);
+            wavetable.set(i, y);
+        }
+        
+        this.wavetables.set(name, wavetable);
+        console.log(`Wavetable ${name} created`);
+    }
+
+    getWavetable(name) {
+        return this.wavetables.get(name);
+    }
+
+    connectEffectsChain(effects) {
+        this.effectsChain = effects;
+        
+        // Connect instrument to effects
+        if (this.instrument) {
+            let lastNode = this.instrument;
+            
+            effects.forEach(effect => {
+                lastNode.connect(effect);
+                lastNode = effect;
+            });
+            
+            // Connect to destination
+            lastNode.connect(Tone.Destination);
+        }
+    }
+
+    dispose() {
+        this.stop();
+        
+        // Clean up recording resources
+        if (this.isRecording) {
+            this.stopRecording();
+        }
+        
+        // Clean up sample library
+        this.samplers.forEach(sampler => sampler.dispose());
+        this.samplers.clear();
+        this.sampleLibrary.clear();
+        
+        // Clean up timeline sync
+        this.removeBeatSync();
+        
+        if (this.instrument) {
+            this.instrument.dispose();
+        }
+        if (this.currentSequence) {
+            this.currentSequence.dispose();
+        }
+        if (this.masterGain) {
+            this.masterGain.dispose();
+        }
+        
+        console.log('AudioEngine disposed');
+    }
+    
+    /**
+     * SAMPLE MANAGEMENT UTILITIES
+     */
+    
+    getSampleLibrary() {
+        const samples = [];
+        this.sampleLibrary.forEach((sample, id) => {
+            samples.push({
+                id,
+                name: sample.name,
+                type: sample.type,
+                duration: sample.duration
+            });
+        });
+        return samples;
+    }
+    
+    deleteSample(sampleId) {
+        // Clean up any associated instruments
+        const instrument = this.samplers.get(sampleId);
+        if (instrument) {
+            instrument.dispose();
+            this.samplers.delete(sampleId);
+        }
+        
+        // Remove from library
+        this.sampleLibrary.delete(sampleId);
+        
+        this.eventBus.emit('sample:deleted', sampleId);
+    }
+    
+    exportSample(sampleId) {
+        const sample = this.sampleLibrary.get(sampleId);
+        if (!sample) return null;
+        
+        // Convert audio buffer to blob for download
+        // This would require additional implementation for audio encoding
+        this.eventBus.emit('sample:export_requested', { sampleId, sample });
+    }
+}
+```
+:::

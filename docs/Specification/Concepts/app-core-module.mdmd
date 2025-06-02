@@ -1,0 +1,26 @@
+<!-- filepath: docs/Compositions/app-core-module.mdmd -->
+::: {composition}
+id: "app-core-module"
+title: "App Core Module"
+composition-type: "software-module-definition"
+status: "draft"
+version: "0.2"
+brief: "Core application infrastructure including bootstrap, main app class, and event system."
+see-also:
+  - "[[sprunki-core-architecture]]"
+  - "[[../../Definition/Requirements/client-side-architecture-requirement.mdmd]]"
+  - "[[../../Definition/Requirements/CoreSystemRequirements.mdmd]]"
+  - "[[../Implementations/html-main-page.mdmd]]"
+  - "[[../Implementations/app-main-bootstrap.mdmd]]"
+  - "[[../Implementations/core/app-core-class.mdmd]]"
+  - "[[../Implementations/core/event-bus-class.mdmd]]"
+  - "[[../Implementations/core/state-manager-class.mdmd]]"
+
+The core module provides the foundational infrastructure for the application. It is essential for meeting the `[[../../Definition/Requirements/client-side-architecture-requirement.mdmd]]` by orchestrating the entirely browser-based application. Its existence and proper functioning are implied by nearly all entries in `[[core-system-requirements]]` as it underpins the entire system.
+
+- **HTML Structure**: `[[../Implementations/html-main-page.mdmd]]` - Main page layout and containers
+- **Bootstrap**: `[[../Implementations/app-main-bootstrap.mdmd]]` - Application entry point and initialization
+- **App Orchestrator**: `[[../Implementations/core/app-core-class.mdmd]]` - Main application state and module coordination  
+- **Event Communication**: `[[../Implementations/core/event-bus-class.mdmd]]` - Inter-module communication system
+- **State Management**: `[[../Implementations/core/state-manager-class.mdmd]]` - Global application state
+:::

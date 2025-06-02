@@ -1,0 +1,821 @@
+```{unit}
+id: "phase-aware-music-editor-class"
+title: "Phase-Aware Music Editor Class"
+unit-type: "javascript-class-definition"
+source-ref: "../../src/music/PhaseAwareMusicEditor.js"
+status: "draft"
+see-also:
+  - "[[music-editor-class]]"
+  - "[[piano-roll-class]]"
+  - "[[audio-engine-class]]"
+  - "[[beat-sync-service-class]]"
+  - "[[phase-manager-class]]"
+  - "[[multi-modal-audio-input-requirement]]"
+```
+
+## Overview
+
+The **Phase-Aware Music Editor** extends the base Music Editor with comprehensive phase integration, enabling users to create and manage music content that is linked to specific character phases. This editor provides tools for phase-specific music creation, cross-phase musical coordination, and seamless integration with character appearance and animation systems.
+
+## Core Features
+
+### Phase-Linked Music Creation
+- **Phase Context Awareness**: All music editing occurs within the context of a specific character phase
+- **Multi-Phase Music Management**: Manage complete music sets for each character phase
+- **Cross-Phase Musical Coordination**: Coordinate musical elements across multiple phases
+- **Phase Transition Audio**: Create smooth audio transitions between phases
+
+### Musical Phase Workflows
+- **Music-First Creation**: Start with musical ideas and generate matching visuals/animations
+- **Appearance-Synchronized Music**: Create music that matches character appearance themes
+- **Animation-Driven Music**: Generate music that complements existing character animations
+- **Template-Based Composition**: Use musical templates for rapid phase music creation
+
+### Advanced Audio Features
+- **Loop-Based Composition**: Phase music built around seamless audio loops
+- **Multi-Modal Input Integration**: Support synthesis, recording, and sample import for phase music
+- **Dynamic Music Adaptation**: Music that adapts to performance context and other characters
+- **Real-Time Audio Effects**: Phase-specific audio effects and processing
+
+## Technical Implementation
+
+```javascript
+class PhaseAwareMusicEditor {
+    constructor(containerElement, eventBus, phaseManager, audioEngine, beatSyncService) {
+        this.container = containerElement;
+        this.eventBus = eventBus;
+        this.phaseManager = phaseManager;
+        this.audioEngine = audioEngine;
+        this.beatSyncService = beatSyncService;
+        
+        // Base music editor functionality
+        this.baseMusicEditor = null;
+        this.pianoRoll = null;
+        this.instrumentSelector = null;
+        
+        // Phase-specific state
+        this.characterId = null;
+        this.currentPhaseId = null;
+        this.phaseMusic = new Map(); // All music for current character's phases
+        
+        // Music creation state
+        this.currentLoop = null;
+        this.recordingState = null;
+        this.compositionWorkflow = "music-first"; // "music-first" | "appearance-first" | "animation-first"
+        
+        // UI elements
+        this.phaseSelector = null;
+        this.loopManager = null;
+        this.transitionEditor = null;
+        this.coordinationPanel = null;
+        this.workflowSelector = null;
+        
+        // Musical coordination
+        this.masterTempo = 120;
+        this.masterTimeSignature = { numerator: 4, denominator: 4 };
+        this.phaseCoordination = new Map(); // Cross-phase musical relationships
+        
+        // Audio processing
+        this.phaseEffects = new Map(); // Phase-specific audio effects
+        this.transitionEffects = new Map(); // Transition-specific audio effects
+        this.dynamicAdaptation = true;
+        
+        this.setupUI();
+        this.setupEventHandlers();
+    }
+    
+    async init() {
+        // Initialize base music editor components
+        await this.initializeBaseMusicEditor();
+        
+        // Initialize phase-specific components
+        await this.initializeLoopManager();
+        await this.initializeTransitionEditor();
+        await this.initializeCoordinationSystem();
+        
+        // Setup audio processing
+        await this.setupPhaseAudioProcessing();
+        
+        console.log('PhaseAwareMusicEditor initialized');
+    }
+    
+    // Phase Management Methods
+    async loadCharacterPhases(characterId) {
+        this.characterId = characterId;
+        
+        // Load all phase music for this character
+        const phaseData = await this.phaseManager.getCharacterPhases(characterId);
+        this.phaseMusic.clear();
+        
+        for (const phase of phaseData.phases) {
+            if (phase.music) {
+                this.phaseMusic.set(phase.id, phase.music);
+            } else {
+                // Create empty music data for this phase
+                this.phaseMusic.set(phase.id, this.createEmptyPhaseMusic(phase.id));
+            }
+        }
+        
+        // Set initial active phase
+        if (this.phaseMusic.size > 0) {
+            const firstPhaseId = phaseData.phases[0].id;
+            await this.setActivePhase(firstPhaseId);
+        }
+        
+        this.updatePhaseSelector();
+        this.eventBus.emit('character-phases-loaded-music', { characterId, phaseCount: this.phaseMusic.size });
+    }
+    
+    async setActivePhase(phaseId) {
+        if (!this.phaseMusic.has(phaseId)) {
+            console.error(`Phase ${phaseId} not found`);
+            return;
+        }
+        
+        // Save current music work
+        if (this.currentPhaseId && this.currentLoop) {
+            await this.saveCurrentMusic();
+        }
+        
+        this.currentPhaseId = phaseId;
+        
+        // Load phase music data
+        const phaseMusic = this.phaseMusic.get(phaseId);
+        await this.loadPhaseMusic(phaseMusic);
+        
+        // Update UI to reflect active phase
+        this.updateActivePhaseUI();
+        
+        // Sync beat service with phase tempo
+        this.syncWithPhaseTempo(phaseMusic);
+        
+        // Load phase-specific audio effects
+        await this.loadPhaseAudioEffects(phaseId);
+        
+        this.eventBus.emit('music-phase-activated', { 
+            characterId: this.characterId, 
+            phaseId: phaseId,
+            bpm: phaseMusic.bpm 
+        });
+    }
+    
+    async loadPhaseMusic(phaseMusic) {
+        // Load main loop into piano roll/sequencer
+        if (phaseMusic.loop) {
+            this.currentLoop = phaseMusic.loop;
+            await this.loadLoopIntoEditor(this.currentLoop);
+        } else {
+            // Create new loop for this phase
+            this.currentLoop = this.createNewLoop(phaseMusic.bpm, phaseMusic.timeSignature);
+            await this.loadLoopIntoEditor(this.currentLoop);
+        }
+        
+        // Update tempo and time signature
+        this.beatSyncService.setBPM(phaseMusic.bpm);
+        this.beatSyncService.setTimeSignature(phaseMusic.timeSignature);
+        
+        // Load additional audio elements
+        this.loadPhaseInstruments(phaseMusic.instruments);
+        this.loadPhaseSamples(phaseMusic.samples);
+        this.loadPhaseEffects(phaseMusic.effects);
+    }
+    
+    // Music Creation Workflows
+    async createMusicFirstPhase(musicData, options = {}) {
+        const phaseId = options.phaseId || `${this.characterId}-music-phase-${Date.now()}`;
+        
+        // Analyze music to extract characteristics
+        const musicAnalysis = await this.analyzeMusicContent(musicData);
+        
+        // Create phase music data
+        const phaseMusic = {
+            id: phaseId,
+            bpm: musicAnalysis.bpm || 120,
+            timeSignature: musicAnalysis.timeSignature || { numerator: 4, denominator: 4 },
+            key: musicAnalysis.key || "C major",
+            mood: musicAnalysis.mood || "neutral",
+            
+            // Core audio content
+            loop: musicData.loop || this.createLoopFromAnalysis(musicAnalysis),
+            instruments: musicData.instruments || [],
+            samples: musicData.samples || [],
+            effects: musicData.effects || [],
+            
+            // Generated suggestions for other modalities
+            suggestedAppearance: this.generateAppearanceFromMusic(musicAnalysis),
+            suggestedAnimation: this.generateAnimationFromMusic(musicAnalysis),
+            
+            // Metadata
+            metadata: {
+                created: new Date().toISOString(),
+                workflow: "music-first",
+                musicSource: options.source || "user-created",
+                analysisData: musicAnalysis
+            }
+        };
+        
+        this.phaseMusic.set(phaseId, phaseMusic);
+        await this.setActivePhase(phaseId);
+        
+        // Emit suggestions to other editors
+        this.eventBus.emit('music-first-phase-created', {
+            phaseId,
+            characterId: this.characterId,
+            suggestions: {
+                appearance: phaseMusic.suggestedAppearance,
+                animation: phaseMusic.suggestedAnimation
+            }
+        });
+        
+        return phaseId;
+    }
+    
+    async createAppearanceFirstMusic(appearanceData, phaseId) {
+        // Generate music that matches character appearance
+        const musicCharacteristics = this.extractMusicFromAppearance(appearanceData);
+        
+        const phaseMusic = {
+            id: phaseId,
+            bpm: musicCharacteristics.bpm,
+            timeSignature: musicCharacteristics.timeSignature,
+            key: musicCharacteristics.key,
+            mood: musicCharacteristics.mood,
+            
+            // Generated audio content
+            loop: await this.generateLoopFromCharacteristics(musicCharacteristics),
+            instruments: this.selectInstrumentsForCharacter(appearanceData),
+            samples: [],
+            effects: this.generateEffectsForAppearance(appearanceData),
+            
+            // Source tracking
+            metadata: {
+                created: new Date().toISOString(),
+                workflow: "appearance-first",
+                appearanceSource: appearanceData,
+                generatedCharacteristics: musicCharacteristics
+            }
+        };
+        
+        this.phaseMusic.set(phaseId, phaseMusic);
+        await this.loadPhaseMusic(phaseMusic);
+        
+        return phaseMusic;
+    }
+    
+    async createAnimationFirstMusic(animationData, phaseId) {
+        // Generate music that matches animation timing and style
+        const musicCharacteristics = this.extractMusicFromAnimation(animationData);
+        
+        const phaseMusic = {
+            id: phaseId,
+            bpm: musicCharacteristics.bpm,
+            timeSignature: musicCharacteristics.timeSignature,
+            key: musicCharacteristics.key,
+            intensity: musicCharacteristics.intensity,
+            
+            // Generated audio content matching animation
+            loop: await this.generateLoopFromAnimation(animationData),
+            instruments: this.selectInstrumentsForAnimation(animationData),
+            samples: this.generatePercussionFromAnimation(animationData),
+            effects: [],
+            
+            // Animation synchronization data
+            animationSync: {
+                keyMoments: this.extractKeyMomentsFromAnimation(animationData),
+                rhythmPattern: this.extractRhythmFromAnimation(animationData),
+                intensityCurve: this.extractIntensityFromAnimation(animationData)
+            },
+            
+            metadata: {
+                created: new Date().toISOString(),
+                workflow: "animation-first",
+                animationSource: animationData,
+                syncData: musicCharacteristics
+            }
+        };
+        
+        this.phaseMusic.set(phaseId, phaseMusic);
+        await this.loadPhaseMusic(phaseMusic);
+        
+        return phaseMusic;
+    }
+    
+    // Loop Management
+    createNewLoop(bpm = 120, timeSignature = { numerator: 4, denominator: 4 }) {
+        const loopDuration = this.calculateLoopDuration(bpm, timeSignature);
+        
+        return {
+            id: `loop-${Date.now()}`,
+            bpm,
+            timeSignature,
+            duration: loopDuration, // Duration in milliseconds
+            seamless: true, // Whether loop connects smoothly to itself
+            
+            // Musical content
+            tracks: [
+                {
+                    id: "melody",
+                    instrument: "synth",
+                    notes: [],
+                    volume: 0.8,
+                    effects: []
+                },
+                {
+                    id: "bass",
+                    instrument: "bass",
+                    notes: [],
+                    volume: 0.7,
+                    effects: []
+                },
+                {
+                    id: "drums",
+                    instrument: "drums",
+                    notes: [],
+                    volume: 0.9,
+                    effects: []
+                }
+            ],
+            
+            // Loop behavior
+            behavior: {
+                fadeInDuration: 0, // Fade in when loop starts
+                fadeOutDuration: 0, // Fade out when loop ends
+                crossfadeDuration: 100, // Crossfade between loop iterations
+                variationProbability: 0.2 // Chance of playing variations
+            },
+            
+            // Quality settings
+            quality: {
+                sampleRate: 44100,
+                bitDepth: 16,
+                compression: "lossless"
+            }
+        };
+    }
+    
+    async recordLoopForPhase(recordingOptions = {}) {
+        const phaseMusic = this.phaseMusic.get(this.currentPhaseId);
+        if (!phaseMusic) return null;
+        
+        // Setup recording with phase tempo
+        const recordingConfig = {
+            bpm: phaseMusic.bpm,
+            timeSignature: phaseMusic.timeSignature,
+            duration: recordingOptions.duration || this.calculateLoopDuration(phaseMusic.bpm, phaseMusic.timeSignature),
+            clickTrack: recordingOptions.clickTrack !== false,
+            metronome: recordingOptions.metronome !== false,
+            inputSource: recordingOptions.inputSource || "microphone"
+        };
+        
+        // Start recording
+        this.recordingState = {
+            phaseId: this.currentPhaseId,
+            startTime: Date.now(),
+            config: recordingConfig,
+            status: "recording"
+        };
+        
+        const recordedLoop = await this.audioEngine.recordLoop(recordingConfig);
+        
+        if (recordedLoop) {
+            // Process recorded audio into usable loop
+            const processedLoop = await this.processRecordedLoop(recordedLoop, recordingConfig);
+            
+            // Update phase music
+            phaseMusic.loop = processedLoop;
+            await this.loadPhaseMusic(phaseMusic);
+            
+            this.eventBus.emit('phase-loop-recorded', {
+                phaseId: this.currentPhaseId,
+                loop: processedLoop
+            });
+        }
+        
+        this.recordingState = null;
+        return recordedLoop;
+    }
+    
+    // Phase Transition Audio
+    async createPhaseTransitionAudio(fromPhaseId, toPhaseId, transitionType = "crossfade") {
+        const fromMusic = this.phaseMusic.get(fromPhaseId);
+        const toMusic = this.phaseMusic.get(toPhaseId);
+        
+        if (!fromMusic || !toMusic) {
+            console.error("Cannot create audio transition: missing phase music");
+            return null;
+        }
+        
+        const transitionId = `${fromPhaseId}-to-${toPhaseId}`;
+        let transitionAudio;
+        
+        switch (transitionType) {
+            case "crossfade":
+                transitionAudio = await this.createCrossfadeTransition(fromMusic, toMusic);
+                break;
+            case "beat-sync":
+                transitionAudio = await this.createBeatSyncTransition(fromMusic, toMusic);
+                break;
+            case "key-modulation":
+                transitionAudio = await this.createKeyModulationTransition(fromMusic, toMusic);
+                break;
+            case "tempo-bridge":
+                transitionAudio = await this.createTempoBridgeTransition(fromMusic, toMusic);
+                break;
+            default:
+                transitionAudio = await this.createCrossfadeTransition(fromMusic, toMusic);
+        }
+        
+        // Store transition
+        this.transitionEffects.set(transitionId, transitionAudio);
+        
+        return transitionAudio;
+    }
+    
+    async createCrossfadeTransition(fromMusic, toMusic) {
+        const duration = 2000; // 2 second transition
+        
+        return {
+            type: "crossfade",
+            duration,
+            
+            // Audio processing
+            fromFadeOut: {
+                startTime: 0,
+                duration: duration,
+                curve: "exponential" // "linear" | "exponential" | "logarithmic"
+            },
+            toFadeIn: {
+                startTime: 0,
+                duration: duration,
+                curve: "exponential"
+            },
+            
+            // Tempo matching
+            tempoSync: {
+                enabled: true,
+                method: "time-stretch", // "time-stretch" | "beat-slice" | "none"
+                targetTempo: toMusic.bpm,
+                smoothing: true
+            },
+            
+            // Key matching
+            keySync: {
+                enabled: true,
+                method: "pitch-shift", // "pitch-shift" | "harmonic-bridge" | "none"
+                targetKey: toMusic.key,
+                preserveFormants: true
+            },
+            
+            // Effects processing
+            effects: [
+                {
+                    type: "reverb",
+                    wetness: 0.3,
+                    roomSize: 0.7,
+                    fadeInOut: true
+                },
+                {
+                    type: "lowpass",
+                    frequency: 8000,
+                    resonance: 1,
+                    automation: "fade-sweep" // Frequency sweeps during transition
+                }
+            ]
+        };
+    }
+    
+    async createBeatSyncTransition(fromMusic, toMusic) {
+        // Calculate beat-aligned transition timing
+        const fromBeatDuration = 60 / fromMusic.bpm * 1000; // Beat duration in ms
+        const toBeatDuration = 60 / toMusic.bpm * 1000;
+        
+        // Find next beat boundary for transition start
+        const nextBeatTime = this.beatSyncService.getNextBeatTime();
+        
+        return {
+            type: "beat-sync",
+            startTime: nextBeatTime,
+            
+            // Beat-aligned crossfade
+            crossfade: {
+                beatsBefore: 1, // Start crossfade 1 beat before transition point
+                beatsAfter: 1, // Complete crossfade 1 beat after transition point
+                syncPoint: "downbeat" // "downbeat" | "upbeat" | "phrase"
+            },
+            
+            // Tempo transition
+            tempoTransition: {
+                method: "gradual", // "gradual" | "instant" | "accelerando" | "ritardando"
+                duration: 2, // Duration in beats
+                curve: "smooth"
+            },
+            
+            // Musical elements
+            bridge: {
+                enabled: true,
+                type: "percussive", // Add percussive elements during transition
+                pattern: this.generateTransitionPattern(fromMusic, toMusic)
+            }
+        };
+    }
+    
+    // Cross-Phase Musical Coordination
+    async setupPhaseCoordination(coordinationMode = "independent") {
+        this.phaseCoordination.clear();
+        
+        switch (coordinationMode) {
+            case "synchronized":
+                await this.setupSynchronizedCoordination();
+                break;
+            case "layered":
+                await this.setupLayeredCoordination();
+                break;
+            case "call-response":
+                await this.setupCallResponseCoordination();
+                break;
+            case "harmonic":
+                await this.setupHarmonicCoordination();
+                break;
+            default:
+                // Independent - no coordination needed
+                break;
+        }
+    }
+    
+    async setupSynchronizedCoordination() {
+        // All phases share the same master tempo and timing
+        const masterBPM = this.masterTempo;
+        const masterTimeSignature = this.masterTimeSignature;
+        
+        for (const [phaseId, phaseMusic] of this.phaseMusic) {
+            // Adjust all phase music to master tempo
+            if (phaseMusic.bpm !== masterBPM) {
+                await this.adjustPhaseToTempo(phaseId, masterBPM);
+            }
+            
+            // Setup coordination data
+            this.phaseCoordination.set(phaseId, {
+                mode: "synchronized",
+                masterTempo: masterBPM,
+                masterTimeSignature: masterTimeSignature,
+                syncOffset: 0,
+                role: "follower"
+            });
+        }
+    }
+    
+    async setupLayeredCoordination() {
+        // Phases are designed to layer harmonically
+        const basePhaseId = this.findBasePhase(); // Phase with most complete musical content
+        const baseMusic = this.phaseMusic.get(basePhaseId);
+        
+        for (const [phaseId, phaseMusic] of this.phaseMusic) {
+            if (phaseId === basePhaseId) {
+                this.phaseCoordination.set(phaseId, {
+                    mode: "layered",
+                    role: "base",
+                    harmonyKey: baseMusic.key,
+                    rhythmPattern: "foundation"
+                });
+            } else {
+                // Create complementary layers
+                this.phaseCoordination.set(phaseId, {
+                    mode: "layered",
+                    role: "layer",
+                    basePhase: basePhaseId,
+                    harmonyKey: baseMusic.key,
+                    rhythmPattern: this.generateComplementaryRhythm(baseMusic, phaseMusic),
+                    harmonicRole: this.assignHarmonicRole(phaseMusic) // "melody" | "harmony" | "bass" | "percussion"
+                });
+            }
+        }
+    }
+    
+    // Music Analysis and Generation
+    async analyzeMusicContent(musicData) {
+        // Analyze uploaded or recorded music to extract characteristics
+        const analysis = {
+            bpm: null,
+            timeSignature: null,
+            key: null,
+            mood: null,
+            intensity: null,
+            genre: null,
+            instruments: [],
+            rhythmPatterns: [],
+            harmonicContent: []
+        };
+        
+        if (musicData.audioBuffer) {
+            // Use Web Audio API for analysis
+            analysis.bpm = await this.detectTempo(musicData.audioBuffer);
+            analysis.key = await this.detectKey(musicData.audioBuffer);
+            analysis.mood = await this.analyzeMood(musicData.audioBuffer);
+        }
+        
+        if (musicData.midiData) {
+            // Analyze MIDI data
+            analysis.timeSignature = this.extractTimeSignature(musicData.midiData);
+            analysis.instruments = this.extractInstruments(musicData.midiData);
+            analysis.harmonicContent = this.analyzeHarmony(musicData.midiData);
+        }
+        
+        return analysis;
+    }
+    
+    generateAppearanceFromMusic(musicAnalysis) {
+        // Generate visual suggestions based on musical characteristics
+        const suggestions = {
+            colorPalette: this.musicToColorMapping(musicAnalysis),
+            characterStyle: this.musicToStyleMapping(musicAnalysis),
+            accessories: this.musicToAccessoryMapping(musicAnalysis),
+            mood: musicAnalysis.mood
+        };
+        
+        return suggestions;
+    }
+    
+    generateAnimationFromMusic(musicAnalysis) {
+        // Generate animation suggestions based on musical characteristics
+        const suggestions = {
+            movementStyle: this.musicToMovementMapping(musicAnalysis),
+            tempo: musicAnalysis.bpm,
+            intensity: musicAnalysis.intensity,
+            rhythmicEmphasis: this.extractRhythmicEmphasis(musicAnalysis),
+            gestureTypes: this.musicToGestureMapping(musicAnalysis)
+        };
+        
+        return suggestions;
+    }
+    
+    // UI Management
+    setupUI() {
+        this.createPhaseSelector();
+        this.createLoopManager();
+        this.createWorkflowSelector();
+        this.createTransitionEditor();
+        this.createCoordinationPanel();
+        this.createRecordingControls();
+    }
+    
+    createPhaseSelector() {
+        this.phaseSelector = document.createElement('select');
+        this.phaseSelector.className = 'phase-selector music-phase-selector';
+        this.phaseSelector.innerHTML = '<option value="">Select Phase...</option>';
+        
+        this.phaseSelector.addEventListener('change', (e) => {
+            if (e.target.value) {
+                this.setActivePhase(e.target.value);
+            }
+        });
+        
+        // Add to music editor toolbar
+        const toolbar = this.container.querySelector('.music-toolbar');
+        if (toolbar) {
+            toolbar.prepend(this.phaseSelector);
+        }
+    }
+    
+    createLoopManager() {
+        this.loopManager = document.createElement('div');
+        this.loopManager.className = 'loop-manager';
+        this.loopManager.innerHTML = `
+            <div class="loop-controls">
+                <button class="record-loop-btn">🎤 Record Loop</button>
+                <button class="import-loop-btn">📁 Import Audio</button>
+                <button class="generate-loop-btn">🎵 Generate Loop</button>
+            </div>
+            <div class="loop-properties">
+                <label>BPM: <input type="number" class="bpm-input" min="60" max="200" value="120"></label>
+                <label>Key: <select class="key-selector">
+                    <option value="C major">C Major</option>
+                    <option value="A minor">A Minor</option>
+                    <!-- More keys... -->
+                </select></label>
+            </div>
+            <div class="loop-visualization">
+                <!-- Waveform and loop visualization -->
+            </div>
+        `;
+        
+        this.container.appendChild(this.loopManager);
+    }
+    
+    // Event Handling
+    setupEventHandlers() {
+        // Phase Manager events
+        this.eventBus.on('phase-created', (data) => {
+            if (data.characterId === this.characterId) {
+                this.phaseMusic.set(data.phaseId, this.createEmptyPhaseMusic(data.phaseId));
+                this.updatePhaseSelector();
+            }
+        });
+        
+        this.eventBus.on('phase-deleted', (data) => {
+            if (data.characterId === this.characterId) {
+                this.phaseMusic.delete(data.phaseId);
+                this.updatePhaseSelector();
+                
+                // Switch to another phase if this was active
+                if (this.currentPhaseId === data.phaseId) {
+                    const firstPhaseId = this.phaseMusic.keys().next().value;
+                    if (firstPhaseId) {
+                        this.setActivePhase(firstPhaseId);
+                    }
+                }
+            }
+        });
+        
+        // Cross-editor coordination
+        this.eventBus.on('appearance-first-phase-created', async (data) => {
+            if (data.characterId === this.characterId) {
+                await this.createAppearanceFirstMusic(data.appearanceData, data.phaseId);
+            }
+        });
+        
+        this.eventBus.on('animation-first-phase-created', async (data) => {
+            if (data.characterId === this.characterId) {
+                await this.createAnimationFirstMusic(data.animationData, data.phaseId);
+            }
+        });
+        
+        // Beat sync events
+        this.eventBus.on('beat-tick', (beatData) => {
+            this.updateBeatVisualization(beatData);
+        });
+    }
+    
+    // Utility Methods
+    createEmptyPhaseMusic(phaseId) {
+        return {
+            id: phaseId,
+            bpm: 120,
+            timeSignature: { numerator: 4, denominator: 4 },
+            key: "C major",
+            mood: "neutral",
+            
+            // Audio content
+            loop: null,
+            instruments: [],
+            samples: [],
+            effects: [],
+            
+            // Coordination
+            coordination: {
+                mode: "independent",
+                syncTarget: null,
+                harmonyKey: "C major",
+                rhythmPattern: "standard"
+            },
+            
+            // Metadata
+            metadata: {
+                created: new Date().toISOString(),
+                workflow: "music-first",
+                version: "1.0.0"
+            }
+        };
+    }
+    
+    async saveCurrentMusic() {
+        if (!this.currentPhaseId || !this.currentLoop) return;
+        
+        const phaseMusic = this.phaseMusic.get(this.currentPhaseId);
+        phaseMusic.loop = this.currentLoop;
+        
+        // Save to Phase Manager
+        await this.phaseManager.updatePhaseMusic(this.characterId, this.currentPhaseId, phaseMusic);
+    }
+    
+    calculateLoopDuration(bpm, timeSignature) {
+        // Calculate duration for a musical loop (typically 4 bars)
+        const beatsPerMeasure = timeSignature.numerator;
+        const beatValue = timeSignature.denominator;
+        const barsInLoop = 4; // Standard 4-bar loop
+        
+        const totalBeats = beatsPerMeasure * barsInLoop;
+        const beatDuration = (60 / bpm) * 1000; // Beat duration in milliseconds
+        
+        return totalBeats * beatDuration;
+    }
+}
+```
+
+## Integration Features
+
+### Character Editor Coordination
+- **Appearance-Driven Music**: Automatically generate music suggestions based on character appearance
+- **Visual-Audio Sync**: Coordinate color themes and visual elements with musical characteristics
+- **Cross-Modal Templates**: Templates that define both visual and musical elements
+
+### Animation Editor Integration
+- **Animation-Synced Composition**: Create music that matches animation timing and style
+- **Beat-Aligned Animation**: Provide precise timing reference for animation editor
+- **Movement-Music Mapping**: Automatic mapping between character movements and musical elements
+
+### Performance Stage Coordination
+- **Live Music Coordination**: Real-time coordination of phase music across multiple characters
+- **Dynamic Adaptation**: Music adapts to performance context and audience interaction
+- **Cross-Character Harmony**: Multiple characters create harmonic relationships
+
+This Phase-Aware Music Editor provides comprehensive tools for creating rich, coordinated musical experiences that seamlessly integrate with character appearance and animation systems, enabling truly multi-modal creative expression.

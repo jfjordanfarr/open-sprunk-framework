@@ -1,0 +1,102 @@
+<!-- filepath: docs/Units/music/instrument-selector-class.mdmd -->
+::: {unit}
+id: "instrument-selector-class"
+title: "Instrument Selector Class"
+unit-type: "javascript-class-definition"
+language: "javascript"
+status: "draft"
+version: "0.2"
+brief: "UI component for selecting musical instruments for Tone.js."
+source-ref: "../../src/music/InstrumentSelector.js"
+see-also:
+  - "[[audio-engine-class]]" # Implementation dependency (configures instruments in AudioEngine)
+  - "[[../core/event-bus-class.mdmd]]" # Implementation dependency (uses EventBus for instrument selection events)
+  - "[[../Concepts/music-editor-module.mdmd]]" # Parent composition
+
+Allows users to choose an instrument, which then gets configured in the AudioEngine (Tone.js).
+
+```javascript
+export class InstrumentSelector {
+    constructor(containerElement, eventBus) {
+        this.container = containerElement;
+        this.eventBus = eventBus;
+        this.availableInstruments = [
+            { id: 'synth', name: 'Basic Synth', config: { oscillator: { type: 'triangle' }, envelope: { attack: 0.01, decay: 0.1, sustain: 0.5, release: 0.8 } } },
+            { id: 'fmSynth', name: 'FM Synth', config: { harmonicity: 3, modulationIndex: 10, detune: 0, oscillator: { type: 'sine' }, envelope: { attack: 0.01, decay: 0.01, sustain: 1, release: 0.5 }, modulation: { type: 'square' }, modulationEnvelope: { attack: 0.5, decay: 0, sustain: 1, release: 0.5 } } },
+            { id: 'pluckSynth', name: 'Pluck Synth', config: { attackNoise: 1, dampening: 4000, resonance: 0.7 } },
+            { id: 'kick', name: 'Drum Kick', type: 'MembraneSynth', config: { pitchDecay: 0.05, octaves: 10, oscillator: { type: 'sine' }, envelope: { attack: 0.001, decay: 0.4, sustain: 0.01, release: 1.4, attackCurve: 'exponential' } } },
+            { id: 'snare', name: 'Drum Snare', type: 'NoiseSynth', config: { noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.1, sustain: 0 } } }
+        ];
+        this.selectedInstrumentId = 'synth';
+        this.selectElement = null;
+    }
+
+    async init() {
+        this._renderSelector();
+        this._setupEventHandlers();
+        // Emit initial selection
+        this.eventBus.emit('instrument:selected', this.selectedInstrumentId, this.getInstrumentConfig(this.selectedInstrumentId));
+        console.log('InstrumentSelector initialized');
+    }
+
+    _renderSelector() {
+        this.container.innerHTML = ''; // Clear
+        const label = document.createElement('label');
+        label.htmlFor = 'instrument-select';
+        label.textContent = 'Instrument: ';
+        
+        this.selectElement = document.createElement('select');
+        this.selectElement.id = 'instrument-select';
+
+        this.availableInstruments.forEach(inst => {
+            const option = document.createElement('option');
+            option.value = inst.id;
+            option.textContent = inst.name;
+            if (inst.id === this.selectedInstrumentId) {
+                option.selected = true;
+            }
+            this.selectElement.appendChild(option);
+        });
+        this.container.appendChild(label);
+        this.container.appendChild(this.selectElement);
+    }
+
+    _setupEventHandlers() {
+        this.selectElement.addEventListener('change', (e) => {
+            this.selectedInstrumentId = e.target.value;
+            this.eventBus.emit('instrument:selected', this.selectedInstrumentId, this.getInstrumentConfig(this.selectedInstrumentId));
+        });
+    }
+
+    getSelectedInstrument() {
+        return this.selectedInstrumentId;
+    }
+
+    getInstrumentConfig(instrumentId) {
+        const instrument = this.availableInstruments.find(inst => inst.id === instrumentId);
+        return instrument ? { type: instrument.type || 'Synth', config: instrument.config } : null;
+    }
+
+    selectInstrument(instrumentId) {
+        const instrument = this.availableInstruments.find(inst => inst.id === instrumentId);
+        if (instrument) {
+            this.selectedInstrumentId = instrumentId;
+            if (this.selectElement) {
+                this.selectElement.value = instrumentId;
+            }
+            this.eventBus.emit('instrument:selected', this.selectedInstrumentId, this.getInstrumentConfig(this.selectedInstrumentId));
+        } else {
+            console.warn(`Instrument ID '${instrumentId}' not found.`);
+        }
+    }
+
+    dispose() {
+        if (this.selectElement) {
+            this.selectElement.removeEventListener('change', this._setupEventHandlers); // This might need to be a named function to remove properly
+        }
+        this.container.innerHTML = '';
+        console.log('InstrumentSelector disposed');
+    }
+}
+```
+:::

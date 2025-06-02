@@ -1,0 +1,287 @@
+<!-- filepath: docs/Units/music/music-data-schema.mdmd -->
+::: {unit}
+id: "music-data-schema"
+title: "Music Data Schema"
+unit-type: "json-schema-definition"
+language: "json"
+status: "draft"
+version: "0.3"
+brief: "Defines the structure for storing music data with unified timeline support."
+source-ref: "../../src/music/MusicData.js"
+see-also:
+  - "[[../Concepts/music-editor-module.mdmd]]" # Parent composition
+  - "[[../data/project-file-schema.mdmd]]" # Architectural association (used by project schema)
+  - "[[../animation/animation-data-schema]]" # Shared temporal structures
+  - "[[../../Definition/Requirements/unified-timeline-requirement]]" # Traceability (implements shared temporal data)
+
+Defines the JSON schema for music data including tracks, notes, instruments, and audio settings. Implements shared temporal structures required by `[[../../Definition/Requirements/unified-timeline-requirement]]` for music-animation synchronization.
+
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Music Data Schema",
+  "type": "object",
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "version": { "type": "string", "default": "1.0" },
+        "created": { "type": "string", "format": "date-time" },
+        "modified": { "type": "string", "format": "date-time" },
+        "title": { "type": "string" },
+        "artist": { "type": "string" }
+      },
+      "required": ["version"]
+    },
+    
+    "temporal": {
+      "type": "object",
+      "description": "Unified temporal settings shared with animation system",
+      "properties": {
+        "tempo": {
+          "type": "number",
+          "minimum": 60,
+          "maximum": 200,
+          "default": 120,
+          "description": "Beats per minute (BPM) - shared with animation timeline"
+        },
+        "timeSignature": {
+          "type": "object",
+          "properties": {
+            "numerator": { "type": "integer", "minimum": 1, "maximum": 16, "default": 4 },
+            "denominator": { "type": "integer", "enum": [1, 2, 4, 8, 16], "default": 4 }
+          },
+          "required": ["numerator", "denominator"]
+        },
+        "duration": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Total duration in seconds - synchronized with animation timeline"
+        },
+        "quantization": {
+          "type": "number",
+          "enum": [1, 0.5, 0.25, 0.125, 0.0625],
+          "default": 0.25,
+          "description": "Beat subdivision for grid snapping (1=whole, 0.25=sixteenth note)"
+        },
+        "syncReference": {
+          "type": "string",
+          "description": "Reference ID for cross-domain synchronization with animation"
+        }
+      },
+      "required": ["tempo", "timeSignature", "duration"]
+    },
+    
+    "tracks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique track identifier"
+          },
+          "name": {
+            "type": "string",
+            "description": "Human-readable track name"
+          },
+          "instrumentId": {
+            "type": "string",
+            "description": "Reference to instrument configuration"
+          },
+          "volume": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "default": 0.8
+          },
+          "muted": {
+            "type": "boolean",
+            "default": false
+          },
+          "solo": {
+            "type": "boolean",
+            "default": false
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Unique note identifier"
+                },
+                "time": {
+                  "type": "number",
+                  "minimum": 0,
+                  "description": "Start time in seconds (absolute timeline position)"
+                },
+                "duration": {
+                  "type": "number",
+                  "minimum": 0.01,
+                  "description": "Note duration in seconds"
+                },
+                "pitch": {
+                  "type": "string",
+                  "pattern": "^[A-G](#|b)?[0-9]$",
+                  "description": "Musical pitch notation (e.g., 'C4', 'F#3', 'Bb2')"
+                },
+                "velocity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1,
+                  "default": 0.8,
+                  "description": "Note velocity/volume (0-1)"
+                },
+                "beat": {
+                  "type": "number",
+                  "description": "Position in beats (calculated from time and tempo)"
+                },
+                "measure": {
+                  "type": "number",
+                  "description": "Measure number (calculated from beat and time signature)"
+                },
+                "animationSync": {
+                  "type": "object",
+                  "description": "Cross-references to synchronized animation events",
+                  "properties": {
+                    "linkedKeyframes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "description": "Animation keyframe IDs synchronized with this note"
+                      }
+                    },
+                    "syncType": {
+                      "type": "string",
+                      "enum": ["attack", "sustain", "release", "beat", "measure"],
+                      "description": "Type of synchronization with animation"
+                    }
+                  }
+                }
+              },
+              "required": ["id", "time", "duration", "pitch"]
+            }
+          }
+        },
+        "required": ["id", "name", "instrumentId", "notes"]
+      }
+    },
+    
+    "instruments": {
+      "type": "object",
+      "description": "Instrument configurations used by tracks",
+      "patternProperties": {
+        "^[a-zA-Z0-9_-]+$": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "Unique instrument identifier"
+            },
+            "name": {
+              "type": "string",
+              "description": "Human-readable instrument name"
+            },
+            "type": {
+              "type": "string",
+              "enum": ["Synth", "FMSynth", "AMSynth", "PluckSynth", "MonoSynth"],
+              "default": "Synth",
+              "description": "Tone.js synthesizer type"
+            },
+            "config": {
+              "type": "object",
+              "description": "Tone.js instrument configuration",
+              "properties": {
+                "oscillator": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": ["sine", "square", "triangle", "sawtooth"],
+                      "default": "triangle"
+                    }
+                  }
+                },
+                "envelope": {
+                  "type": "object",
+                  "properties": {
+                    "attack": { "type": "number", "minimum": 0, "default": 0.01 },
+                    "decay": { "type": "number", "minimum": 0, "default": 0.1 },
+                    "sustain": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.5 },
+                    "release": { "type": "number", "minimum": 0, "default": 0.8 }
+                  }
+                }
+              }
+            }
+          },
+          "required": ["id", "name", "type", "config"]
+        }
+      }
+    },
+    
+    "beatMarkers": {
+      "type": "array",
+      "description": "Beat markers for visual timeline alignment",
+      "items": {
+        "type": "object",
+        "properties": {
+          "time": {
+            "type": "number",
+            "description": "Marker time in seconds"
+          },
+          "beat": {
+            "type": "number",
+            "description": "Beat number from start"
+          },
+          "measure": {
+            "type": "integer",
+            "description": "Measure number"
+          },
+          "isMeasureStart": {
+            "type": "boolean",
+            "description": "Whether this marker starts a new measure"
+          },
+          "isVisible": {
+            "type": "boolean",
+            "default": true,
+            "description": "Whether marker should be displayed in timeline"
+          }
+        },
+        "required": ["time", "beat", "measure", "isMeasureStart"]
+      }
+    },
+    
+    "loops": {
+      "type": "object",
+      "description": "Loop configuration for synchronized playback",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "startTime": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Loop start time in seconds"
+        },
+        "endTime": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Loop end time in seconds"
+        },
+        "crossfade": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.1,
+          "description": "Crossfade duration for seamless looping"
+        }
+      }
+    }
+  },
+  "required": ["metadata", "temporal", "tracks", "instruments"]
+}
+```
+:::

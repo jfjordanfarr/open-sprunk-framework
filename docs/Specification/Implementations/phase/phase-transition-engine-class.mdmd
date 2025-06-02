@@ -1,0 +1,644 @@
+```{unit}
+id: "phase-transition-engine-class"
+title: "Phase Transition Engine Class"
+unit-type: "javascript-class-definition"
+source-ref: "../../src/phase/PhaseTransitionEngine.js"
+status: "draft"
+see-also:
+  - "[[phase-system-architecture]]"
+  - "[[phase-manager-class]]"
+  - "[[audio-engine-class]]"
+  - "[[character-renderer-class]]"
+  - "[[event-bus-class]]"
+```
+
+## Overview
+
+The PhaseTransitionEngine handles smooth transitions between character and background phases, coordinating visual, audio, and animation changes. It supports multiple transition types including instant switching, crossfades, beat-synchronized changes, and custom transition animations.
+
+## Class Definition
+
+```javascript
+/**
+ * Manages smooth transitions between phases
+ * Coordinates visual, audio, and animation changes during phase switches
+ */
+class PhaseTransitionEngine {
+    constructor(eventBus, audioEngine, characterRenderer) {
+        this.eventBus = eventBus;
+        this.audioEngine = audioEngine;
+        this.characterRenderer = characterRenderer;
+        
+        this.activeTransitions = new Map(); // entityId -> transitionData
+        this.transitionHandlers = new Map(); // transitionType -> handlerFunction
+        this.beatSync = null; // Beat synchronization service
+        
+        this.defaultTransitionDuration = 1000; // 1 second
+        this.maxConcurrentTransitions = 8; // Performance limit
+        
+        this._registerDefaultTransitions();
+        this._setupEventHandlers();
+    }
+
+    // Main Transition Execution
+    async executeTransition(entityId, fromPhase, toPhase, options = {}) {
+        const {
+            transitionType = 'instant',
+            transitionDuration = this.defaultTransitionDuration,
+            beatAlign = false,
+            customEasing = null,
+            priorityLevel = 'normal'
+        } = options;
+        
+        // Check for existing transition
+        if (this.activeTransitions.has(entityId)) {
+            await this._handleConcurrentTransition(entityId, options);
+        }
+        
+        // Check transition limits
+        if (this.activeTransitions.size >= this.maxConcurrentTransitions) {
+            if (priorityLevel !== 'critical') {
+                throw new Error('Maximum concurrent transitions reached');
+            }
+            await this._interruptLowestPriorityTransition();
+        }
+        
+        const transitionId = this._generateTransitionId();
+        const transitionData = {
+            transitionId,
+            entityId,
+            fromPhase,
+            toPhase,
+            options,
+            startTime: null,
+            status: 'preparing'
+        };
+        
+        this.activeTransitions.set(entityId, transitionData);
+        
+        try {
+            // Prepare transition
+            await this._prepareTransition(transitionData);
+            
+            // Wait for beat alignment if requested
+            if (beatAlign && this.beatSync) {
+                await this._waitForBeatAlignment(options.beatAlignment || 'measure');
+            }
+            
+            // Execute the transition
+            transitionData.startTime = performance.now();
+            transitionData.status = 'active';
+            
+            this.eventBus.emit('phase:transition:started', {
+                entityId,
+                transitionId,
+                transitionType,
+                estimatedDuration: transitionDuration
+            });
+            
+            const handler = this.transitionHandlers.get(transitionType);
+            if (!handler) {
+                throw new Error(`Unknown transition type: ${transitionType}`);
+            }
+            
+            await handler.call(this, transitionData);
+            
+            transitionData.status = 'completed';
+            
+            this.eventBus.emit('phase:transition:completed', {
+                entityId,
+                transitionId,
+                actualDuration: performance.now() - transitionData.startTime
+            });
+            
+        } catch (error) {
+            transitionData.status = 'failed';
+            
+            this.eventBus.emit('phase:transition:failed', {
+                entityId,
+                transitionId,
+                error: error.message
+            });
+            
+            // Attempt rollback to previous phase
+            await this._rollbackTransition(transitionData);
+            
+            throw error;
+        } finally {
+            this.activeTransitions.delete(entityId);
+        }
+    }
+
+    // Transition Type Handlers
+    async _handleInstantTransition(transitionData) {
+        const { entityId, fromPhase, toPhase } = transitionData;
+        
+        // Update visual appearance instantly
+        await this.characterRenderer.updateAppearance(entityId, toPhase.appearance);
+        
+        // Switch audio immediately
+        if (fromPhase?.musicLoop) {
+            await this.audioEngine.stopLoop(fromPhase.musicLoop.id);
+        }
+        if (toPhase.musicLoop) {
+            await this.audioEngine.playLoop(toPhase.musicLoop);
+        }
+        
+        // Update animations
+        await this._updateAnimations(entityId, toPhase.animations);
+        
+        // No duration for instant transitions
+        return Promise.resolve();
+    }
+
+    async _handleCrossfadeTransition(transitionData) {
+        const { entityId, fromPhase, toPhase, options } = transitionData;
+        const duration = options.transitionDuration || this.defaultTransitionDuration;
+        
+        // Start crossfade for all modalities
+        const promises = [];
+        
+        // Visual crossfade
+        if (fromPhase?.appearance && toPhase.appearance) {
+            promises.push(this._crossfadeVisuals(entityId, fromPhase.appearance, toPhase.appearance, duration));
+        }
+        
+        // Audio crossfade
+        if (fromPhase?.musicLoop && toPhase.musicLoop) {
+            promises.push(this._crossfadeAudio(fromPhase.musicLoop, toPhase.musicLoop, duration));
+        }
+        
+        // Animation transition
+        if (fromPhase?.animations && toPhase.animations) {
+            promises.push(this._transitionAnimations(entityId, fromPhase.animations, toPhase.animations, duration));
+        }
+        
+        await Promise.all(promises);
+    }
+
+    async _handleBeatSyncTransition(transitionData) {
+        const { entityId, fromPhase, toPhase, options } = transitionData;
+        
+        // Wait for next beat boundary
+        const nextBeat = await this.beatSync.getNextBeatTime(options.beatAlignment || 'beat');
+        const waitTime = nextBeat - performance.now();
+        
+        if (waitTime > 0) {
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+        }
+        
+        // Execute instant transition on beat
+        await this._handleInstantTransition(transitionData);
+    }
+
+    async _handleCustomTransition(transitionData) {
+        const { entityId, fromPhase, toPhase, options } = transitionData;
+        const { customTransition } = options;
+        
+        if (!customTransition || typeof customTransition.execute !== 'function') {
+            throw new Error('Invalid custom transition provided');
+        }
+        
+        await customTransition.execute({
+            entityId,
+            fromPhase,
+            toPhase,
+            options,
+            engine: this,
+            audioEngine: this.audioEngine,
+            characterRenderer: this.characterRenderer
+        });
+    }
+
+    // Modality-Specific Transition Methods
+    async _crossfadeVisuals(entityId, fromAppearance, toAppearance, duration) {
+        const steps = 60; // 60 FPS
+        const stepDuration = duration / steps;
+        
+        for (let i = 0; i <= steps; i++) {
+            const progress = i / steps;
+            const alpha = this._easeInOut(progress);
+            
+            // Blend appearance properties
+            const blendedAppearance = this._blendAppearance(fromAppearance, toAppearance, alpha);
+            
+            await this.characterRenderer.updateAppearance(entityId, blendedAppearance);
+            
+            if (i < steps) {
+                await new Promise(resolve => setTimeout(resolve, stepDuration));
+            }
+        }
+    }
+
+    async _crossfadeAudio(fromLoop, toLoop, duration) {
+        const steps = 60;
+        const stepDuration = duration / steps;
+        
+        // Start new loop at 0 volume
+        await this.audioEngine.playLoop({
+            ...toLoop,
+            volume: 0
+        });
+        
+        for (let i = 0; i <= steps; i++) {
+            const progress = i / steps;
+            const fromVolume = fromLoop.volume * (1 - progress);
+            const toVolume = toLoop.volume * progress;
+            
+            // Update volumes
+            await this.audioEngine.setLoopVolume(fromLoop.id, fromVolume);
+            await this.audioEngine.setLoopVolume(toLoop.id, toVolume);
+            
+            if (i < steps) {
+                await new Promise(resolve => setTimeout(resolve, stepDuration));
+            }
+        }
+        
+        // Stop the old loop
+        await this.audioEngine.stopLoop(fromLoop.id);
+    }
+
+    async _transitionAnimations(entityId, fromAnimations, toAnimations, duration) {
+        // Strategy: Gradually fade out old animations while fading in new ones
+        const transitionSteps = Math.ceil(duration / 16.67); // 60 FPS
+        
+        for (let step = 0; step <= transitionSteps; step++) {
+            const progress = step / transitionSteps;
+            
+            // Calculate blend weights
+            const fromWeight = 1 - progress;
+            const toWeight = progress;
+            
+            // Update animation weights
+            for (const animId of fromAnimations) {
+                await this._setAnimationWeight(entityId, animId, fromWeight);
+            }
+            
+            for (const animId of toAnimations) {
+                await this._setAnimationWeight(entityId, animId, toWeight);
+            }
+            
+            if (step < transitionSteps) {
+                await new Promise(resolve => requestAnimationFrame(resolve));
+            }
+        }
+        
+        // Clean up old animations
+        for (const animId of fromAnimations) {
+            if (!toAnimations.includes(animId)) {
+                await this._stopAnimation(entityId, animId);
+            }
+        }
+    }
+
+    // Transition Coordination
+    async coordinateMultiEntityTransition(entities, options = {}) {
+        const {
+            synchronizeStart = true,
+            staggerDelay = 0,
+            transitionType = 'instant'
+        } = options;
+        
+        if (synchronizeStart) {
+            // Start all transitions simultaneously
+            const promises = entities.map(({ entityId, fromPhase, toPhase, entityOptions }) =>
+                this.executeTransition(entityId, fromPhase, toPhase, {
+                    ...options,
+                    ...entityOptions
+                })
+            );
+            
+            await Promise.all(promises);
+        } else {
+            // Stagger transitions
+            for (let i = 0; i < entities.length; i++) {
+                const { entityId, fromPhase, toPhase, entityOptions } = entities[i];
+                
+                const transitionPromise = this.executeTransition(entityId, fromPhase, toPhase, {
+                    ...options,
+                    ...entityOptions
+                });
+                
+                if (staggerDelay > 0 && i < entities.length - 1) {
+                    // Start next transition after delay (don't wait for completion)
+                    setTimeout(() => {}, staggerDelay);
+                } else {
+                    await transitionPromise;
+                }
+            }
+        }
+    }
+
+    // Beat Synchronization
+    setBeatSyncService(beatSyncService) {
+        this.beatSync = beatSyncService;
+    }
+
+    async _waitForBeatAlignment(alignment = 'beat') {
+        if (!this.beatSync) {
+            return; // No beat sync available
+        }
+        
+        const nextBeat = await this.beatSync.getNextBeatTime(alignment);
+        const waitTime = Math.max(0, nextBeat - performance.now());
+        
+        if (waitTime > 0) {
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+        }
+    }
+
+    // Utility Methods
+    _blendAppearance(fromAppearance, toAppearance, alpha) {
+        const blended = { ...fromAppearance };
+        
+        // Blend colors
+        if (fromAppearance.color && toAppearance.color) {
+            blended.color = this._blendColors(fromAppearance.color, toAppearance.color, alpha);
+        }
+        
+        // Blend opacity
+        if (fromAppearance.opacity !== undefined && toAppearance.opacity !== undefined) {
+            blended.opacity = this._lerp(fromAppearance.opacity, toAppearance.opacity, alpha);
+        }
+        
+        // Handle texture switching at midpoint
+        if (alpha > 0.5 && toAppearance.texture) {
+            blended.texture = toAppearance.texture;
+            blended.textureOpacity = (alpha - 0.5) * 2; // Fade in new texture
+        }
+        
+        return blended;
+    }
+
+    _blendColors(color1, color2, alpha) {
+        // Simple RGB blending (could be enhanced with proper color space handling)
+        const rgb1 = this._hexToRgb(color1);
+        const rgb2 = this._hexToRgb(color2);
+        
+        const blended = {
+            r: Math.round(this._lerp(rgb1.r, rgb2.r, alpha)),
+            g: Math.round(this._lerp(rgb1.g, rgb2.g, alpha)),
+            b: Math.round(this._lerp(rgb1.b, rgb2.b, alpha))
+        };
+        
+        return this._rgbToHex(blended);
+    }
+
+    _lerp(start, end, alpha) {
+        return start + (end - start) * alpha;
+    }
+
+    _easeInOut(t) {
+        // Smooth easing function
+        return t * t * (3 - 2 * t);
+    }
+
+    _hexToRgb(hex) {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? {
+            r: parseInt(result[1], 16),
+            g: parseInt(result[2], 16),
+            b: parseInt(result[3], 16)
+        } : null;
+    }
+
+    _rgbToHex(rgb) {
+        return "#" + ((1 << 24) + (rgb.r << 16) + (rgb.g << 8) + rgb.b).toString(16).slice(1);
+    }
+
+    // Transition Management
+    async _prepareTransition(transitionData) {
+        const { entityId, toPhase } = transitionData;
+        
+        // Preload resources if needed
+        if (toPhase.appearance?.texture) {
+            await this.characterRenderer.preloadTexture(toPhase.appearance.texture);
+        }
+        
+        if (toPhase.musicLoop) {
+            await this.audioEngine.preloadLoop(toPhase.musicLoop);
+        }
+        
+        if (toPhase.animations) {
+            for (const animId of toPhase.animations) {
+                await this._preloadAnimation(entityId, animId);
+            }
+        }
+    }
+
+    async _handleConcurrentTransition(entityId, newOptions) {
+        const existing = this.activeTransitions.get(entityId);
+        
+        if (newOptions.priorityLevel === 'critical') {
+            // Interrupt existing transition
+            await this._interruptTransition(entityId);
+        } else {
+            // Queue or reject based on policy
+            throw new Error(`Transition already active for entity ${entityId}`);
+        }
+    }
+
+    async _interruptTransition(entityId) {
+        const transition = this.activeTransitions.get(entityId);
+        if (transition) {
+            transition.status = 'interrupted';
+            this.activeTransitions.delete(entityId);
+            
+            this.eventBus.emit('phase:transition:interrupted', {
+                entityId,
+                transitionId: transition.transitionId
+            });
+        }
+    }
+
+    async _interruptLowestPriorityTransition() {
+        // Find transition with lowest priority and interrupt it
+        let lowestPriority = 'critical';
+        let targetEntityId = null;
+        
+        for (const [entityId, transition] of this.activeTransitions.entries()) {
+            const priority = transition.options.priorityLevel || 'normal';
+            if (this._comparePriority(priority, lowestPriority) < 0) {
+                lowestPriority = priority;
+                targetEntityId = entityId;
+            }
+        }
+        
+        if (targetEntityId) {
+            await this._interruptTransition(targetEntityId);
+        }
+    }
+
+    _comparePriority(priority1, priority2) {
+        const priorities = { low: 0, normal: 1, high: 2, critical: 3 };
+        return priorities[priority1] - priorities[priority2];
+    }
+
+    async _rollbackTransition(transitionData) {
+        const { entityId, fromPhase } = transitionData;
+        
+        if (fromPhase) {
+            try {
+                // Restore previous phase state
+                await this.characterRenderer.updateAppearance(entityId, fromPhase.appearance);
+                
+                if (fromPhase.musicLoop) {
+                    await this.audioEngine.playLoop(fromPhase.musicLoop);
+                }
+                
+                await this._updateAnimations(entityId, fromPhase.animations);
+            } catch (rollbackError) {
+                console.error('Failed to rollback transition:', rollbackError);
+            }
+        }
+    }
+
+    // Animation Helpers
+    async _updateAnimations(entityId, animations) {
+        // Stop all current animations
+        await this._stopAllAnimations(entityId);
+        
+        // Start new animations
+        for (const animId of animations) {
+            await this._startAnimation(entityId, animId);
+        }
+    }
+
+    async _setAnimationWeight(entityId, animId, weight) {
+        // Implementation depends on animation system
+        this.eventBus.emit('animation:set-weight', { entityId, animId, weight });
+    }
+
+    async _startAnimation(entityId, animId) {
+        this.eventBus.emit('animation:start', { entityId, animId });
+    }
+
+    async _stopAnimation(entityId, animId) {
+        this.eventBus.emit('animation:stop', { entityId, animId });
+    }
+
+    async _stopAllAnimations(entityId) {
+        this.eventBus.emit('animation:stop-all', { entityId });
+    }
+
+    async _preloadAnimation(entityId, animId) {
+        this.eventBus.emit('animation:preload', { entityId, animId });
+    }
+
+    // Setup and Registration
+    _registerDefaultTransitions() {
+        this.transitionHandlers.set('instant', this._handleInstantTransition);
+        this.transitionHandlers.set('crossfade', this._handleCrossfadeTransition);
+        this.transitionHandlers.set('beat-sync', this._handleBeatSyncTransition);
+        this.transitionHandlers.set('custom', this._handleCustomTransition);
+    }
+
+    registerTransitionType(transitionType, handlerFunction) {
+        this.transitionHandlers.set(transitionType, handlerFunction);
+    }
+
+    _setupEventHandlers() {
+        this.eventBus.on('audio:beat', (beatData) => {
+            // Could be used for beat-aware transition timing
+        });
+        
+        this.eventBus.on('performance:pause', () => {
+            // Pause all active transitions
+            for (const transition of this.activeTransitions.values()) {
+                transition.status = 'paused';
+            }
+        });
+        
+        this.eventBus.on('performance:resume', () => {
+            // Resume paused transitions
+            for (const transition of this.activeTransitions.values()) {
+                if (transition.status === 'paused') {
+                    transition.status = 'active';
+                }
+            }
+        });
+    }
+
+    _generateTransitionId() {
+        return `transition-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+    }
+
+    // Public API
+    getActiveTransitions() {
+        return Array.from(this.activeTransitions.values()).map(t => ({
+            transitionId: t.transitionId,
+            entityId: t.entityId,
+            status: t.status,
+            startTime: t.startTime,
+            estimatedCompletion: t.startTime + (t.options.transitionDuration || this.defaultTransitionDuration)
+        }));
+    }
+
+    isTransitionActive(entityId) {
+        return this.activeTransitions.has(entityId);
+    }
+
+    getTransitionProgress(entityId) {
+        const transition = this.activeTransitions.get(entityId);
+        if (!transition || !transition.startTime) return 0;
+        
+        const elapsed = performance.now() - transition.startTime;
+        const duration = transition.options.transitionDuration || this.defaultTransitionDuration;
+        
+        return Math.min(1, elapsed / duration);
+    }
+}
+```
+
+## Dependencies
+
+- **EventBus**: For transition event communication
+- **AudioEngine**: For audio crossfading and loop management
+- **CharacterRenderer**: For visual appearance transitions
+- **Beat Sync Service**: For musical timing coordination (optional)
+
+## Integration Points
+
+- **PhaseManager**: Primary consumer for transition execution
+- **Animation System**: Receives animation weight and control events
+- **Performance Stage**: Coordinates multi-entity transitions
+
+## Usage Examples
+
+```javascript
+// Execute crossfade transition
+await transitionEngine.executeTransition(entityId, fromPhase, toPhase, {
+    transitionType: 'crossfade',
+    transitionDuration: 2000,
+    beatAlign: true
+});
+
+// Coordinate multiple character transitions
+await transitionEngine.coordinateMultiEntityTransition([
+    { entityId: 'char-1', fromPhase: phase1a, toPhase: phase1b },
+    { entityId: 'char-2', fromPhase: phase2a, toPhase: phase2b }
+], {
+    synchronizeStart: true,
+    transitionType: 'beat-sync'
+});
+
+// Custom transition with user-defined logic
+await transitionEngine.executeTransition(entityId, fromPhase, toPhase, {
+    transitionType: 'custom',
+    customTransition: {
+        execute: async ({ entityId, fromPhase, toPhase, engine }) => {
+            // Custom transition logic
+        }
+    }
+});
+```
+
+## Performance Features
+
+- **Concurrent Transition Limiting**: Prevents performance degradation with too many simultaneous transitions
+- **Resource Preloading**: Textures, audio, and animations preloaded before transition starts
+- **Optimized Frame Rates**: Visual transitions maintain 60fps through requestAnimationFrame
+- **Priority System**: Critical transitions can interrupt lower-priority ones
+- **Rollback Support**: Failed transitions automatically restore previous state
+
+The PhaseTransitionEngine provides smooth, professional-quality transitions that make Open Sprunk Framework's phase system feel responsive and polished.

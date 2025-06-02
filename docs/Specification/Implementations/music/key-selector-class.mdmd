@@ -1,0 +1,366 @@
+::: {unit}
+id: "key-selector-class"
+title: "Key Selector Class"
+unit-type: "javascript-class-definition"
+language: "javascript"
+status: "draft"
+version: "0.1"
+brief: "UI component for selecting musical key and scale type for piano roll highlighting."
+source-ref: "../../src/music/KeySelector.js"
+see-also:
+  - "[[../utils/music-theory-utils]]" # Implementation dependency (uses music theory utilities)
+  - "[[piano-roll-class]]" # Implementation dependency (piano roll uses this for key context)
+  - "[[../core/event-bus-class.mdmd]]" # Implementation dependency (uses EventBus for key change events)
+
+Provides a user interface for selecting musical keys and scale types, enabling educational highlighting in the piano roll interface.
+
+```javascript
+import { MusicTheoryUtils } from '../utils/MusicTheoryUtils.js';
+
+export class KeySelector {
+    constructor(containerElement, eventBus, options = {}) {
+        this.container = containerElement;
+        this.eventBus = eventBus;
+        this.options = {
+            defaultRoot: 'C',
+            defaultScale: 'major',
+            showChordTypes: true,
+            compact: false,
+            ...options
+        };
+        
+        this.currentKey = {
+            rootNote: this.options.defaultRoot,
+            scaleType: this.options.defaultScale,
+            chordType: 'triad_major'
+        };
+        
+        this.elements = {};
+    }
+
+    async init() {
+        this._createInterface();
+        this._setupEventHandlers();
+        this._updateDisplay();
+        this.eventBus.emit('keySelector:changed', this.currentKey);
+        console.log('KeySelector initialized');
+    }
+
+    _createInterface() {
+        this.container.innerHTML = '';
+        this.container.className = `key-selector ${this.options.compact ? 'compact' : ''}`;
+        
+        // Create main container
+        const wrapper = document.createElement('div');
+        wrapper.className = 'key-selector-wrapper';
+        
+        // Root note selector
+        const rootSection = this._createRootNoteSelector();
+        
+        // Scale type selector
+        const scaleSection = this._createScaleSelector();
+        
+        // Chord type selector (optional)
+        const chordSection = this.options.showChordTypes ? 
+            this._createChordSelector() : null;
+        
+        // Current key display
+        const displaySection = this._createKeyDisplay();
+        
+        wrapper.appendChild(rootSection);
+        wrapper.appendChild(scaleSection);
+        if (chordSection) wrapper.appendChild(chordSection);
+        wrapper.appendChild(displaySection);
+        
+        this.container.appendChild(wrapper);
+    }
+
+    _createRootNoteSelector() {
+        const section = document.createElement('div');
+        section.className = 'key-selector-section root-note-section';
+        
+        const label = document.createElement('label');
+        label.textContent = 'Key:';
+        label.className = 'key-selector-label';
+        
+        const select = document.createElement('select');
+        select.className = 'key-selector-select root-note-select';
+        
+        // Add all chromatic notes
+        MusicTheoryUtils.CHROMATIC_NOTES.forEach(note => {
+            const option = document.createElement('option');
+            option.value = note;
+            option.textContent = note;
+            if (note === this.currentKey.rootNote) {
+                option.selected = true;
+            }
+            select.appendChild(option);
+        });
+        
+        section.appendChild(label);
+        section.appendChild(select);
+        this.elements.rootSelect = select;
+        
+        return section;
+    }
+
+    _createScaleSelector() {
+        const section = document.createElement('div');
+        section.className = 'key-selector-section scale-section';
+        
+        const label = document.createElement('label');
+        label.textContent = 'Scale:';
+        label.className = 'key-selector-label';
+        
+        const select = document.createElement('select');
+        select.className = 'key-selector-select scale-select';
+        
+        // Add all available scales
+        const scales = MusicTheoryUtils.getAvailableScales();
+        scales.forEach(scale => {
+            const option = document.createElement('option');
+            option.value = scale.id;
+            option.textContent = scale.name;
+            if (scale.id === this.currentKey.scaleType) {
+                option.selected = true;
+            }
+            select.appendChild(option);
+        });
+        
+        section.appendChild(label);
+        section.appendChild(select);
+        this.elements.scaleSelect = select;
+        
+        return section;
+    }
+
+    _createChordSelector() {
+        const section = document.createElement('div');
+        section.className = 'key-selector-section chord-section';
+        
+        const label = document.createElement('label');
+        label.textContent = 'Chord:';
+        label.className = 'key-selector-label';
+        
+        const select = document.createElement('select');
+        select.className = 'key-selector-select chord-select';
+        
+        // Add chord options
+        const chordOptions = [
+            { id: 'triad_major', name: 'Major Triad' },
+            { id: 'triad_minor', name: 'Minor Triad' },
+            { id: 'seventh_major', name: 'Major 7th' },
+            { id: 'seventh_minor', name: 'Minor 7th' },
+            { id: 'seventh_dominant', name: 'Dominant 7th' }
+        ];
+        
+        chordOptions.forEach(chord => {
+            const option = document.createElement('option');
+            option.value = chord.id;
+            option.textContent = chord.name;
+            if (chord.id === this.currentKey.chordType) {
+                option.selected = true;
+            }
+            select.appendChild(option);
+        });
+        
+        section.appendChild(label);
+        section.appendChild(select);
+        this.elements.chordSelect = select;
+        
+        return section;
+    }
+
+    _createKeyDisplay() {
+        const section = document.createElement('div');
+        section.className = 'key-selector-display';
+        
+        const keyName = document.createElement('div');
+        keyName.className = 'current-key-name';
+        
+        const scaleNotes = document.createElement('div');
+        scaleNotes.className = 'scale-notes';
+        
+        section.appendChild(keyName);
+        section.appendChild(scaleNotes);
+        
+        this.elements.keyDisplay = keyName;
+        this.elements.scaleNotes = scaleNotes;
+        
+        return section;
+    }
+
+    _setupEventHandlers() {
+        // Root note change
+        this.elements.rootSelect.addEventListener('change', (e) => {
+            this.currentKey.rootNote = e.target.value;
+            this._updateDisplay();
+            this._emitChange();
+        });
+        
+        // Scale type change
+        this.elements.scaleSelect.addEventListener('change', (e) => {
+            this.currentKey.scaleType = e.target.value;
+            this._updateDisplay();
+            this._emitChange();
+        });
+        
+        // Chord type change
+        if (this.elements.chordSelect) {
+            this.elements.chordSelect.addEventListener('change', (e) => {
+                this.currentKey.chordType = e.target.value;
+                this._updateDisplay();
+                this._emitChange();
+            });
+        }
+    }
+
+    _updateDisplay() {
+        // Update key name display
+        const scaleName = MusicTheoryUtils.formatScaleName(this.currentKey.scaleType);
+        this.elements.keyDisplay.textContent = 
+            `${this.currentKey.rootNote} ${scaleName}`;
+        
+        // Update scale notes display
+        try {
+            const scaleNotes = MusicTheoryUtils.getScaleNotes(
+                this.currentKey.rootNote, 
+                this.currentKey.scaleType
+            );
+            this.elements.scaleNotes.textContent = 
+                `Notes: ${scaleNotes.join(' - ')}`;
+        } catch (error) {
+            this.elements.scaleNotes.textContent = 'Error loading scale notes';
+            console.error('Error getting scale notes:', error);
+        }
+    }
+
+    _emitChange() {
+        this.eventBus.emit('keySelector:changed', { ...this.currentKey });
+    }
+
+    // Public API methods
+    getCurrentKey() {
+        return { ...this.currentKey };
+    }
+
+    setKey(rootNote, scaleType, chordType = null) {
+        this.currentKey.rootNote = rootNote;
+        this.currentKey.scaleType = scaleType;
+        if (chordType) this.currentKey.chordType = chordType;
+        
+        // Update UI selectors
+        this.elements.rootSelect.value = rootNote;
+        this.elements.scaleSelect.value = scaleType;
+        if (this.elements.chordSelect && chordType) {
+            this.elements.chordSelect.value = chordType;
+        }
+        
+        this._updateDisplay();
+        this._emitChange();
+    }
+
+    // Preset key shortcuts for common keys
+    setPreset(keyName) {
+        const presets = {
+            'c-major': { rootNote: 'C', scaleType: 'major' },
+            'g-major': { rootNote: 'G', scaleType: 'major' },
+            'd-major': { rootNote: 'D', scaleType: 'major' },
+            'a-minor': { rootNote: 'A', scaleType: 'minor' },
+            'e-minor': { rootNote: 'E', scaleType: 'minor' },
+            'b-minor': { rootNote: 'B', scaleType: 'minor' },
+            'c-blues': { rootNote: 'C', scaleType: 'blues' },
+            'pentatonic': { rootNote: 'C', scaleType: 'pentatonic_major' }
+        };
+        
+        const preset = presets[keyName];
+        if (preset) {
+            this.setKey(preset.rootNote, preset.scaleType, preset.chordType);
+        }
+    }
+
+    dispose() {
+        this.container.innerHTML = '';
+        console.log('KeySelector disposed');
+    }
+}
+```
+
+```css
+/* Basic styling for the key selector */
+.key-selector {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    background: #f5f5f5;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.key-selector.compact {
+    flex-direction: row;
+    align-items: center;
+    padding: 6px 10px;
+}
+
+.key-selector-section {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.key-selector-label {
+    font-size: 14px;
+    font-weight: 500;
+    color: #333;
+    min-width: 45px;
+}
+
+.key-selector-select {
+    padding: 4px 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+    background: white;
+    min-width: 80px;
+}
+
+.key-selector-select:focus {
+    outline: none;
+    border-color: #007acc;
+    box-shadow: 0 0 0 2px rgba(0, 122, 204, 0.2);
+}
+
+.key-selector-display {
+    margin-top: 8px;
+    padding: 8px;
+    background: white;
+    border-radius: 4px;
+    border: 1px solid #e0e0e0;
+}
+
+.current-key-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 4px;
+}
+
+.scale-notes {
+    font-size: 12px;
+    color: #666;
+    font-family: 'Courier New', monospace;
+}
+
+.key-selector.compact .key-selector-display {
+    margin-top: 0;
+    margin-left: 12px;
+}
+
+.key-selector.compact .scale-notes {
+    display: none;
+}
+```
+:::

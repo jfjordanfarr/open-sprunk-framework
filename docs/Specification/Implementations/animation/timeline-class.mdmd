@@ -1,0 +1,346 @@
+<!-- filepath: docs/Units/animation/timeline-class.mdmd -->
+::: {unit}
+id: "timeline-class"
+title: "Timeline Class"
+unit-type: "javascript-class-definition"
+language: "javascript"
+status: "draft"
+version: "0.3"
+brief: "Manages unified timeline for synchronized music and animation editing."
+source-ref: "../../src/animation/Timeline.js"
+see-also:
+  - "[[animation-data-schema]]" # Implementation dependency (works with animation data structure)
+  - "[[../music/music-data-schema]]" # Implementation dependency (works with music data for sync)
+  - "[[../core/event-bus-class.mdmd]]" # Implementation dependency (uses EventBus for timeline events)
+  - "[[../music/audio-engine-class]]" # Implementation dependency (coordinates with audio timing)
+  - "[[../../Definition/Requirements/unified-timeline-requirement]]" # Traceability (implements unified timeline)
+  - "[[../Concepts/animation-editor-module.mdmd]]" # Parent composition
+
+Manages the unified timeline that enables synchronized music and animation editing. Implements the core temporal coordination system required by `[[../../Definition/Requirements/unified-timeline-requirement]]`.
+
+```javascript
+export class Timeline {
+    constructor(eventBus, audioEngine) {
+        this.eventBus = eventBus;
+        this.audioEngine = audioEngine;
+        
+        // Unified temporal state
+        this.currentTime = 0; // Current playback position in seconds
+        this.duration = 0; // Total duration in seconds
+        this.tempo = 120; // BPM (beats per minute)
+        this.timeSignature = { numerator: 4, denominator: 4 };
+        this.isPlaying = false;
+        this.isLooping = false;
+        
+        // Timeline tracks
+        this.animationTracks = new Map(); // Animation keyframe tracks
+        this.musicTracks = new Map(); // Music note tracks
+        this.beatMarkers = []; // Visual beat indicators
+        
+        // Synchronization
+        this.syncPrecision = 0.01; // 10ms tolerance as per requirement
+        this.lastUpdateTime = 0;
+        this.scheduledEvents = new Map();
+        
+        this.setupEventHandlers();
+    }
+
+    /**
+     * UNIFIED TEMPORAL REFERENCE SYSTEM
+     * Implements requirement for common time base across music and animation
+     */
+    
+    // Convert between time units
+    beatsToSeconds(beats) {
+        return (beats * 60) / this.tempo;
+    }
+    
+    secondsToBeats(seconds) {
+        return (seconds * this.tempo) / 60;
+    }
+    
+    measureToSeconds(measure) {
+        const beatsPerMeasure = this.timeSignature.numerator;
+        return this.beatsToSeconds(measure * beatsPerMeasure);
+    }
+    
+    secondsToMeasure(seconds) {
+        const beatsPerMeasure = this.timeSignature.numerator;
+        return this.secondsToBeats(seconds) / beatsPerMeasure;
+    }
+
+    /**
+     * UNIFIED TIMELINE INTERFACE
+     * Implements requirement for shared timeline view
+     */
+    
+    // Add animation keyframe at specific time
+    addAnimationKeyframe(trackId, time, properties) {
+        if (!this.animationTracks.has(trackId)) {
+            this.animationTracks.set(trackId, []);
+        }
+        
+        const keyframe = {
+            time: this.quantizeToGrid(time),
+            properties: properties,
+            id: `anim_${Date.now()}_${Math.random()}`
+        };
+        
+        this.animationTracks.get(trackId).push(keyframe);
+        this.sortTrackByTime(this.animationTracks.get(trackId));
+        
+        this.eventBus.emit('timeline:keyframe_added', {
+            trackId, keyframe, type: 'animation'
+        });
+    }
+    
+    // Add music note at specific time
+    addMusicNote(trackId, time, note) {
+        if (!this.musicTracks.has(trackId)) {
+            this.musicTracks.set(trackId, []);
+        }
+        
+        const musicEvent = {
+            time: this.quantizeToGrid(time),
+            note: note,
+            id: `music_${Date.now()}_${Math.random()}`
+        };
+        
+        this.musicTracks.get(trackId).push(musicEvent);
+        this.sortTrackByTime(this.musicTracks.get(trackId));
+        
+        this.eventBus.emit('timeline:note_added', {
+            trackId, musicEvent, type: 'music'
+        });
+    }
+
+    /**
+     * INTEGRATED PLAYBACK CONTROL
+     * Implements requirement for unified play/pause/stop controls
+     */
+    
+    async play() {
+        if (this.isPlaying) return;
+        
+        this.isPlaying = true;
+        this.lastUpdateTime = performance.now();
+        
+        // Start audio engine
+        await this.audioEngine.startPlayback(this.currentTime);
+        
+        // Start animation loop
+        this.animationFrameId = requestAnimationFrame(() => this.updateLoop());
+        
+        this.eventBus.emit('timeline:playback_started', {
+            currentTime: this.currentTime
+        });
+    }
+    
+    pause() {
+        if (!this.isPlaying) return;
+        
+        this.isPlaying = false;
+        
+        // Stop audio engine
+        this.audioEngine.pausePlayback();
+        
+        // Stop animation loop
+        if (this.animationFrameId) {
+            cancelAnimationFrame(this.animationFrameId);
+        }
+        
+        this.eventBus.emit('timeline:playback_paused', {
+            currentTime: this.currentTime
+        });
+    }
+    
+    stop() {
+        this.pause();
+        this.setCurrentTime(0);
+        
+        this.eventBus.emit('timeline:playback_stopped');
+    }
+
+    /**
+     * TEMPORAL COORDINATION
+     * Implements requirement for tempo changes and synchronization
+     */
+    
+    setTempo(newTempo) {
+        const oldTempo = this.tempo;
+        this.tempo = newTempo;
+        
+        // Proportionally adjust all animation timing
+        const ratio = oldTempo / newTempo;
+        this.animationTracks.forEach((track) => {
+            track.forEach(keyframe => {
+                keyframe.time *= ratio;
+            });
+        });
+        
+        // Update audio engine tempo
+        this.audioEngine.setTempo(newTempo);
+        
+        this.eventBus.emit('timeline:tempo_changed', {
+            oldTempo, newTempo, ratio
+        });
+    }
+    
+    // Quantize time to beat grid for alignment
+    quantizeToGrid(time, subdivision = 0.25) { // Default to 16th notes
+        const beats = this.secondsToBeats(time);
+        const quantizedBeats = Math.round(beats / subdivision) * subdivision;
+        return this.beatsToSeconds(quantizedBeats);
+    }
+
+    /**
+     * CROSS-DOMAIN TIMING FEATURES
+     * Implements requirement for beat markers and copying across domains
+     */
+    
+    generateBeatMarkers() {
+        this.beatMarkers = [];
+        const totalBeats = this.secondsToBeats(this.duration);
+        
+        for (let beat = 0; beat <= totalBeats; beat += 0.25) {
+            const time = this.beatsToSeconds(beat);
+            const isMeasureStart = (beat % this.timeSignature.numerator) === 0;
+            
+            this.beatMarkers.push({
+                time: time,
+                beat: beat,
+                isMeasureStart: isMeasureStart,
+                measure: Math.floor(beat / this.timeSignature.numerator)
+            });
+        }
+        
+        this.eventBus.emit('timeline:beat_markers_updated', {
+            markers: this.beatMarkers
+        });
+    }
+    
+    // Copy temporal selection across music and animation domains
+    copyTimeRange(startTime, endTime) {
+        const selection = {
+            startTime,
+            endTime,
+            animationData: new Map(),
+            musicData: new Map()
+        };
+        
+        // Copy animation keyframes in range
+        this.animationTracks.forEach((track, trackId) => {
+            const keyframesInRange = track.filter(kf => 
+                kf.time >= startTime && kf.time <= endTime
+            );
+            if (keyframesInRange.length > 0) {
+                selection.animationData.set(trackId, keyframesInRange);
+            }
+        });
+        
+        // Copy music events in range
+        this.musicTracks.forEach((track, trackId) => {
+            const notesInRange = track.filter(note => 
+                note.time >= startTime && note.time <= endTime
+            );
+            if (notesInRange.length > 0) {
+                selection.musicData.set(trackId, notesInRange);
+            }
+        });
+        
+        return selection;
+    }
+
+    /**
+     * TIMELINE SCRUBBING AND SYNCHRONIZATION
+     * Implements requirement for scrubbing with sub-frame precision
+     */
+    
+    setCurrentTime(time) {
+        this.currentTime = Math.max(0, Math.min(time, this.duration));
+        
+        // Update audio engine position
+        this.audioEngine.seekTo(this.currentTime);
+        
+        // Update animation positions
+        this.updateAnimationStates(this.currentTime);
+        
+        this.eventBus.emit('timeline:time_changed', {
+            currentTime: this.currentTime,
+            beat: this.secondsToBeats(this.currentTime),
+            measure: this.secondsToMeasure(this.currentTime)
+        });
+    }
+    
+    // Main update loop for synchronized playback
+    updateLoop() {
+        if (!this.isPlaying) return;
+        
+        const now = performance.now();
+        const deltaTime = (now - this.lastUpdateTime) / 1000; // Convert to seconds
+        this.lastUpdateTime = now;
+        
+        // Update current time
+        this.currentTime += deltaTime;
+        
+        // Handle looping
+        if (this.isLooping && this.currentTime >= this.duration) {
+            this.currentTime = 0;
+            this.audioEngine.seekTo(0);
+        } else if (this.currentTime >= this.duration) {
+            this.stop();
+            return;
+        }
+        
+        // Update animation states
+        this.updateAnimationStates(this.currentTime);
+        
+        // Emit time update
+        this.eventBus.emit('timeline:time_update', {
+            currentTime: this.currentTime
+        });
+        
+        // Schedule next frame
+        this.animationFrameId = requestAnimationFrame(() => this.updateLoop());
+    }
+    
+    updateAnimationStates(time) {
+        this.animationTracks.forEach((track, trackId) => {
+            // Find active keyframes for current time
+            const activeKeyframes = this.getActiveKeyframes(track, time);
+            
+            this.eventBus.emit('timeline:animation_update', {
+                trackId,
+                time,
+                keyframes: activeKeyframes
+            });
+        });
+    }
+    
+    getActiveKeyframes(track, time) {
+        // Find keyframes before and after current time for interpolation
+        const before = track.filter(kf => kf.time <= time).slice(-1)[0];
+        const after = track.find(kf => kf.time > time);
+        
+        return { before, after, currentTime: time };
+    }
+    
+    // Utility methods
+    sortTrackByTime(track) {
+        track.sort((a, b) => a.time - b.time);
+    }
+    
+    setupEventHandlers() {
+        // Handle external tempo changes
+        this.eventBus.on('music:tempo_changed', (tempo) => {
+            this.setTempo(tempo);
+        });
+        
+        // Handle timeline scrubbing from UI
+        this.eventBus.on('ui:timeline_scrub', (time) => {
+            this.setCurrentTime(time);
+        });
+    }
+}
+```
+:::

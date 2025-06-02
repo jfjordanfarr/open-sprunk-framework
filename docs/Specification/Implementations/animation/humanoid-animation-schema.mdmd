@@ -1,0 +1,291 @@
+<!-- filepath: do../Implementations/animation/humanoid-animation-schema.mdmd -->
+::: {unit}
+id: "humanoid-animation-schema"
+title: "Humanoid Animation Data Schema"
+unit-type: "json-schema-definition"
+language: "json"
+status: "draft"
+version: "0.1"
+brief: "Animation data schema optimized for body-part-based humanoid character animation."
+source-ref: "../../src/animation/HumanoidAnimationData.js"
+see-also:
+  - "[[animation-data-schema]]" # Base animation schema
+  - "[[../character/humanoid-character-schema]]" # Character schema this animates
+  - "[[../../Definition/Requirements/humanoid-character-animation-requirement]]" # Implements this requirement
+  - "[[../Concepts/animation-editor-module]]" # Parent composition
+
+Enhanced animation schema specifically designed for humanoid character animation with body-part keyframes, direct manipulation support, and instrument-aware constraints.
+
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Humanoid Animation Data",
+  "description": "Animation data schema for body-part-based humanoid character animation",
+  "type": "object",
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "name": { "type": "string" },
+        "characterId": { 
+          "type": "string",
+          "description": "References the humanoid character this animation applies to"
+        },
+        "created": { "type": "string", "format": "date-time" },
+        "modified": { "type": "string", "format": "date-time" },
+        "version": { "type": "string", "default": "1.0" },
+        "duration": { "type": "number", "minimum": 0.1 },
+        "tags": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["id", "name", "characterId", "duration"]
+    },
+
+    "temporal": {
+      "type": "object",
+      "description": "Temporal settings synchronized with music system",
+      "properties": {
+        "tempo": { "type": "number", "minimum": 60, "maximum": 200, "default": 120 },
+        "timeSignature": {
+          "type": "object",
+          "properties": {
+            "numerator": { "type": "integer", "minimum": 1, "maximum": 16, "default": 4 },
+            "denominator": { "type": "integer", "enum": [2, 4, 8, 16], "default": 4 }
+          }
+        },
+        "beatSnapEnabled": { "type": "boolean", "default": true },
+        "subdivision": { "type": "integer", "default": 4, "description": "Beat subdivisions for keyframe snapping" }
+      }
+    },
+
+    "bodyPartTracks": {
+      "type": "object",
+      "description": "Animation tracks for each body part with keyframe data",
+      "properties": {
+        "head": { "$ref": "#/definitions/BodyPartTrack" },
+        "body": { "$ref": "#/definitions/BodyPartTrack" },
+        "leftArm": { "$ref": "#/definitions/BodyPartTrack" },
+        "rightArm": { "$ref": "#/definitions/BodyPartTrack" },
+        "leftLeg": { "$ref": "#/definitions/BodyPartTrack" },
+        "rightLeg": { "$ref": "#/definitions/BodyPartTrack" },
+        "leftHand": { "$ref": "#/definitions/BodyPartTrack" },
+        "rightHand": { "$ref": "#/definitions/BodyPartTrack" },
+        "leftFoot": { "$ref": "#/definitions/BodyPartTrack" },
+        "rightFoot": { "$ref": "#/definitions/BodyPartTrack" }
+      }
+    },
+
+    "poses": {
+      "type": "array",
+      "description": "Key poses created through direct manipulation interface",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "timestamp": { "type": "number", "description": "Time in seconds" },
+          "beatPosition": { "type": "number", "description": "Position in musical beats" },
+          "poseData": {
+            "type": "object",
+            "description": "Complete character pose at this moment",
+            "patternProperties": {
+              "^[a-zA-Z][a-zA-Z0-9]*$": {
+                "type": "object",
+                "properties": {
+                  "position": { "$ref": "#/definitions/Vector2D" },
+                  "rotation": { "type": "number" },
+                  "scale": { "$ref": "#/definitions/Vector2D" }
+                }
+              }
+            }
+          },
+          "createdBy": { 
+            "type": "string", 
+            "enum": ["direct-manipulation", "keyframe-editor", "preset", "ai-suggestion"],
+            "description": "How this pose was created"
+          }
+        },
+        "required": ["id", "timestamp", "poseData"]
+      }
+    },
+
+    "instrumentAnimation": {
+      "type": "object",
+      "description": "Animation data specific to instrument playing",
+      "properties": {
+        "activeInstruments": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "IDs of instruments being used in this animation"
+        },
+        "playingTechniques": {
+          "type": "array",
+          "description": "Instrument-specific animation behaviors",
+          "items": {
+            "type": "object",
+            "properties": {
+              "instrumentId": { "type": "string" },
+              "technique": { 
+                "type": "string",
+                "enum": ["playing", "holding", "lowering", "raising", "bow-motion", "key-press"]
+              },
+              "startTime": { "type": "number" },
+              "endTime": { "type": "number" },
+              "intensity": { "type": "number", "minimum": 0, "maximum": 1 },
+              "parameters": { "type": "object" }
+            },
+            "required": ["instrumentId", "technique", "startTime", "endTime"]
+          }
+        }
+      }
+    },
+
+    "constraints": {
+      "type": "object",
+      "description": "Animation constraints for realistic movement",
+      "properties": {
+        "physicsEnabled": { "type": "boolean", "default": false },
+        "collisionDetection": { "type": "boolean", "default": false },
+        "inverseKinematics": { "type": "boolean", "default": true },
+        "balanceAssistance": { "type": "boolean", "default": true },
+        "jointLimits": { "type": "boolean", "default": true },
+        "customConstraints": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": { "type": "string" },
+              "bodyParts": { "type": "array", "items": { "type": "string" } },
+              "parameters": { "type": "object" }
+            }
+          }
+        }
+      }
+    },
+
+    "synchronization": {
+      "type": "object",
+      "description": "Audio-animation synchronization data",
+      "properties": {
+        "musicTrackId": { "type": "string", "description": "Associated music track ID" },
+        "syncPoints": {
+          "type": "array",
+          "description": "Key synchronization points between music and animation",
+          "items": {
+            "type": "object",
+            "properties": {
+              "musicTime": { "type": "number" },
+              "animationTime": { "type": "number" },
+              "syncType": { 
+                "type": "string",
+                "enum": ["beat", "measure", "chord-change", "melody-peak", "custom"]
+              },
+              "intensity": { "type": "number", "minimum": 0, "maximum": 1 }
+            }
+          }
+        },
+        "rhythmMapping": {
+          "type": "object",
+          "description": "How animation responds to musical rhythm",
+          "properties": {
+            "beatResponse": { "type": "string", "enum": ["none", "subtle", "moderate", "strong"] },
+            "bodyPartAssignments": {
+              "type": "object",
+              "description": "Which body parts respond to which musical elements"
+            }
+          }
+        }
+      }
+    }
+  },
+
+  "definitions": {
+    "BodyPartTrack": {
+      "type": "object",
+      "description": "Animation track for a single body part",
+      "properties": {
+        "enabled": { "type": "boolean", "default": true },
+        "keyframes": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/Keyframe" }
+        },
+        "constraints": {
+          "type": "object",
+          "description": "Constraints specific to this body part",
+          "properties": {
+            "locked": { "type": "boolean", "default": false },
+            "followParent": { "type": "boolean", "default": true },
+            "customLimits": { "type": "object" }
+          }
+        }
+      }
+    },
+
+    "Keyframe": {
+      "type": "object",
+      "description": "Individual keyframe with transformation and timing data",
+      "properties": {
+        "id": { "type": "string" },
+        "timestamp": { "type": "number", "description": "Time in seconds" },
+        "beatPosition": { "type": "number", "description": "Position in musical beats" },
+        "transform": {
+          "type": "object",
+          "properties": {
+            "position": { "$ref": "#/definitions/Vector2D" },
+            "rotation": { "type": "number" },
+            "scale": { "$ref": "#/definitions/Vector2D" }
+          }
+        },
+        "easing": {
+          "type": "string",
+          "enum": ["linear", "ease-in", "ease-out", "ease-in-out", "bounce", "elastic"],
+          "default": "ease-in-out"
+        },
+        "tangents": {
+          "type": "object",
+          "description": "Bezier curve control points for smooth interpolation",
+          "properties": {
+            "inTangent": { "$ref": "#/definitions/Vector2D" },
+            "outTangent": { "$ref": "#/definitions/Vector2D" }
+          }
+        },
+        "createdBy": { 
+          "type": "string",
+          "enum": ["direct-manipulation", "timeline-editor", "auto-generated"],
+          "description": "Method used to create this keyframe"
+        }
+      },
+      "required": ["id", "timestamp", "transform"]
+    },
+
+    "Vector2D": {
+      "type": "object",
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" }
+      },
+      "required": ["x", "y"]
+    }
+  },
+
+  "required": ["metadata", "temporal", "bodyPartTracks"]
+}
+```
+
+This animation schema supports:
+
+1. **Direct Manipulation**: Poses created by "dragging the doll" are stored with creation method metadata
+2. **Body-Part Animation**: Individual tracks for each body part with hierarchical relationships
+3. **Musical Synchronization**: Beat-aware keyframe placement and rhythm mapping
+4. **Instrument Integration**: Special animation data for instrument playing techniques
+5. **Educational Features**: Constraints and assistance for natural movement
+6. **Performance**: Optimized data structure for real-time 60fps animation
+
+Key features:
+- **Pose-Based Keyframing**: Complete character poses as primary animation unit
+- **Beat Synchronization**: Musical beat awareness throughout the animation system
+- **Constraint System**: Realistic movement limits and physics assistance
+- **Creation Tracking**: Records how keyframes were created (drag vs. timeline vs. AI)
+- **Instrument Awareness**: Special handling for musical instrument animations
+
+:::

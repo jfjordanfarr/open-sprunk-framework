@@ -1,0 +1,597 @@
+```{unit}
+id: "phase-aware-performance-stage-class"
+title: "Phase-Aware Performance Stage Class"
+unit-type: "javascript-class-definition"
+source-ref: "../../src/stage/PhaseAwarePerformanceStage.js"
+status: "draft"
+see-also:
+  - "[[performance-stage-class]]"
+  - "[[../phase/phase-manager-class]]"
+  - "[[../phase/phase-coordinator-class]]"
+  - "[[../phase/phase-transition-engine-class]]"
+  - "[[../music/beat-sync-service-class]]"
+  - "[[character-renderer-class]]"
+  - "[[background-manager-class]]"
+  - "[[../Concepts/phase-system-architecture]]"
+  - "[[../../Definition/Requirements/phase-system-requirement]]"
+```
+
+## Overview
+
+The PhaseAwarePerformanceStage extends the base performance stage with comprehensive phase system integration. It orchestrates synchronized phase changes across multiple entities (characters and backgrounds) during live performance, ensuring seamless coordination of appearance, animation, and music transitions.
+
+## Key Capabilities
+
+- **Multi-Entity Phase Coordination**: Synchronized phase changes across all stage entities
+- **Beat-Aligned Phase Transitions**: Musical timing integration for phase changes
+- **Cross-Modal Transition Management**: Coordinated appearance, animation, and music transitions
+- **Real-Time Phase Control**: Live phase switching during performance
+- **Background Phase Integration**: Environment participation in phase system
+- **Performance Optimization**: Efficient rendering during phase transitions
+
+## Class Definition
+
+```javascript
+import { PerformanceStage } from './PerformanceStage.js';
+
+/**
+ * Performance stage with comprehensive phase system integration
+ * Orchestrates synchronized multi-entity phase transitions during live performance
+ */
+export class PhaseAwarePerformanceStage extends PerformanceStage {
+    constructor(canvas, eventBus, timeline, audioEngine, phaseManager, phaseCoordinator, beatSyncService) {
+        super(canvas, eventBus, timeline, audioEngine);
+        
+        this.phaseManager = phaseManager;
+        this.phaseCoordinator = phaseCoordinator;
+        this.beatSyncService = beatSyncService;
+        
+        // Phase-specific state
+        this.activePhases = new Map(); // entityId -> currentPhaseId
+        this.scheduledPhaseChanges = new Map(); // changeId -> phaseChangeData
+        this.phaseTransitionStates = new Map(); // entityId -> transitionState
+        this.phaseRenderCache = new Map(); // cacheKey -> renderedPhaseData
+        
+        // Coordination state
+        this.entityGroups = new Map(); // groupId -> [entityIds]
+        this.phaseQueue = []; // Queued phase changes
+        this.globalPhaseState = {
+            masterPhase: null,
+            coordinationMode: 'independent',
+            transitionInProgress: false
+        };
+        
+        // Performance tracking
+        this.phaseTransitionMetrics = {
+            averageTransitionTime: 0,
+            totalTransitions: 0,
+            failedTransitions: 0
+        };
+        
+        this._setupPhaseEventHandlers();
+    }
+
+    async initialize() {
+        await super.initialize();
+        
+        // Initialize phase-aware components
+        await this.initializePhaseSystem();
+        
+        this.eventBus.emit('phase-stage:initialized');
+    }
+
+    async initializePhaseSystem() {
+        // Initialize phase states for all entities
+        const entities = await this.getStageEntities();
+        
+        for (const entity of entities) {
+            const defaultPhase = await this.phaseManager.getDefaultPhase(entity.id);
+            if (defaultPhase) {
+                this.activePhases.set(entity.id, defaultPhase.id);
+            }
+        }
+        
+        // Set up beat sync integration
+        this.beatSyncService.on('beat', (beatData) => {
+            this.processScheduledPhaseChanges(beatData);
+        });
+        
+        // Initialize coordination rules
+        await this.setupDefaultCoordination();
+    }
+
+    /**
+     * PHASE CHANGE ORCHESTRATION
+     * Manages phase transitions across multiple entities with coordination
+     */
+
+    async changeEntityPhase(entityId, newPhaseId, options = {}) {
+        const currentPhaseId = this.activePhases.get(entityId);
+        if (currentPhaseId === newPhaseId) return;
+        
+        const phaseChange = {
+            id: `phase-change-${Date.now()}-${Math.random()}`,
+            entityId,
+            fromPhaseId: currentPhaseId,
+            toPhaseId: newPhaseId,
+            timing: options.timing || 'immediate',
+            beatAlign: options.beatAlign !== false,
+            coordinationMode: options.coordinationMode || 'default',
+            priority: options.priority || 'normal',
+            metadata: options.metadata || {}
+        };
+        
+        // Apply coordination rules
+        const coordinatedChanges = await this.phaseCoordinator.planPhaseChange(phaseChange);
+        
+        // Schedule or execute based on timing
+        if (phaseChange.timing === 'immediate' && !phaseChange.beatAlign) {
+            await this.executePhaseChanges(coordinatedChanges);
+        } else {
+            this.schedulePhaseChanges(coordinatedChanges, phaseChange.timing);
+        }
+        
+        this.eventBus.emit('phase-stage:phase-change-initiated', { 
+            primaryChange: phaseChange,
+            coordinatedChanges: coordinatedChanges.length
+        });
+    }
+
+    async changeGlobalPhase(newPhaseId, coordinationConfig = {}) {
+        const config = {
+            mode: coordinationConfig.mode || 'synchronized',
+            timing: coordinationConfig.timing || 'next-beat',
+            staggerDelay: coordinationConfig.staggerDelay || 0,
+            includeBackground: coordinationConfig.includeBackground !== false,
+            ...coordinationConfig
+        };
+        
+        this.globalPhaseState.masterPhase = newPhaseId;
+        this.globalPhaseState.coordinationMode = config.mode;
+        
+        // Get all entities that should participate
+        const entities = await this.getCoordinatedEntities(config);
+        
+        // Create coordinated phase change plan
+        const phaseChanges = entities.map((entity, index) => ({
+            id: `global-phase-${Date.now()}-${index}`,
+            entityId: entity.id,
+            fromPhaseId: this.activePhases.get(entity.id),
+            toPhaseId: newPhaseId,
+            timing: config.timing,
+            beatAlign: true,
+            delay: config.staggerDelay * index,
+            priority: 'high',
+            metadata: { 
+                globalChange: true,
+                coordinationMode: config.mode
+            }
+        }));
+        
+        // Schedule coordinated execution
+        this.schedulePhaseChanges(phaseChanges, config.timing);
+        
+        this.eventBus.emit('phase-stage:global-phase-change', {
+            newPhaseId,
+            affectedEntities: entities.length,
+            coordinationConfig: config
+        });
+    }
+
+    schedulePhaseChanges(phaseChanges, timing) {
+        for (const change of phaseChanges) {
+            if (timing === 'next-beat') {
+                const nextBeat = this.beatSyncService.getNextBeatTime();
+                change.executeAt = nextBeat + (change.delay || 0);
+            } else if (timing === 'next-measure') {
+                const nextMeasure = this.beatSyncService.getNextMeasureTime();
+                change.executeAt = nextMeasure + (change.delay || 0);
+            } else if (typeof timing === 'number') {
+                change.executeAt = this.currentTime + timing + (change.delay || 0);
+            }
+            
+            this.scheduledPhaseChanges.set(change.id, change);
+        }
+    }
+
+    async executePhaseChanges(phaseChanges) {
+        this.globalPhaseState.transitionInProgress = true;
+        const startTime = performance.now();
+        
+        try {
+            // Group changes by priority
+            const priorityGroups = this.groupChangesByPriority(phaseChanges);
+            
+            // Execute in priority order
+            for (const group of priorityGroups) {
+                await Promise.all(group.map(change => this.executeSinglePhaseChange(change)));
+            }
+            
+            // Update metrics
+            const transitionTime = performance.now() - startTime;
+            this.updateTransitionMetrics(transitionTime, true);
+            
+        } catch (error) {
+            this.updateTransitionMetrics(performance.now() - startTime, false);
+            this.eventBus.emit('phase-stage:transition-error', { error, phaseChanges });
+            throw error;
+        } finally {
+            this.globalPhaseState.transitionInProgress = false;
+        }
+    }
+
+    async executeSinglePhaseChange(phaseChange) {
+        const { entityId, fromPhaseId, toPhaseId } = phaseChange;
+        
+        // Get phase data
+        const fromPhase = fromPhaseId ? await this.phaseManager.getPhase(entityId, fromPhaseId) : null;
+        const toPhase = await this.phaseManager.getPhase(entityId, toPhaseId);
+        
+        if (!toPhase) {
+            throw new Error(`Phase not found: ${toPhaseId} for entity ${entityId}`);
+        }
+        
+        // Create transition state
+        const transitionState = {
+            entityId,
+            fromPhase,
+            toPhase,
+            startTime: this.currentTime,
+            duration: this.calculateTransitionDuration(fromPhase, toPhase),
+            progress: 0,
+            renderCache: new Map()
+        };
+        
+        this.phaseTransitionStates.set(entityId, transitionState);
+        
+        // Update active phase
+        this.activePhases.set(entityId, toPhaseId);
+        
+        // Trigger entity-specific transition logic
+        await this.triggerEntityPhaseTransition(entityId, fromPhase, toPhase, transitionState);
+        
+        this.eventBus.emit('phase-stage:phase-changed', {
+            entityId,
+            fromPhaseId,
+            toPhaseId,
+            transitionDuration: transitionState.duration
+        });
+    }
+
+    async triggerEntityPhaseTransition(entityId, fromPhase, toPhase, transitionState) {
+        // Character phase transition
+        if (await this.isCharacterEntity(entityId)) {
+            await this.transitionCharacterPhase(entityId, fromPhase, toPhase, transitionState);
+        }
+        
+        // Background phase transition
+        if (await this.isBackgroundEntity(entityId)) {
+            await this.transitionBackgroundPhase(entityId, fromPhase, toPhase, transitionState);
+        }
+        
+        // Audio phase transition
+        if (toPhase.musicData) {
+            await this.transitionAudioPhase(entityId, fromPhase, toPhase, transitionState);
+        }
+        
+        // Animation phase transition
+        if (toPhase.animationData) {
+            await this.transitionAnimationPhase(entityId, fromPhase, toPhase, transitionState);
+        }
+    }
+
+    async transitionCharacterPhase(entityId, fromPhase, toPhase, transitionState) {
+        // Update character appearance
+        const appearanceTransition = {
+            fromAppearance: fromPhase?.appearanceData,
+            toAppearance: toPhase.appearanceData,
+            transitionStyle: toPhase.transitionConfig?.appearance || 'crossfade',
+            duration: transitionState.duration
+        };
+        
+        await this.characterRenderer.startPhaseTransition(entityId, appearanceTransition);
+    }
+
+    async transitionBackgroundPhase(entityId, fromPhase, toPhase, transitionState) {
+        // Update background elements
+        const backgroundTransition = {
+            fromBackground: fromPhase?.backgroundData,
+            toBackground: toPhase.backgroundData,
+            transitionStyle: toPhase.transitionConfig?.background || 'fade',
+            duration: transitionState.duration
+        };
+        
+        await this.backgroundManager.startPhaseTransition(entityId, backgroundTransition);
+    }
+
+    async transitionAudioPhase(entityId, fromPhase, toPhase, transitionState) {
+        // Coordinate audio transition with beat sync
+        const audioTransition = {
+            fromAudio: fromPhase?.musicData,
+            toAudio: toPhase.musicData,
+            transitionStyle: toPhase.transitionConfig?.audio || 'crossfade',
+            beatAlignment: true,
+            duration: transitionState.duration
+        };
+        
+        await this.audioEngine.startPhaseTransition(entityId, audioTransition);
+    }
+
+    async transitionAnimationPhase(entityId, fromPhase, toPhase, transitionState) {
+        // Update animation patterns
+        const animationTransition = {
+            fromAnimation: fromPhase?.animationData,
+            toAnimation: toPhase.animationData,
+            transitionStyle: toPhase.transitionConfig?.animation || 'blend',
+            beatAlignment: true,
+            duration: transitionState.duration
+        };
+        
+        await this.tweenEngine.startPhaseTransition(entityId, animationTransition);
+    }
+
+    /**
+     * PHASE-AWARE RENDERING
+     * Enhanced rendering with phase transition support
+     */
+
+    render(time) {
+        // Phase-aware background rendering
+        this.renderPhaseAwareBackground(time);
+        
+        // Get phase-aware animation states
+        const phaseStates = this.getPhaseAwareAnimationStates(time);
+        
+        // Apply phase transitions and animations
+        const finalStates = this.applyPhaseTransitions(phaseStates, time);
+        
+        // Render characters with phase context
+        this.renderPhaseAwareCharacters(finalStates, time);
+        
+        // Render phase transition overlays
+        this.renderPhaseTransitionEffects(time);
+        
+        // Update transition progress
+        this.updatePhaseTransitions(time);
+        
+        this.frameCount++;
+    }
+
+    renderPhaseAwareBackground(time) {
+        for (const [entityId, phaseId] of this.activePhases) {
+            if (this.isBackgroundEntity(entityId)) {
+                const transitionState = this.phaseTransitionStates.get(entityId);
+                this.backgroundManager.renderWithPhase(this.ctx, entityId, phaseId, transitionState, time);
+            }
+        }
+    }
+
+    getPhaseAwareAnimationStates(time) {
+        const states = new Map();
+        
+        for (const [entityId, phaseId] of this.activePhases) {
+            const phase = this.phaseManager.getPhaseSync(entityId, phaseId);
+            if (phase?.animationData) {
+                const transitionState = this.phaseTransitionStates.get(entityId);
+                const phaseAnimationState = this.calculatePhaseAnimationState(phase, transitionState, time);
+                states.set(entityId, phaseAnimationState);
+            }
+        }
+        
+        return states;
+    }
+
+    applyPhaseTransitions(phaseStates, time) {
+        const finalStates = new Map();
+        
+        for (const [entityId, state] of phaseStates) {
+            const transitionState = this.phaseTransitionStates.get(entityId);
+            
+            if (transitionState && transitionState.progress < 1) {
+                // Apply transition blending
+                const blendedState = this.blendPhaseStates(
+                    transitionState.fromPhase?.animationData,
+                    state,
+                    transitionState.progress
+                );
+                finalStates.set(entityId, blendedState);
+            } else {
+                finalStates.set(entityId, state);
+            }
+        }
+        
+        return finalStates;
+    }
+
+    renderPhaseAwareCharacters(states, time) {
+        for (const [entityId, state] of states) {
+            const phaseId = this.activePhases.get(entityId);
+            const transitionState = this.phaseTransitionStates.get(entityId);
+            
+            this.characterRenderer.renderWithPhase(
+                this.ctx, 
+                entityId, 
+                phaseId, 
+                state, 
+                transitionState, 
+                time
+            );
+        }
+    }
+
+    renderPhaseTransitionEffects(time) {
+        // Render visual transition effects
+        for (const [entityId, transitionState] of this.phaseTransitionStates) {
+            if (transitionState.progress < 1) {
+                this.renderTransitionEffect(entityId, transitionState, time);
+            }
+        }
+    }
+
+    /**
+     * PHASE SYSTEM INTEGRATION
+     */
+
+    processScheduledPhaseChanges(beatData) {
+        const currentTime = beatData.timestamp;
+        const readyChanges = [];
+        
+        for (const [changeId, change] of this.scheduledPhaseChanges) {
+            if (change.executeAt <= currentTime) {
+                readyChanges.push(change);
+                this.scheduledPhaseChanges.delete(changeId);
+            }
+        }
+        
+        if (readyChanges.length > 0) {
+            this.executePhaseChanges(readyChanges);
+        }
+    }
+
+    updatePhaseTransitions(time) {
+        for (const [entityId, transitionState] of this.phaseTransitionStates) {
+            const elapsed = time - transitionState.startTime;
+            transitionState.progress = Math.min(elapsed / transitionState.duration, 1);
+            
+            if (transitionState.progress >= 1) {
+                this.phaseTransitionStates.delete(entityId);
+                this.eventBus.emit('phase-stage:transition-completed', { entityId });
+            }
+        }
+    }
+
+    /**
+     * COORDINATION UTILITIES
+     */
+
+    async getCoordinatedEntities(config) {
+        const entities = [];
+        
+        // Get all stage entities
+        const stageEntities = await this.getStageEntities();
+        
+        for (const entity of stageEntities) {
+            const shouldInclude = config.includeBackground || entity.type !== 'background';
+            if (shouldInclude) {
+                entities.push(entity);
+            }
+        }
+        
+        return entities;
+    }
+
+    groupChangesByPriority(phaseChanges) {
+        const groups = new Map();
+        
+        for (const change of phaseChanges) {
+            const priority = change.priority || 'normal';
+            if (!groups.has(priority)) {
+                groups.set(priority, []);
+            }
+            groups.get(priority).push(change);
+        }
+        
+        // Return in priority order: high, normal, low
+        return ['high', 'normal', 'low']
+            .map(p => groups.get(p) || [])
+            .filter(group => group.length > 0);
+    }
+
+    calculateTransitionDuration(fromPhase, toPhase) {
+        // Calculate based on transition complexity and content
+        let baseDuration = 1.0; // 1 second default
+        
+        if (toPhase.transitionConfig?.duration) {
+            baseDuration = toPhase.transitionConfig.duration;
+        }
+        
+        // Adjust for beat alignment
+        if (this.beatSyncService) {
+            const beatDuration = 60 / this.beatSyncService.getCurrentBPM();
+            baseDuration = Math.ceil(baseDuration / beatDuration) * beatDuration;
+        }
+        
+        return baseDuration;
+    }
+
+    /**
+     * PERFORMANCE UTILITIES
+     */
+
+    updateTransitionMetrics(duration, success) {
+        this.phaseTransitionMetrics.totalTransitions++;
+        
+        if (success) {
+            const total = this.phaseTransitionMetrics.totalTransitions;
+            const current = this.phaseTransitionMetrics.averageTransitionTime;
+            this.phaseTransitionMetrics.averageTransitionTime = 
+                (current * (total - 1) + duration) / total;
+        } else {
+            this.phaseTransitionMetrics.failedTransitions++;
+        }
+    }
+
+    /**
+     * EVENT HANDLERS
+     */
+
+    _setupPhaseEventHandlers() {
+        // Phase system events
+        this.eventBus.on('phase:changed', (data) => {
+            if (this.activePhases.has(data.entityId)) {
+                this.changeEntityPhase(data.entityId, data.newPhaseId, data.options);
+            }
+        });
+        
+        // Beat sync events
+        this.eventBus.on('beat-sync:tempo-changed', (data) => {
+            this.adjustScheduledTransitions(data.newBPM);
+        });
+        
+        // Coordination events
+        this.eventBus.on('coordination:group-change', (data) => {
+            this.updateEntityGroup(data.groupId, data.entityIds);
+        });
+    }
+
+    /**
+     * PHASE STATE MANAGEMENT
+     */
+
+    getCurrentPhase(entityId) {
+        return this.activePhases.get(entityId);
+    }
+
+    getAllActivePhases() {
+        return new Map(this.activePhases);
+    }
+
+    isTransitioning(entityId = null) {
+        if (entityId) {
+            return this.phaseTransitionStates.has(entityId);
+        }
+        return this.phaseTransitionStates.size > 0;
+    }
+
+    getTransitionProgress(entityId) {
+        const state = this.phaseTransitionStates.get(entityId);
+        return state ? state.progress : 1;
+    }
+
+    /**
+     * CLEANUP
+     */
+
+    dispose() {
+        super.dispose();
+        
+        // Clear phase-specific state
+        this.activePhases.clear();
+        this.scheduledPhaseChanges.clear();
+        this.phaseTransitionStates.clear();
+        this.phaseRenderCache.clear();
+        
+        this.eventBus.emit('phase-stage:disposed');
+    }
+}
+```

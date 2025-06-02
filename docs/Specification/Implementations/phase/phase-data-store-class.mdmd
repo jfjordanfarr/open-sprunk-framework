@@ -1,0 +1,662 @@
+```{unit}
+id: "phase-data-store-class"
+title: "Phase Data Store Class"
+unit-type: "javascript-class-definition"
+source-ref: "../../src/phase/PhaseDataStore.js"
+status: "draft"
+see-also:
+  - "[[phase-system-architecture]]"
+  - "[[phase-manager-class]]"
+  - "[[local-storage-class]]"
+  - "[[project-file-schema]]"
+```
+
+## Overview
+
+The PhaseDataStore class manages persistent storage and retrieval of phase data, including phase metadata, templates, and cross-reference integrity. It provides efficient serialization, versioning, and data validation for all phase-related information.
+
+## Class Definition
+
+```javascript
+/**
+ * Manages persistent storage and retrieval of phase data
+ * Handles serialization, versioning, and data integrity for phases
+ */
+class PhaseDataStore {
+    constructor(localStorage, eventBus) {
+        this.localStorage = localStorage;
+        this.eventBus = eventBus;
+        
+        this.storageKeys = {
+            phases: 'phases',
+            phaseTemplates: 'phase-templates',
+            phaseMetadata: 'phase-metadata',
+            phaseHistory: 'phase-history'
+        };
+        
+        this.compressionEnabled = true;
+        this.versioningEnabled = true;
+        this.maxHistoryVersions = 10;
+        
+        this._initializeStorage();
+    }
+
+    // Phase CRUD Operations
+    async savePhase(phaseId, phaseData, options = {}) {
+        const { 
+            createHistory = this.versioningEnabled,
+            validateBeforeSave = true,
+            compress = this.compressionEnabled 
+        } = options;
+        
+        if (validateBeforeSave && !this._validatePhaseData(phaseData)) {
+            throw new Error(`Invalid phase data for ${phaseId}`);
+        }
+        
+        // Create history version if enabled
+        if (createHistory) {
+            await this._createHistoryVersion(phaseId, phaseData);
+        }
+        
+        // Prepare phase data for storage
+        const storageData = {
+            ...phaseData,
+            savedAt: Date.now(),
+            version: this._generateVersion(),
+            checksum: this._calculateChecksum(phaseData)
+        };
+        
+        // Apply compression if enabled
+        const finalData = compress ? 
+            this._compressPhaseData(storageData) : 
+            storageData;
+        
+        // Store in localStorage
+        const phasesData = await this._loadPhasesData();
+        phasesData[phaseId] = finalData;
+        
+        await this.localStorage.setItem(
+            this.storageKeys.phases,
+            JSON.stringify(phasesData)
+        );
+        
+        // Update metadata
+        await this._updatePhaseMetadata(phaseId, {
+            lastSaved: Date.now(),
+            size: JSON.stringify(finalData).length,
+            compressed: compress
+        });
+        
+        this.eventBus.emit('phase:data:saved', { phaseId, size: finalData.length });
+        
+        return storageData.version;
+    }
+
+    async loadPhase(phaseId) {
+        const phasesData = await this._loadPhasesData();
+        const rawData = phasesData[phaseId];
+        
+        if (!rawData) {
+            return null;
+        }
+        
+        // Decompress if necessary
+        const phaseData = this._isCompressed(rawData) ?
+            this._decompressPhaseData(rawData) :
+            rawData;
+        
+        // Validate data integrity
+        if (!this._validateChecksum(phaseData)) {
+            console.warn(`Checksum validation failed for phase ${phaseId}`);
+            // Attempt to recover from history
+            const recoveredData = await this._recoverFromHistory(phaseId);
+            if (recoveredData) {
+                return recoveredData;
+            }
+        }
+        
+        this.eventBus.emit('phase:data:loaded', { phaseId });
+        
+        return phaseData;
+    }
+
+    async deletePhase(phaseId, options = {}) {
+        const { keepHistory = false } = options;
+        
+        const phasesData = await this._loadPhasesData();
+        const phaseData = phasesData[phaseId];
+        
+        if (!phaseData) {
+            return false;
+        }
+        
+        // Remove from main storage
+        delete phasesData[phaseId];
+        await this.localStorage.setItem(
+            this.storageKeys.phases,
+            JSON.stringify(phasesData)
+        );
+        
+        // Clean up metadata
+        await this._removePhaseMetadata(phaseId);
+        
+        // Optionally preserve history
+        if (!keepHistory) {
+            await this._removePhaseHistory(phaseId);
+        }
+        
+        this.eventBus.emit('phase:data:deleted', { phaseId });
+        
+        return true;
+    }
+
+    async getAllPhases() {
+        const phasesData = await this._loadPhasesData();
+        const result = {};
+        
+        for (const [phaseId, rawData] of Object.entries(phasesData)) {
+            const phaseData = this._isCompressed(rawData) ?
+                this._decompressPhaseData(rawData) :
+                rawData;
+            
+            result[phaseId] = phaseData;
+        }
+        
+        return result;
+    }
+
+    async getPhasesByEntity(entityId) {
+        const allPhases = await this.getAllPhases();
+        const entityPhases = {};
+        
+        for (const [phaseId, phaseData] of Object.entries(allPhases)) {
+            if (phaseData.entityId === entityId) {
+                entityPhases[phaseId] = phaseData;
+            }
+        }
+        
+        return entityPhases;
+    }
+
+    // Phase Templates
+    async savePhaseTemplate(templateId, templateData) {
+        const templates = await this._loadPhaseTemplates();
+        
+        const template = {
+            ...templateData,
+            templateId,
+            createdAt: Date.now(),
+            version: this._generateVersion()
+        };
+        
+        templates[templateId] = template;
+        
+        await this.localStorage.setItem(
+            this.storageKeys.phaseTemplates,
+            JSON.stringify(templates)
+        );
+        
+        this.eventBus.emit('phase:template:saved', { templateId });
+        
+        return template;
+    }
+
+    async getPhaseTemplate(templateId) {
+        const templates = await this._loadPhaseTemplates();
+        return templates[templateId] || null;
+    }
+
+    async getAllPhaseTemplates() {
+        return this._loadPhaseTemplates();
+    }
+
+    async deletePhaseTemplate(templateId) {
+        const templates = await this._loadPhaseTemplates();
+        
+        if (!templates[templateId]) {
+            return false;
+        }
+        
+        delete templates[templateId];
+        
+        await this.localStorage.setItem(
+            this.storageKeys.phaseTemplates,
+            JSON.stringify(templates)
+        );
+        
+        this.eventBus.emit('phase:template:deleted', { templateId });
+        
+        return true;
+    }
+
+    // Phase History and Versioning
+    async getPhaseHistory(phaseId, maxVersions = this.maxHistoryVersions) {
+        const historyData = await this._loadPhaseHistory();
+        const phaseHistory = historyData[phaseId] || [];
+        
+        return phaseHistory
+            .sort((a, b) => b.timestamp - a.timestamp)
+            .slice(0, maxVersions);
+    }
+
+    async restorePhaseFromHistory(phaseId, version) {
+        const history = await this.getPhaseHistory(phaseId);
+        const targetVersion = history.find(h => h.version === version);
+        
+        if (!targetVersion) {
+            throw new Error(`Version ${version} not found for phase ${phaseId}`);
+        }
+        
+        // Restore the historical version as current
+        await this.savePhase(phaseId, targetVersion.data, {
+            createHistory: true,
+            validateBeforeSave: false // Trust historical data
+        });
+        
+        this.eventBus.emit('phase:restored', { phaseId, version });
+        
+        return targetVersion.data;
+    }
+
+    // Data Export and Import
+    async exportPhases(phaseIds = null) {
+        const allPhases = await this.getAllPhases();
+        const templates = await this.getAllPhaseTemplates();
+        const metadata = await this._loadPhaseMetadata();
+        
+        const phasesToExport = phaseIds ? 
+            Object.fromEntries(
+                Object.entries(allPhases).filter(([id]) => phaseIds.includes(id))
+            ) : 
+            allPhases;
+        
+        const exportData = {
+            phases: phasesToExport,
+            templates,
+            metadata: phaseIds ? 
+                Object.fromEntries(
+                    Object.entries(metadata).filter(([id]) => phaseIds.includes(id))
+                ) : 
+                metadata,
+            exportedAt: Date.now(),
+            version: '1.0'
+        };
+        
+        return exportData;
+    }
+
+    async importPhases(importData, options = {}) {
+        const { 
+            overwriteExisting = false,
+            validateData = true,
+            mergeTemplates = true 
+        } = options;
+        
+        if (validateData && !this._validateImportData(importData)) {
+            throw new Error('Invalid import data format');
+        }
+        
+        const results = {
+            imported: 0,
+            skipped: 0,
+            errors: []
+        };
+        
+        // Import phases
+        for (const [phaseId, phaseData] of Object.entries(importData.phases)) {
+            try {
+                const existingPhase = await this.loadPhase(phaseId);
+                
+                if (existingPhase && !overwriteExisting) {
+                    results.skipped++;
+                    continue;
+                }
+                
+                await this.savePhase(phaseId, phaseData, {
+                    createHistory: false, // Don't create history for imports
+                    validateBeforeSave: validateData
+                });
+                
+                results.imported++;
+            } catch (error) {
+                results.errors.push({ phaseId, error: error.message });
+            }
+        }
+        
+        // Import templates if requested
+        if (mergeTemplates && importData.templates) {
+            for (const [templateId, templateData] of Object.entries(importData.templates)) {
+                try {
+                    await this.savePhaseTemplate(templateId, templateData);
+                } catch (error) {
+                    results.errors.push({ templateId, error: error.message });
+                }
+            }
+        }
+        
+        this.eventBus.emit('phase:data:imported', results);
+        
+        return results;
+    }
+
+    // Storage Management
+    async getStorageStats() {
+        const phases = await this._loadPhasesData();
+        const templates = await this._loadPhaseTemplates();
+        const metadata = await this._loadPhaseMetadata();
+        const history = await this._loadPhaseHistory();
+        
+        const stats = {
+            phases: {
+                count: Object.keys(phases).length,
+                size: JSON.stringify(phases).length
+            },
+            templates: {
+                count: Object.keys(templates).length,
+                size: JSON.stringify(templates).length
+            },
+            metadata: {
+                count: Object.keys(metadata).length,
+                size: JSON.stringify(metadata).length
+            },
+            history: {
+                count: Object.values(history).reduce((sum, arr) => sum + arr.length, 0),
+                size: JSON.stringify(history).length
+            }
+        };
+        
+        stats.total = {
+            count: stats.phases.count + stats.templates.count,
+            size: stats.phases.size + stats.templates.size + 
+                  stats.metadata.size + stats.history.size
+        };
+        
+        return stats;
+    }
+
+    async cleanupStorage(options = {}) {
+        const {
+            removeOldHistory = true,
+            compactData = true,
+            removeOrphanedMetadata = true
+        } = options;
+        
+        let cleanedItems = 0;
+        
+        if (removeOldHistory) {
+            cleanedItems += await this._cleanupOldHistory();
+        }
+        
+        if (compactData) {
+            cleanedItems += await this._compactStorageData();
+        }
+        
+        if (removeOrphanedMetadata) {
+            cleanedItems += await this._removeOrphanedMetadata();
+        }
+        
+        this.eventBus.emit('phase:storage:cleaned', { 
+            itemsRemoved: cleanedItems 
+        });
+        
+        return cleanedItems;
+    }
+
+    // Private Helper Methods
+    async _initializeStorage() {
+        // Ensure all storage containers exist
+        for (const key of Object.values(this.storageKeys)) {
+            const existing = await this.localStorage.getItem(key);
+            if (!existing) {
+                await this.localStorage.setItem(key, JSON.stringify({}));
+            }
+        }
+    }
+
+    async _loadPhasesData() {
+        const data = await this.localStorage.getItem(this.storageKeys.phases);
+        return JSON.parse(data || '{}');
+    }
+
+    async _loadPhaseTemplates() {
+        const data = await this.localStorage.getItem(this.storageKeys.phaseTemplates);
+        return JSON.parse(data || '{}');
+    }
+
+    async _loadPhaseMetadata() {
+        const data = await this.localStorage.getItem(this.storageKeys.phaseMetadata);
+        return JSON.parse(data || '{}');
+    }
+
+    async _loadPhaseHistory() {
+        const data = await this.localStorage.getItem(this.storageKeys.phaseHistory);
+        return JSON.parse(data || '{}');
+    }
+
+    async _createHistoryVersion(phaseId, phaseData) {
+        const historyData = await this._loadPhaseHistory();
+        
+        if (!historyData[phaseId]) {
+            historyData[phaseId] = [];
+        }
+        
+        const version = {
+            version: this._generateVersion(),
+            timestamp: Date.now(),
+            data: { ...phaseData }
+        };
+        
+        historyData[phaseId].unshift(version);
+        
+        // Limit history size
+        if (historyData[phaseId].length > this.maxHistoryVersions) {
+            historyData[phaseId] = historyData[phaseId].slice(0, this.maxHistoryVersions);
+        }
+        
+        await this.localStorage.setItem(
+            this.storageKeys.phaseHistory,
+            JSON.stringify(historyData)
+        );
+    }
+
+    _validatePhaseData(phaseData) {
+        return phaseData && 
+               typeof phaseData === 'object' && 
+               phaseData.phaseId && 
+               phaseData.entityId;
+    }
+
+    _validateImportData(importData) {
+        return importData && 
+               importData.phases && 
+               typeof importData.phases === 'object';
+    }
+
+    _calculateChecksum(data) {
+        // Simple checksum calculation (could be enhanced with proper hashing)
+        const str = JSON.stringify(data);
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            const char = str.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash; // Convert to 32-bit integer
+        }
+        return hash.toString();
+    }
+
+    _validateChecksum(phaseData) {
+        if (!phaseData.checksum) return true; // No checksum to validate
+        
+        const dataForChecksum = { ...phaseData };
+        delete dataForChecksum.checksum;
+        delete dataForChecksum.savedAt;
+        
+        const expectedChecksum = this._calculateChecksum(dataForChecksum);
+        return expectedChecksum === phaseData.checksum;
+    }
+
+    _generateVersion() {
+        return Date.now().toString(36) + Math.random().toString(36).substr(2);
+    }
+
+    _compressPhaseData(data) {
+        // Placeholder for compression logic
+        // Could implement LZ77, gzip, or other compression
+        return {
+            ...data,
+            _compressed: true,
+            _originalSize: JSON.stringify(data).length
+        };
+    }
+
+    _decompressPhaseData(data) {
+        if (!this._isCompressed(data)) return data;
+        
+        // Placeholder for decompression logic
+        const decompressed = { ...data };
+        delete decompressed._compressed;
+        delete decompressed._originalSize;
+        
+        return decompressed;
+    }
+
+    _isCompressed(data) {
+        return data && data._compressed === true;
+    }
+
+    async _updatePhaseMetadata(phaseId, metadata) {
+        const allMetadata = await this._loadPhaseMetadata();
+        allMetadata[phaseId] = {
+            ...allMetadata[phaseId],
+            ...metadata
+        };
+        
+        await this.localStorage.setItem(
+            this.storageKeys.phaseMetadata,
+            JSON.stringify(allMetadata)
+        );
+    }
+
+    async _removePhaseMetadata(phaseId) {
+        const allMetadata = await this._loadPhaseMetadata();
+        delete allMetadata[phaseId];
+        
+        await this.localStorage.setItem(
+            this.storageKeys.phaseMetadata,
+            JSON.stringify(allMetadata)
+        );
+    }
+
+    async _removePhaseHistory(phaseId) {
+        const historyData = await this._loadPhaseHistory();
+        delete historyData[phaseId];
+        
+        await this.localStorage.setItem(
+            this.storageKeys.phaseHistory,
+            JSON.stringify(historyData)
+        );
+    }
+
+    async _cleanupOldHistory() {
+        const historyData = await this._loadPhaseHistory();
+        let removed = 0;
+        
+        for (const [phaseId, history] of Object.entries(historyData)) {
+            if (history.length > this.maxHistoryVersions) {
+                historyData[phaseId] = history.slice(0, this.maxHistoryVersions);
+                removed += history.length - this.maxHistoryVersions;
+            }
+        }
+        
+        if (removed > 0) {
+            await this.localStorage.setItem(
+                this.storageKeys.phaseHistory,
+                JSON.stringify(historyData)
+            );
+        }
+        
+        return removed;
+    }
+
+    async _compactStorageData() {
+        // Implement data compaction logic
+        return 0;
+    }
+
+    async _removeOrphanedMetadata() {
+        const phases = await this._loadPhasesData();
+        const metadata = await this._loadPhaseMetadata();
+        
+        let removed = 0;
+        const validPhaseIds = new Set(Object.keys(phases));
+        
+        for (const phaseId of Object.keys(metadata)) {
+            if (!validPhaseIds.has(phaseId)) {
+                delete metadata[phaseId];
+                removed++;
+            }
+        }
+        
+        if (removed > 0) {
+            await this.localStorage.setItem(
+                this.storageKeys.phaseMetadata,
+                JSON.stringify(metadata)
+            );
+        }
+        
+        return removed;
+    }
+
+    async _recoverFromHistory(phaseId) {
+        const history = await this.getPhaseHistory(phaseId, 1);
+        return history.length > 0 ? history[0].data : null;
+    }
+}
+```
+
+## Dependencies
+
+- **LocalStorage**: For persistent data storage
+- **EventBus**: For storage operation notifications
+
+## Integration Points
+
+- **PhaseManager**: Primary consumer for phase CRUD operations
+- **Project File System**: Provides data for project save/load operations
+- **Backup System**: Utilizes export/import functionality
+
+## Usage Examples
+
+```javascript
+// Save a phase with history tracking
+await phaseDataStore.savePhase('phase-001', {
+    phaseId: 'phase-001',
+    entityId: 'character-001',
+    name: 'Happy State',
+    appearance: { /* visual data */ },
+    musicLoop: { /* audio data */ },
+    animations: ['dance', 'wave']
+});
+
+// Load phase with automatic decompression
+const phase = await phaseDataStore.loadPhase('phase-001');
+
+// Export phases for sharing
+const exportData = await phaseDataStore.exportPhases(['phase-001', 'phase-002']);
+
+// Import phases from another project
+const results = await phaseDataStore.importPhases(importData, {
+    overwriteExisting: true,
+    validateData: true
+});
+```
+
+## Performance Features
+
+- **Lazy Loading**: Phases loaded on-demand to minimize memory usage
+- **Compression**: Optional data compression for large phase datasets
+- **Versioning**: Configurable history depth to balance features and storage
+- **Batching**: Bulk operations for efficient data management
+- **Integrity Checking**: Checksums and validation for data reliability
+
+The PhaseDataStore provides robust, efficient storage management for the complex multi-modal data that powers Open Sprunk Framework's phase system.

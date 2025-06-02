@@ -1,0 +1,19 @@
+<!-- filepath: docs/Units/utils/color-utils.mdmd -->
+::: {unit}
+id: "color-utils"
+title: "Color Utils"
+unit-type: "javascript-module-definition"
+language: "javascript"
+status: "draft"
+version: "0.2"
+brief: "Provides utility functions for color manipulation and conversion."
+source-ref: "../../src/utils/ColorUtils.js"
+see-also:
+  - "[[../Concepts/vector-graphics-system.mdmd]]" # Parent composition
+
+Provides utility functions for color manipulation, conversion between color spaces, and validation.
+
+```javascript
+// Color Utils implementation placeholder
+```
+:::

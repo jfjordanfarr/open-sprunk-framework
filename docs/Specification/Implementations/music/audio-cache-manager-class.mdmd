@@ -1,0 +1,290 @@
+{unit}
+id: "audio-cache-manager-class"
+title: "Audio Cache Manager Class"
+unit-type: "javascript-class-definition"
+language: "javascript"
+status: "draft"
+version: "1.0"
+brief: "Intelligent cache management for pre-baked audio effects with memory optimization"
+source-ref: "../../src/music/AudioCacheManager.js"
+see-also:
+  - "[[audio-effects-processor-class]]" # Implementation dependency (manages cache for effects processor)
+  - "[[../core/event-bus-class]]" # Implementation dependency (uses EventBus for cache events)
+  - "[[../../Definition/Requirements/client-side-architecture-requirement]]" # Traceability (implements client-side memory management)
+
+This class manages the audio cache for pre-baked effects, implementing intelligent memory management and cache invalidation strategies.
+
+```javascript
+export class AudioCacheManager {
+    constructor(eventBus, maxMemoryMB = 100) {
+        this.eventBus = eventBus;
+        this.maxMemoryBytes = maxMemoryMB * 1024 * 1024;
+        
+        // Cache storage
+        this.cache = new Map();
+        this.cacheMetadata = new Map();
+        
+        // LRU tracking
+        this.accessOrder = [];
+        this.currentMemoryUsage = 0;
+        
+        // Cache statistics
+        this.stats = {
+            hits: 0,
+            misses: 0,
+            evictions: 0,
+            totalBakes: 0
+        };
+        
+        this.setupMemoryMonitoring();
+    }
+    
+    /**
+     * INTELLIGENT CACHE STORAGE with automatic eviction
+     */
+    store(key, audioBuffer, metadata = {}) {
+        const bufferSize = this.calculateBufferSize(audioBuffer);
+        
+        // Check if storing this would exceed memory limit
+        if (bufferSize > this.maxMemoryBytes) {
+            console.warn('Audio buffer too large for cache');
+            return false;
+        }
+        
+        // Make room if necessary
+        this.ensureSpace(bufferSize);
+        
+        // Store the audio buffer
+        this.cache.set(key, audioBuffer);
+        this.cacheMetadata.set(key, {
+            size: bufferSize,
+            created: Date.now(),
+            accessed: Date.now(),
+            accessCount: 0,
+            ...metadata
+        });
+        
+        // Update LRU order
+        this.updateAccessOrder(key);
+        
+        // Update memory tracking
+        this.currentMemoryUsage += bufferSize;
+        
+        this.eventBus.emit('cache:stored', {
+            key,
+            size: bufferSize,
+            totalMemory: this.currentMemoryUsage
+        });
+        
+        return true;
+    }
+    
+    /**
+     * SMART CACHE RETRIEVAL with LRU updates
+     */
+    get(key) {
+        if (!this.cache.has(key)) {
+            this.stats.misses++;
+            return null;
+        }
+        
+        // Update access metadata
+        const metadata = this.cacheMetadata.get(key);
+        metadata.accessed = Date.now();
+        metadata.accessCount++;
+        
+        // Update LRU order
+        this.updateAccessOrder(key);
+        
+        this.stats.hits++;
+        
+        return this.cache.get(key);
+    }
+    
+    /**
+     * MEMORY PRESSURE MANAGEMENT: Intelligent eviction
+     */
+    ensureSpace(requiredBytes) {
+        while (this.currentMemoryUsage + requiredBytes > this.maxMemoryBytes && this.cache.size > 0) {
+            const evictedKey = this.evictLeastValuable();
+            if (!evictedKey) break; // Safety valve
+        }
+    }
+    
+    evictLeastValuable() {
+        if (this.accessOrder.length === 0) return null;
+        
+        // Use sophisticated scoring to determine what to evict
+        let lowestScore = Infinity;
+        let evictKey = null;
+        
+        for (const [key, metadata] of this.cacheMetadata) {
+            const score = this.calculateCacheValue(metadata);
+            if (score < lowestScore) {
+                lowestScore = score;
+                evictKey = key;
+            }
+        }
+        
+        if (evictKey) {
+            this.evict(evictKey);
+            this.stats.evictions++;
+            return evictKey;
+        }
+        
+        return null;
+    }
+    
+    /**
+     * CACHE VALUE SCORING: Consider frequency, recency, and cost to recreate
+     */
+    calculateCacheValue(metadata) {
+        const now = Date.now();
+        const age = now - metadata.created;
+        const timeSinceAccess = now - metadata.accessed;
+        
+        // Factors that increase value:
+        const frequencyScore = metadata.accessCount; // More accesses = more valuable
+        const recencyScore = 1 / (1 + timeSinceAccess / 60000); // Recent access = more valuable
+        const sizeScore = 1 / Math.sqrt(metadata.size); // Smaller = easier to keep
+        
+        // Estimate cost to recreate (more complex chains = more valuable to cache)
+        const recreationCost = metadata.effectsComplexity || 1;
+        
+        return (frequencyScore * recencyScore * sizeScore * recreationCost);
+    }
+    
+    /**
+     * PREEMPTIVE CACHE WARMING: Predict what user might need
+     */
+    warmCache(currentEffectsChain, audioBuffer) {
+        // Pre-bake likely variations of the current effects chain
+        const variations = this.generateLikelyVariations(currentEffectsChain);
+        
+        for (const variation of variations) {
+            const key = this.generateCacheKey(audioBuffer, variation);
+            if (!this.cache.has(key)) {
+                // Queue for background baking
+                this.eventBus.emit('cache:warm_request', {
+                    key,
+                    audioBuffer,
+                    effectsChain: variation,
+                    priority: 'low'
+                });
+            }
+        }
+    }
+    
+    generateLikelyVariations(effectsChain) {
+        const variations = [];
+        
+        // Common patterns users might try:
+        // 1. Remove the last effect
+        if (effectsChain.length > 1) {
+            variations.push(effectsChain.slice(0, -1));
+        }
+        
+        // 2. Different parameter variations for common effects
+        for (let i = 0; i < effectsChain.length; i++) {
+            const effect = effectsChain[i];
+            if (effect.type === 'reverb') {
+                // Try different reverb room sizes
+                const newChain = [...effectsChain];
+                newChain[i] = {
+                    ...effect,
+                    params: { ...effect.params, roomSize: 0.5 }
+                };
+                variations.push(newChain);
+            }
+        }
+        
+        return variations.slice(0, 3); // Limit to prevent explosion
+    }
+    
+    /**
+     * MEMORY MONITORING: Track system pressure
+     */
+    setupMemoryMonitoring() {
+        // Monitor browser memory pressure if available
+        if ('memory' in performance) {
+            setInterval(() => {
+                const memInfo = performance.memory;
+                const pressure = memInfo.usedJSHeapSize / memInfo.jsHeapSizeLimit;
+                
+                if (pressure > 0.8) {
+                    // High memory pressure - aggressively evict
+                    this.aggressiveEviction();
+                }
+            }, 5000);
+        }
+        
+        // Periodic cache health check
+        setInterval(() => {
+            this.optimizeCache();
+        }, 30000);
+    }
+    
+    aggressiveEviction() {
+        const targetReduction = this.currentMemoryUsage * 0.3; // Free 30%
+        let freedMemory = 0;
+        
+        while (freedMemory < targetReduction && this.cache.size > 0) {
+            const evictedKey = this.evictLeastValuable();
+            if (!evictedKey) break;
+            
+            const metadata = this.cacheMetadata.get(evictedKey);
+            freedMemory += metadata?.size || 0;
+        }
+        
+        this.eventBus.emit('cache:memory_pressure_handled', {
+            freedMemory,
+            remainingItems: this.cache.size
+        });
+    }
+    
+    /**
+     * CACHE ANALYTICS: Performance insights
+     */
+    getAnalytics() {
+        const hitRate = this.stats.hits / (this.stats.hits + this.stats.misses) || 0;
+        
+        return {
+            hitRate,
+            totalItems: this.cache.size,
+            memoryUsageMB: this.currentMemoryUsage / (1024 * 1024),
+            memoryLimitMB: this.maxMemoryBytes / (1024 * 1024),
+            avgItemSize: this.currentMemoryUsage / this.cache.size || 0,
+            stats: this.stats
+        };
+    }
+    
+    // Helper methods...
+    calculateBufferSize(buffer) {
+        return buffer.length * buffer.numberOfChannels * 4; // 32-bit floats
+    }
+    
+    updateAccessOrder(key) {
+        const index = this.accessOrder.indexOf(key);
+        if (index > -1) {
+            this.accessOrder.splice(index, 1);
+        }
+        this.accessOrder.push(key);
+    }
+    
+    evict(key) {
+        const metadata = this.cacheMetadata.get(key);
+        if (metadata) {
+            this.currentMemoryUsage -= metadata.size;
+        }
+        
+        this.cache.delete(key);
+        this.cacheMetadata.delete(key);
+        
+        const index = this.accessOrder.indexOf(key);
+        if (index > -1) {
+            this.accessOrder.splice(index, 1);
+        }
+    }
+}
+```
+{/unit}

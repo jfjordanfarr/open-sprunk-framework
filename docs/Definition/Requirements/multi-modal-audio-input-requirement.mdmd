@@ -1,0 +1,112 @@
+{unit}
+id: "multi-modal-audio-input-requirement"
+title: "Multi-Modal Audio Input Requirement"
+unit-type: "functional-requirement"
+status: "draft"
+version: "1.0"
+priority: "high"
+brief: "Support for diverse audio input methods including synthesis, samples, uploads, and microphone recording"
+see-also:
+  - "[[core-system-requirements]]" # Parent requirement context
+  - "[[client-side-architecture-requirement]]" # Implementation constraint
+  - "[[../Concepts/music-editor-module]]" # Target composition
+
+## Overview
+
+Users must be able to create sounds for their Sprunk characters through multiple input modalities, providing maximum creative freedom while respecting browser-based computational constraints.
+
+## Functional Requirements
+
+### FR-1: Synthesis Engine (Enhanced)
+- **Advanced Synthesis**: Support complex synthesis beyond basic oscillators
+  - Wavetable synthesis with user-uploadable wavetables
+  - FM synthesis for organic timbres
+  - Subtractive synthesis with advanced filtering
+  - Additive synthesis for harmonic control
+- **Real-time Modulation**: LFOs, envelopes, and parameter automation
+- **Effects Chain**: Reverb, delay, distortion, filtering
+- **Performance**: Optimized for 64-128 sample buffers at 44.1kHz
+
+### FR-2: Microphone Recording
+- **Real-time Recording**: Direct browser microphone input using `getUserMedia()`
+- **Live Monitoring**: Real-time audio feedback during recording
+- **Recording Modes**:
+  - One-shot samples (character sounds, vocal snippets)
+  - Loop recording with automatic length detection
+  - Punch-in recording for overdubs
+- **Processing Pipeline**: Gain control, noise gate, basic EQ
+- **Format**: Record to Web Audio buffer, export as WAV/MP3
+
+### FR-3: Audio File Upload
+- **Supported Formats**: WAV, MP3, OGG, M4A
+- **File Size Limits**: Reasonable limits for client-side processing (e.g., 10MB per file)
+- **Automatic Processing**: 
+  - Convert to consistent sample rate (44.1kHz)
+  - Trim silence
+  - Normalize levels
+- **Sample Management**: Organize user samples in browser storage
+
+### FR-4: Hybrid Audio Architecture
+- **Layered Approach**:
+  - Layer 1: Basic synthesis (always available)
+  - Layer 2: Enhanced synthesis (progressive enhancement)
+  - Layer 3: Sample playback (user uploads/recordings)
+  - Layer 4: Real-time processing (advanced users)
+- **Performance Scaling**: Automatically reduce quality/complexity based on device capabilities
+
+### FR-5: Character Voice Integration
+- **Voice Assignment**: Each character can have custom vocal sounds
+- **Trigger Modes**:
+  - Pitched samples (chromatic playback)
+  - One-shot triggers (percussion-style)
+  - Looped samples (sustained sounds)
+- **Voice Processing**: Pitch shifting, time stretching for musical integration
+
+## Non-Functional Requirements
+
+### NFR-1: Performance Constraints
+- **CPU Usage**: Target <30% CPU on mid-range devices
+- **Memory Limit**: <100MB total audio memory usage
+- **Latency**: <20ms round-trip latency for real-time input
+- **Graceful Degradation**: Reduce quality before failing
+
+### NFR-2: Browser Compatibility
+- **Minimum Support**: Chrome 80+, Firefox 75+, Safari 13+
+- **Progressive Enhancement**: Feature detection and fallbacks
+- **Cross-Platform**: Desktop and mobile device support
+
+### NFR-3: User Privacy
+- **Local Processing**: All audio processing client-side
+- **No Uploads**: Microphone data never leaves user's device
+- **Permission Management**: Clear microphone permission requests
+
+## Technical Considerations
+
+### Computational Efficiency
+- **Web Assembly**: Use WASM for CPU-intensive synthesis
+- **AudioWorklets**: Real-time processing in separate threads
+- **Resource Pooling**: Reuse audio objects and buffers
+- **Smart Loading**: Load audio features on-demand
+
+### Storage Strategy
+- **Local Storage**: IndexedDB for sample storage
+- **Compression**: Use appropriate audio compression
+- **Cleanup**: Automatic cleanup of unused samples
+
+## User Experience Flow
+
+1. **Character Creation**: Record or upload signature sound
+2. **Sound Selection**: Choose synthesis vs. sample-based approach
+3. **Real-time Preview**: Immediate audio feedback
+4. **Musical Integration**: Pitch and tempo matching
+5. **Performance**: Low-latency playback during loop creation
+
+## Success Criteria
+
+- Users can record their voice as their character's sound
+- Audio quality comparable to modern web-based DAWs
+- Smooth performance on target devices
+- Intuitive workflow for non-technical users
+- Professional results possible for advanced users
+
+{/unit}

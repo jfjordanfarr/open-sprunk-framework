@@ -1,0 +1,61 @@
+<!-- filepath: docs/Compositions/sprunki-module-structure.mdmd -->
+::: {composition}
+id: "sprunki-module-structure"
+title: "Sprunki Module Structure"
+composition-type: "file-system-structure"
+status: "draft" 
+version: "0.2"
+brief: "Planned file structure for the src/ directory showing all implementation units."
+see-also:
+  - "[[sprunki-core-architecture]]"
+  - "[[core-system-requirements]]"
+  - "[[../../Definition/Requirements/client-side-architecture-requirement.mdmd]]"
+  - "[[../Implementations/html-main-page.mdmd]]"
+  - "[[../Implementations/app-main-bootstrap.mdmd]]"
+  - "[[../Implementations/core/app-core-class.mdmd]]"
+  - "[[../Implementations/core/event-bus-class.mdmd]]"
+  - "[[../Implementations/core/state-manager-class.mdmd]]"
+
+The `src/` directory will be organized as follows, with each file corresponding to a `{unit}` in this specification. This structure supports the `[[../../Definition/Requirements/CoreSystemRequirements.mdmd]]` and the `[[../../Definition/Requirements/client-side-architecture-requirement.mdmd]]`:
+
+```
+src/
+├── index.html                    # Main application entry point [[../Implementations/html-main-page.mdmd]]
+├── main.js                       # Application bootstrap [[../Implementations/app-main-bootstrap.mdmd]]
+├── core/
+│   ├── AppCore.js               # Main app orchestrator [[../Implementations/core/app-core-class.mdmd]]
+│   ├── EventBus.js              # Event communication system [[../Implementations/core/event-bus-class.mdmd]]
+│   └── StateManager.js          # Global state management [[../Implementations/core/state-manager-class.mdmd]]
+├── character/
+│   ├── CharacterEditor.js       # Character creation interface [[../Implementations/character/character-editor-class.mdmd]]
+│   ├── DrawingCanvas.js         # Fabric.js drawing component [[../Implementations/character/drawing-canvas-class.mdmd]]
+│   ├── TextureManager.js        # Texture/image handling [[../Implementations/character/texture-manager-class.mdmd]]
+│   └── CharacterData.js         # Character data structure [[../Implementations/character/character-data-schema.mdmd]]
+├── music/
+│   ├── MusicEditor.js           # Music composition interface [[../Implementations/music/music-editor-class.mdmd]]
+│   ├── PianoRoll.js             # Note input interface [[../Implementations/music/piano-roll-class.mdmd]]
+│   ├── InstrumentSelector.js    # Instrument selection [[../Implementations/music/instrument-selector-class.mdmd]]
+│   ├── AudioEngine.js           # Tone.js wrapper [[../Implementations/music/audio-engine-class.mdmd]]
+│   └── MusicData.js             # Music data structure [[../Implementations/music/music-data-schema.mdmd]]
+├── animation/
+│   ├── AnimationEditor.js       # Animation creation interface [[../Implementations/animation/animation-editor-class.mdmd]]
+│   ├── Timeline.js              # Keyframe timeline UI [[../Implementations/animation/timeline-class.mdmd]]
+│   ├── PropertyEditor.js        # Property editing controls [[../Implementations/animation/property-editor-class.mdmd]]
+│   ├── TweenEngine.js           # Custom animation engine [[../Implementations/animation/tween-engine-class.mdmd]]
+│   └── AnimationData.js         # Animation data structure [[../Implementations/animation/animation-data-schema.mdmd]]
+├── stage/
+│   ├── PerformanceStage.js      # Main performance view [[../Implementations/stage/performance-stage-class.mdmd]]
+│   ├── CharacterRenderer.js     # PixiJS character rendering [[../Implementations/stage/character-renderer-class.mdmd]]
+│   └── BackgroundManager.js     # Background customization [[../Implementations/stage/background-manager-class.mdmd]]
+├── data/
+│   ├── DataManager.js           # Data persistence and serialization [[../Implementations/data/data-manager-class.mdmd]]
+│   ├── ProjectFile.js           # Project file handling [[../Implementations/data/project-file-schema.mdmd]]
+│   └── LocalStorage.js          # Browser storage interface [[../Implementations/data/local-storage-class.mdmd]]
+└── utils/
+    ├── Vector2D.js              # 2D vector math utilities [[../Implementations/utils/vector2d-utils.mdmd]]
+    ├── ColorUtils.js            # Color manipulation utilities [[../Implementations/utils/color-utils.mdmd]]
+    └── FileUtils.js             # File I/O utilities [[../Implementations/utils/file-utils.mdmd]]
+```
+
+Each of these files is specified as a concrete `{unit}` with implementation details.
+:::

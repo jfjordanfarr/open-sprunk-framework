@@ -1,0 +1,335 @@
+<!-- filepath: docs/Units/animation/animation-data-schema.mdmd -->
+::: {unit}
+id: "animation-data-schema"
+title: "Animation Data Schema"
+unit-type: "json-schema-definition"
+language: "json"
+status: "draft"
+version: "0.3"
+brief: "Defines the structure for storing animation data with unified timeline support."
+source-ref: "../../src/animation/AnimationData.js"
+see-also:
+  - "[[../Concepts/animation-editor-module.mdmd]]" # Parent composition
+  - "[[../data/project-file-schema.mdmd]]" # Architectural association (used by project schema)
+  - "[[../music/music-data-schema]]" # Shared temporal structures
+  - "[[../../Definition/Requirements/unified-timeline-requirement]]" # Traceability (implements shared temporal data)
+
+Defines the JSON schema for animation data including keyframes, timelines, and tween configurations. Implements shared temporal structures required by `[[../../Definition/Requirements/unified-timeline-requirement]]` for music-animation synchronization.
+
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Animation Data Schema",
+  "type": "object",
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "version": { "type": "string", "default": "1.0" },
+        "created": { "type": "string", "format": "date-time" },
+        "modified": { "type": "string", "format": "date-time" },
+        "title": { "type": "string" },
+        "description": { "type": "string" }
+      },
+      "required": ["version"]
+    },
+    
+    "temporal": {
+      "type": "object",
+      "description": "Unified temporal settings shared with music system",
+      "properties": {
+        "tempo": {
+          "type": "number",
+          "minimum": 60,
+          "maximum": 200,
+          "default": 120,
+          "description": "Beats per minute (BPM) - synchronized with music timeline"
+        },
+        "timeSignature": {
+          "type": "object",
+          "properties": {
+            "numerator": { "type": "integer", "minimum": 1, "maximum": 16, "default": 4 },
+            "denominator": { "type": "integer", "enum": [1, 2, 4, 8, 16], "default": 4 }
+          },
+          "required": ["numerator", "denominator"]
+        },
+        "duration": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Total duration in seconds - synchronized with music timeline"
+        },
+        "quantization": {
+          "type": "number",
+          "enum": [1, 0.5, 0.25, 0.125, 0.0625],
+          "default": 0.25,
+          "description": "Beat subdivision for keyframe grid snapping"
+        },
+        "syncReference": {
+          "type": "string",
+          "description": "Reference ID for cross-domain synchronization with music"
+        }
+      },
+      "required": ["tempo", "timeSignature", "duration"]
+    },
+    
+    "characters": {
+      "type": "object",
+      "description": "Character animations and their temporal data",
+      "patternProperties": {
+        "^[a-zA-Z0-9_-]+$": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "Unique character identifier"
+            },
+            "name": {
+              "type": "string",
+              "description": "Human-readable character name"
+            },
+            "textureId": {
+              "type": "string",
+              "description": "Reference to character texture/sprite"
+            },
+            "tracks": {
+              "type": "array",
+              "description": "Animation tracks for different properties",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Unique track identifier"
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Human-readable track name"
+                  },
+                  "property": {
+                    "type": "string",
+                    "enum": ["position", "rotation", "scale", "opacity", "color", "texture"],
+                    "description": "Animated property type"
+                  },
+                  "enabled": {
+                    "type": "boolean",
+                    "default": true
+                  },
+                  "keyframes": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "description": "Unique keyframe identifier"
+                        },
+                        "time": {
+                          "type": "number",
+                          "minimum": 0,
+                          "description": "Keyframe time in seconds (absolute timeline position)"
+                        },
+                        "value": {
+                          "description": "Property value at this keyframe (type varies by property)",
+                          "oneOf": [
+                            { "type": "number" },
+                            { "type": "array", "items": { "type": "number" } },
+                            { "type": "string" },
+                            { "type": "object" }
+                          ]
+                        },
+                        "easing": {
+                          "type": "string",
+                          "enum": ["linear", "ease-in", "ease-out", "ease-in-out", "bounce", "elastic"],
+                          "default": "linear",
+                          "description": "Interpolation easing function"
+                        },
+                        "beat": {
+                          "type": "number",
+                          "description": "Position in beats (calculated from time and tempo)"
+                        },
+                        "measure": {
+                          "type": "number",
+                          "description": "Measure number (calculated from beat and time signature)"
+                        },
+                        "musicSync": {
+                          "type": "object",
+                          "description": "Cross-references to synchronized music events",
+                          "properties": {
+                            "linkedNotes": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "description": "Music note IDs synchronized with this keyframe"
+                              }
+                            },
+                            "syncType": {
+                              "type": "string",
+                              "enum": ["note-attack", "note-release", "beat", "measure", "tempo-change"],
+                              "description": "Type of synchronization with music"
+                            },
+                            "offset": {
+                              "type": "number",
+                              "default": 0,
+                              "description": "Time offset from sync point in seconds"
+                            }
+                          }
+                        }
+                      },
+                      "required": ["id", "time", "value"]
+                    }
+                  }
+                },
+                "required": ["id", "name", "property", "keyframes"]
+              }
+            }
+          },
+          "required": ["id", "name", "tracks"]
+        }
+      }
+    },
+    
+    "beatMarkers": {
+      "type": "array",
+      "description": "Beat markers for visual timeline alignment (shared with music)",
+      "items": {
+        "type": "object",
+        "properties": {
+          "time": {
+            "type": "number",
+            "description": "Marker time in seconds"
+          },
+          "beat": {
+            "type": "number",
+            "description": "Beat number from start"
+          },
+          "measure": {
+            "type": "integer",
+            "description": "Measure number"
+          },
+          "isMeasureStart": {
+            "type": "boolean",
+            "description": "Whether this marker starts a new measure"
+          },
+          "isVisible": {
+            "type": "boolean",
+            "default": true,
+            "description": "Whether marker should be displayed in timeline"
+          }
+        },
+        "required": ["time", "beat", "measure", "isMeasureStart"]
+      }
+    },
+    
+    "loops": {
+      "type": "object",
+      "description": "Loop configuration for synchronized playback",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "startTime": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Loop start time in seconds"
+        },
+        "endTime": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Loop end time in seconds"
+        },
+        "preRoll": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0,
+          "description": "Pre-roll time before loop starts"
+        }
+      }
+    },
+    
+    "timeline": {
+      "type": "object",
+      "description": "Timeline-specific animation settings",
+      "properties": {
+        "snapToGrid": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether keyframes snap to beat grid"
+        },
+        "showBeatMarkers": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether to display beat markers in timeline"
+        },
+        "autoQuantize": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether to automatically quantize keyframe timing"
+        },
+        "zoomLevel": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 10,
+          "default": 1,
+          "description": "Timeline zoom level"
+        },
+        "viewportStart": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0,
+          "description": "Timeline viewport start time in seconds"
+        },
+        "viewportEnd": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Timeline viewport end time in seconds"
+        }
+      }
+    },
+    
+    "crossDomainSync": {
+      "type": "object",
+      "description": "Cross-domain synchronization with music system",
+      "properties": {
+        "musicDataRef": {
+          "type": "string",
+          "description": "Reference to associated music data"
+        },
+        "syncPoints": {
+          "type": "array",
+          "description": "Explicit synchronization points between music and animation",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Unique sync point identifier"
+              },
+              "time": {
+                "type": "number",
+                "description": "Sync point time in seconds"
+              },
+              "musicEventId": {
+                "type": "string",
+                "description": "Associated music event ID"
+              },
+              "animationKeyframeId": {
+                "type": "string",
+                "description": "Associated animation keyframe ID"
+              },
+              "tolerance": {
+                "type": "number",
+                "default": 0.01,
+                "description": "Sync tolerance in seconds (default 10ms)"
+              }
+            },
+            "required": ["id", "time", "musicEventId", "animationKeyframeId"]
+          }
+        }
+      }
+    }
+  },
+  "required": ["metadata", "temporal", "characters"]
+}
+```
+:::

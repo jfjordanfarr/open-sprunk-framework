@@ -1,0 +1,358 @@
+{unit}
+id: "audio-effects-processor-class"
+title: "Audio Effects Processor Class"
+unit-type: "javascript-class-definition"
+language: "javascript"
+status: "draft"
+version: "1.0"
+brief: "Hybrid pre-baked/real-time audio effects processor optimized for loop-based composition"
+source-ref: "../../src/music/AudioEffectsProcessor.js"
+see-also:
+  - "[[audio-engine-class]]" # Implementation dependency (integrates with main audio engine)
+  - "[[../core/event-bus-class]]" # Implementation dependency (uses EventBus for progress updates)
+  - "[[../../Definition/Requirements/multi-modal-audio-input-requirement]]" # Traceability (implements effects for all audio types)
+  - "[[../Concepts/music-editor-module]]" # Parent composition
+
+This class implements the "audio lightmapping" approach - pre-rendering stable effects chains while keeping actively edited effects in real-time for responsive editing.
+
+```javascript
+export class AudioEffectsProcessor {
+    constructor(eventBus, audioContext) {
+        this.eventBus = eventBus;
+        this.audioContext = audioContext || Tone.getContext().rawContext;
+        
+        // Effects chain state
+        this.rawAudioBuffer = null;
+        this.effectsChain = [];
+        this.activeEffectIndex = -1; // Which effect is being edited
+        
+        // Pre-baking system
+        this.bakedAudioCache = new Map(); // Cached pre-rendered audio
+        this.bakingInProgress = false;
+        this.bakingWorker = null;
+        
+        // Real-time chain for active effect
+        this.liveEffectsChain = null;
+        this.prebakedPlayer = null;
+        
+        // Performance monitoring
+        this.lastBakeTime = 0;
+        this.cacheHitRate = 0;
+        
+        this.initializeEffectTypes();
+    }
+    
+    /**
+     * CORE OPTIMIZATION: Pre-bake vs Live Processing Decision
+     */
+    setEffectsChain(rawAudio, effectsChain, activeEffectIndex = -1) {
+        this.rawAudioBuffer = rawAudio;
+        this.effectsChain = effectsChain;
+        this.activeEffectIndex = activeEffectIndex;
+        
+        // Split chain into pre-baked and live sections
+        const preBakedChain = effectsChain.slice(0, activeEffectIndex);
+        const liveChain = effectsChain.slice(activeEffectIndex);
+        
+        // Check if we have cached pre-baked audio
+        const cacheKey = this.generateCacheKey(rawAudio, preBakedChain);
+        
+        if (this.bakedAudioCache.has(cacheKey)) {
+            // Cache hit - use pre-baked audio
+            this.setupLiveChain(this.bakedAudioCache.get(cacheKey), liveChain);
+            this.cacheHitRate = this.cacheHitRate * 0.9 + 0.1; // Moving average
+        } else {
+            // Cache miss - need to bake
+            this.startBaking(rawAudio, preBakedChain, liveChain, cacheKey);
+            this.cacheHitRate = this.cacheHitRate * 0.9; // Moving average
+        }
+    }
+    
+    /**
+     * PRE-BAKING SYSTEM: Offline processing for stable effects
+     */
+    async startBaking(rawAudio, preBakedChain, liveChain, cacheKey) {
+        if (this.bakingInProgress) {
+            // Cancel previous baking if still in progress
+            this.cancelBaking();
+        }
+        
+        this.bakingInProgress = true;
+        this.eventBus.emit('effects:baking_started', {
+            effectsCount: preBakedChain.length,
+            estimatedTime: this.estimateBakeTime(preBakedChain)
+        });
+        
+        try {
+            const startTime = performance.now();
+            
+            // Use Web Worker for offline processing to avoid blocking UI
+            const bakedAudio = await this.renderEffectsChain(rawAudio, preBakedChain);
+            
+            // Cache the result
+            this.bakedAudioCache.set(cacheKey, bakedAudio);
+            
+            // Set up live chain with baked result
+            this.setupLiveChain(bakedAudio, liveChain);
+            
+            this.lastBakeTime = performance.now() - startTime;
+            this.bakingInProgress = false;
+            
+            this.eventBus.emit('effects:baking_completed', {
+                bakeTime: this.lastBakeTime,
+                cacheSize: this.bakedAudioCache.size
+            });
+            
+        } catch (error) {
+            this.bakingInProgress = false;
+            this.eventBus.emit('effects:baking_error', error);
+        }
+    }
+    
+    /**
+     * OFFLINE EFFECTS RENDERING: High-quality processing without real-time constraints
+     */
+    async renderEffectsChain(audioBuffer, effectsChain) {
+        if (effectsChain.length === 0) {
+            return audioBuffer;
+        }
+        
+        // Create offline audio context for high-quality processing
+        const offlineContext = new OfflineAudioContext(
+            audioBuffer.numberOfChannels,
+            audioBuffer.length,
+            audioBuffer.sampleRate
+        );
+        
+        // Create source
+        const source = offlineContext.createBufferSource();
+        source.buffer = audioBuffer;
+        
+        // Build effects chain
+        let currentNode = source;
+        
+        for (const effect of effectsChain) {
+            const effectNode = this.createOfflineEffect(offlineContext, effect);
+            currentNode.connect(effectNode);
+            currentNode = effectNode;
+        }
+        
+        // Connect to destination
+        currentNode.connect(offlineContext.destination);
+        
+        // Start processing
+        source.start(0);
+        
+        // Render offline (this is where the heavy computation happens)
+        const renderedBuffer = await offlineContext.startRendering();
+        
+        return renderedBuffer;
+    }
+    
+    /**
+     * LIVE EFFECTS CHAIN: Real-time processing for actively edited effect
+     */
+    setupLiveChain(prebakedAudio, liveEffects) {
+        // Clean up previous live chain
+        this.disposeLiveChain();
+        
+        // Create player for pre-baked audio
+        this.prebakedPlayer = new Tone.Player(prebakedAudio);
+        
+        if (liveEffects.length === 0) {
+            // No live effects - just connect to destination
+            this.prebakedPlayer.toDestination();
+        } else {
+            // Build live effects chain
+            let currentNode = this.prebakedPlayer;
+            
+            for (const effect of liveEffects) {
+                const effectNode = this.createLiveEffect(effect);
+                currentNode.connect(effectNode);
+                currentNode = effectNode;
+            }
+            
+            currentNode.toDestination();
+        }
+        
+        this.eventBus.emit('effects:chain_ready');
+    }
+    
+    /**
+     * EFFECT CREATION: Different strategies for offline vs live
+     */
+    createOfflineEffect(offlineContext, effectConfig) {
+        // Use high-quality algorithms for offline processing
+        switch (effectConfig.type) {
+            case 'reverb':
+                return this.createHighQualityReverb(offlineContext, effectConfig);
+            case 'delay':
+                return this.createPrecisionDelay(offlineContext, effectConfig);
+            case 'distortion':
+                return this.createAnalogDistortion(offlineContext, effectConfig);
+            case 'eq':
+                return this.createLinearPhaseEQ(offlineContext, effectConfig);
+            case 'compressor':
+                return this.createVintageCompressor(offlineContext, effectConfig);
+            default:
+                return offlineContext.createGain(); // Passthrough
+        }
+    }
+    
+    createLiveEffect(effectConfig) {
+        // Use optimized algorithms for real-time processing
+        switch (effectConfig.type) {
+            case 'reverb':
+                return this.createFastReverb(effectConfig);
+            case 'delay':
+                return this.createSimpleDelay(effectConfig);
+            case 'distortion':
+                return this.createBasicDistortion(effectConfig);
+            case 'eq':
+                return this.createBiquadEQ(effectConfig);
+            case 'compressor':
+                return this.createWebAudioCompressor(effectConfig);
+            default:
+                return new Tone.Gain(); // Passthrough
+        }
+    }
+    
+    /**
+     * HIGH-QUALITY OFFLINE EFFECTS (Slow but beautiful)
+     */
+    createHighQualityReverb(context, config) {
+        // Use convolution reverb with long impulse responses
+        const convolver = context.createConvolver();
+        convolver.buffer = this.generateConvolutionIR(context, config);
+        return convolver;
+    }
+    
+    createLinearPhaseEQ(context, config) {
+        // Use FFT-based linear phase EQ (no phase distortion)
+        // This would be computationally expensive in real-time
+        // but perfect for offline processing
+        return this.createFFTBasedEQ(context, config);
+    }
+    
+    /**
+     * FAST LIVE EFFECTS (Responsive but simpler)
+     */
+    createFastReverb(config) {
+        // Use simple feedback delay network
+        return new Tone.Reverb({
+            roomSize: config.roomSize || 0.8,
+            dampening: config.dampening || 3000
+        });
+    }
+    
+    createBiquadEQ(config) {
+        // Use simple biquad filters for real-time EQ
+        return new Tone.EQ3({
+            low: config.low || 0,
+            mid: config.mid || 0,
+            high: config.high || 0
+        });
+    }
+    
+    /**
+     * CACHE MANAGEMENT: Smart invalidation and memory management
+     */
+    generateCacheKey(audioBuffer, effectsChain) {
+        // Generate unique key based on audio content and effects parameters
+        const audioHash = this.hashAudioBuffer(audioBuffer);
+        const effectsHash = this.hashEffectsChain(effectsChain);
+        return `${audioHash}_${effectsHash}`;
+    }
+    
+    hashAudioBuffer(buffer) {
+        // Simple hash based on audio characteristics
+        const samples = buffer.getChannelData(0);
+        let hash = 0;
+        
+        // Sample key points for hash (every 1000th sample)
+        for (let i = 0; i < samples.length; i += 1000) {
+            hash ^= Math.floor(samples[i] * 1000000);
+        }
+        
+        return hash.toString(36);
+    }
+    
+    hashEffectsChain(effectsChain) {
+        // Hash based on effect types and parameters
+        return effectsChain.map(effect => 
+            `${effect.type}_${JSON.stringify(effect.params)}`
+        ).join('|');
+    }
+    
+    /**
+     * SMART PARAMETER UPDATES: Minimize re-baking
+     */
+    updateEffectParameter(effectIndex, parameterName, value) {
+        if (effectIndex === this.activeEffectIndex) {
+            // Update live effect parameter (no re-baking needed)
+            this.updateLiveEffectParameter(parameterName, value);
+        } else {
+            // Update affects pre-baked chain - need to re-bake
+            this.effectsChain[effectIndex].params[parameterName] = value;
+            this.setEffectsChain(this.rawAudioBuffer, this.effectsChain, this.activeEffectIndex);
+        }
+    }
+    
+    updateLiveEffectParameter(parameterName, value) {
+        // Update real-time effect parameters instantly
+        if (this.liveEffectsChain && this.liveEffectsChain[0]) {
+            const effect = this.liveEffectsChain[0];
+            if (effect[parameterName]) {
+                effect[parameterName].value = value;
+            }
+        }
+    }
+    
+    /**
+     * PERFORMANCE MONITORING
+     */
+    getPerformanceStats() {
+        return {
+            cacheHitRate: this.cacheHitRate,
+            lastBakeTime: this.lastBakeTime,
+            cacheSize: this.bakedAudioCache.size,
+            memoryUsage: this.estimateMemoryUsage(),
+            bakingInProgress: this.bakingInProgress
+        };
+    }
+    
+    estimateMemoryUsage() {
+        let totalSamples = 0;
+        this.bakedAudioCache.forEach(buffer => {
+            totalSamples += buffer.length * buffer.numberOfChannels;
+        });
+        return (totalSamples * 4) / (1024 * 1024); // MB (assuming 32-bit floats)
+    }
+    
+    /**
+     * CLEANUP
+     */
+    dispose() {
+        this.cancelBaking();
+        this.disposeLiveChain();
+        this.bakedAudioCache.clear();
+    }
+    
+    disposeLiveChain() {
+        if (this.prebakedPlayer) {
+            this.prebakedPlayer.dispose();
+            this.prebakedPlayer = null;
+        }
+        // Dispose live effects...
+    }
+    
+    cancelBaking() {
+        if (this.bakingWorker) {
+            this.bakingWorker.terminate();
+            this.bakingWorker = null;
+        }
+        this.bakingInProgress = false;
+    }
+}
+```
+{/unit}

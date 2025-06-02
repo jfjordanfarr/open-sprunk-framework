@@ -1,0 +1,150 @@
+<!-- filepath: docs/Units/character/drawing-canvas-class.mdmd -->
+::: {unit}
+id: "drawing-canvas-class"
+title: "Drawing Canvas Class"
+unit-type: "javascript-class-definition"
+language: "javascript"
+status: "draft"
+version: "0.2"
+brief: "Fabric.js canvas wrapper for character drawing and editing."
+source-ref: "../../src/character/DrawingCanvas.js"
+see-also:
+  - "[[../core/event-bus-class.mdmd]]" # Implementation dependency (uses EventBus for drawing events)
+  - "[[../utils/vector2d-utils.mdmd]]" # Implementation dependency (uses for coordinate calculations)
+  - "[[../utils/color-utils.mdmd]]" # Implementation dependency (uses for color management)
+  - "[[../Concepts/character-editor-module.mdmd]]" # Parent composition
+
+This class encapsulates the Fabric.js canvas, providing an API for drawing, editing, and managing character graphics.
+
+```javascript
+// Assumes Fabric.js is loaded globally or imported via a module loader
+// import { fabric } from 'fabric'; // If using npm package
+
+export class DrawingCanvas {
+    constructor(containerElement, eventBus) {
+        this.container = containerElement;
+        this.eventBus = eventBus;
+        this.canvas = null;
+        this.canvasId = 'character-fabric-canvas'; // Ensure this matches HTML or is created
+    }
+
+    async init() {
+        // Ensure Fabric.js is available
+        if (typeof fabric === 'undefined') {
+            console.error('Fabric.js is not loaded!');
+            // Potentially load it dynamically here if not using a bundler
+            // await this._loadFabricJS(); 
+            return;
+        }
+
+        let canvasElement = this.container.querySelector(`#${this.canvasId}`);
+        if (!canvasElement) {
+            canvasElement = document.createElement('canvas');
+            canvasElement.id = this.canvasId;
+            this.container.appendChild(canvasElement);
+        }
+        
+        this.canvas = new fabric.Canvas(this.canvasId, {
+            width: this.container.clientWidth || 600,
+            height: this.container.clientHeight || 400,
+            backgroundColor: '#f0f0f0',
+            // Add other Fabric.js canvas options here
+        });
+
+        this._setupEventHandlers();
+        this.resize(); // Initial resize
+        console.log('DrawingCanvas initialized with Fabric.js');
+    }
+
+    // _async _loadFabricJS() { ... } // Optional: for dynamic loading
+
+    _setupEventHandlers() {
+        this.canvas.on({
+            'object:modified': (e) => this.eventBus.emit('canvas:object:modified', e.target.toJSON()),
+            'object:added': (e) => this.eventBus.emit('canvas:object:added', e.target.toJSON()),
+            'object:removed': (e) => this.eventBus.emit('canvas:object:removed', e.target.toJSON()),
+            'selection:created': (e) => this.eventBus.emit('canvas:selection:created', e.selected),
+            'selection:updated': (e) => this.eventBus.emit('canvas:selection:updated', e.selected),
+            'selection:cleared': (e) => this.eventBus.emit('canvas:selection:cleared', e.deselected),
+            // Add more Fabric.js event handlers as needed
+        });
+
+        window.addEventListener('resize', () => this.resize());
+    }
+
+    resize() {
+        if (this.canvas && this.container) {
+            this.canvas.setWidth(this.container.clientWidth);
+            this.canvas.setHeight(this.container.clientHeight);
+            this.canvas.renderAll();
+        }
+    }
+
+    addShape(type, options = {}) {
+        let shape;
+        switch (type) {
+            case 'rect':
+                shape = new fabric.Rect({ left: 50, top: 50, width: 100, height: 50, fill: 'red', ...options });
+                break;
+            case 'circle':
+                shape = new fabric.Circle({ left: 100, top: 100, radius: 30, fill: 'blue', ...options });
+                break;
+            // Add other shapes
+            default:
+                console.warn(`Shape type '${type}' not supported.`);
+                return null;
+        }
+        this.canvas.add(shape);
+        this.canvas.setActiveObject(shape);
+        this.canvas.renderAll();
+        return shape;
+    }
+
+    loadFromJSON(jsonData, callback) {
+        this.canvas.loadFromJSON(jsonData, () => {
+            this.canvas.renderAll();
+            if (callback) callback();
+        });
+    }
+
+    toJSON(propertiesToInclude = []) {
+        return this.canvas.toJSON(propertiesToInclude);
+    }
+
+    getObjects() {
+        return this.canvas.getObjects();
+    }
+
+    getActiveObject() {
+        return this.canvas.getActiveObject();
+    }
+
+    removeActiveObject() {
+        const activeObject = this.canvas.getActiveObject();
+        if (activeObject) {
+            this.canvas.remove(activeObject);
+            this.canvas.renderAll();
+        }
+    }
+
+    clear() {
+        this.canvas.clear();
+        this.canvas.backgroundColor = '#f0f0f0'; // Reset background
+        this.canvas.renderAll();
+    }
+
+    render() {
+        this.canvas.renderAll();
+    }
+
+    dispose() {
+        window.removeEventListener('resize', this.resize);
+        if (this.canvas) {
+            this.canvas.dispose();
+            this.canvas = null;
+        }
+        console.log('DrawingCanvas disposed');
+    }
+}
+```
+:::

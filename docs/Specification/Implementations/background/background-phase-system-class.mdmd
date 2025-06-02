@@ -1,0 +1,659 @@
+```{unit}
+id: "background-phase-system-class"
+title: "Background Phase System Class"
+unit-type: "javascript-class-definition"
+source-ref: "../../src/background/BackgroundPhaseSystem.js"
+status: "draft"
+see-also:
+  - "[[background-manager-class]]"
+  - "[[../phase/phase-manager-class]]"
+  - "[[../phase/phase-data-store-class]]"
+  - "[[phase-aware-performance-stage-class]]"
+  - "[[../Concepts/phase-system-architecture]]"
+  - "[[../../Definition/Requirements/phase-system-requirement]]"
+```
+
+## Overview
+
+The BackgroundPhaseSystem enables backgrounds and environmental elements to participate in the phase system alongside characters. It manages background phase data, coordinates environmental changes with character phases, and provides immersive environmental storytelling through dynamic background phases.
+
+## Key Capabilities
+
+- **Environmental Phase Creation**: Tools for creating background phases that complement character phases
+- **Character-Background Synchronization**: Automatic coordination between character and background phase changes
+- **Layered Background System**: Multiple background layers with independent phase capabilities
+- **Environmental Storytelling**: Background phases that enhance narrative and mood
+- **Performance Optimization**: Efficient rendering of dynamic background phases
+- **Ambient Effects Integration**: Sound and visual effects tied to background phases
+
+## Class Definition
+
+```javascript
+/**
+ * Manages background participation in the phase system
+ * Coordinates environmental changes with character phases for immersive storytelling
+ */
+export class BackgroundPhaseSystem {
+    constructor(eventBus, phaseManager, backgroundManager) {
+        this.eventBus = eventBus;
+        this.phaseManager = phaseManager;
+        this.backgroundManager = backgroundManager;
+        
+        // Background phase management
+        this.backgroundPhases = new Map(); // backgroundId -> phases[]
+        this.activeBackgroundPhases = new Map(); // backgroundId -> currentPhaseId
+        this.backgroundLayers = new Map(); // layerId -> layerConfig
+        this.phaseCoordinationRules = new Map(); // ruleId -> coordinationRule
+        
+        // Environmental systems
+        this.ambientEffects = new Map(); // effectId -> effectConfig
+        this.environmentalTriggers = new Map(); // triggerId -> triggerConfig
+        this.backgroundTransitions = new Map(); // transitionId -> transitionData
+        
+        // Background types
+        this.backgroundTypes = {
+            STATIC: 'static',           // Fixed background image
+            ANIMATED: 'animated',       // Animated background elements
+            PARALLAX: 'parallax',       // Multi-layer parallax scrolling
+            INTERACTIVE: 'interactive', // Responsive to character actions
+            AMBIENT: 'ambient',         // Subtle atmospheric changes
+            NARRATIVE: 'narrative'      // Story-driven background changes
+        };
+        
+        // Layer system
+        this.layerTypes = {
+            SKYBOX: 'skybox',           // Far background (sky, horizon)
+            DISTANT: 'distant',         // Distant background elements
+            MIDGROUND: 'midground',     // Middle distance elements
+            FOREGROUND: 'foreground',   // Near background elements
+            OVERLAY: 'overlay',         // Front overlay effects
+            AMBIENT: 'ambient'          // Ambient effects layer
+        };
+        
+        // Coordination modes
+        this.coordinationModes = {
+            SYNCHRONIZED: 'synchronized',     // Change with character phases
+            RESPONSIVE: 'responsive',         // React to character phase changes
+            INDEPENDENT: 'independent',       // Change on own schedule
+            COMPLEMENTARY: 'complementary',   // Enhance character phase themes
+            CONTRASTING: 'contrasting'        // Provide thematic contrast
+        };
+        
+        this._setupEventHandlers();
+    }
+
+    /**
+     * BACKGROUND PHASE CREATION
+     */
+
+    async createBackgroundPhase(backgroundId, phaseData) {
+        const phase = {
+            id: phaseData.id || `bg-phase-${Date.now()}`,
+            backgroundId,
+            name: phaseData.name || 'Untitled Background Phase',
+            type: phaseData.type || this.backgroundTypes.STATIC,
+            
+            // Visual configuration
+            layers: phaseData.layers || [],
+            colorScheme: phaseData.colorScheme || {},
+            lighting: phaseData.lighting || {},
+            effects: phaseData.effects || [],
+            
+            // Animation configuration
+            animations: phaseData.animations || [],
+            parallaxConfig: phaseData.parallaxConfig || {},
+            motionBlur: phaseData.motionBlur || false,
+            
+            // Audio configuration
+            ambientAudio: phaseData.ambientAudio || null,
+            soundEffects: phaseData.soundEffects || [],
+            reverbSettings: phaseData.reverbSettings || {},
+            
+            // Coordination configuration
+            coordinationMode: phaseData.coordinationMode || this.coordinationModes.INDEPENDENT,
+            characterPhaseLinks: phaseData.characterPhaseLinks || [],
+            triggerConditions: phaseData.triggerConditions || [],
+            
+            // Transition configuration
+            transitionConfig: {
+                duration: phaseData.transitionConfig?.duration || 2.0,
+                style: phaseData.transitionConfig?.style || 'crossfade',
+                easing: phaseData.transitionConfig?.easing || 'ease-in-out',
+                beatAlign: phaseData.transitionConfig?.beatAlign !== false
+            },
+            
+            // Metadata
+            mood: phaseData.mood || 'neutral',
+            intensity: phaseData.intensity || 'medium',
+            timeOfDay: phaseData.timeOfDay || 'day',
+            weather: phaseData.weather || 'clear',
+            tags: phaseData.tags || [],
+            
+            created: new Date(),
+            modified: new Date()
+        };
+        
+        // Validate phase data
+        this.validateBackgroundPhase(phase);
+        
+        // Store phase
+        if (!this.backgroundPhases.has(backgroundId)) {
+            this.backgroundPhases.set(backgroundId, []);
+        }
+        this.backgroundPhases.get(backgroundId).push(phase);
+        
+        // Store in phase manager for global access
+        await this.phaseManager.storeBackgroundPhase(backgroundId, phase);
+        
+        this.eventBus.emit('background-phase:created', {
+            backgroundId,
+            phaseId: phase.id,
+            phase
+        });
+        
+        return phase;
+    }
+
+    async createLayeredBackgroundPhase(backgroundId, layerConfigs, globalConfig = {}) {
+        const layers = [];
+        
+        for (const [layerType, config] of Object.entries(layerConfigs)) {
+            const layer = {
+                id: `${backgroundId}-${layerType}-${Date.now()}`,
+                type: layerType,
+                zIndex: this.getLayerZIndex(layerType),
+                visible: config.visible !== false,
+                opacity: config.opacity || 1.0,
+                
+                // Visual properties
+                image: config.image || null,
+                video: config.video || null,
+                shader: config.shader || null,
+                color: config.color || null,
+                gradient: config.gradient || null,
+                
+                // Animation properties
+                animation: config.animation || null,
+                parallaxSpeed: config.parallaxSpeed || 1.0,
+                scrollBehavior: config.scrollBehavior || 'none',
+                
+                // Effects
+                filters: config.filters || [],
+                blendMode: config.blendMode || 'normal',
+                
+                // Responsive behavior
+                responsiveRules: config.responsiveRules || [],
+                
+                ...config
+            };
+            
+            layers.push(layer);
+        }
+        
+        const phaseData = {
+            ...globalConfig,
+            type: this.backgroundTypes.PARALLAX,
+            layers: layers
+        };
+        
+        return await this.createBackgroundPhase(backgroundId, phaseData);
+    }
+
+    /**
+     * CHARACTER-BACKGROUND COORDINATION
+     */
+
+    setupCharacterBackgroundCoordination(characterId, backgroundId, coordinationConfig) {
+        const rule = {
+            id: `coord-${characterId}-${backgroundId}-${Date.now()}`,
+            characterId,
+            backgroundId,
+            mode: coordinationConfig.mode || this.coordinationModes.SYNCHRONIZED,
+            
+            // Phase mapping
+            phaseMapping: coordinationConfig.phaseMapping || 'automatic',
+            customMappings: coordinationConfig.customMappings || {},
+            
+            // Timing configuration
+            delay: coordinationConfig.delay || 0,
+            transitionDelay: coordinationConfig.transitionDelay || 0,
+            beatAlign: coordinationConfig.beatAlign !== false,
+            
+            // Conditions
+            conditions: coordinationConfig.conditions || [],
+            priority: coordinationConfig.priority || 'normal',
+            
+            // Behavioral rules
+            onCharacterPhaseChange: coordinationConfig.onCharacterPhaseChange || 'auto',
+            onBackgroundPhaseChange: coordinationConfig.onBackgroundPhaseChange || 'notify',
+            
+            created: new Date()
+        };
+        
+        this.phaseCoordinationRules.set(rule.id, rule);
+        
+        this.eventBus.emit('background-phase:coordination-setup', {
+            characterId,
+            backgroundId,
+            rule
+        });
+        
+        return rule;
+    }
+
+    async coordinateWithCharacterPhase(characterId, newCharacterPhaseId, characterPhaseData) {
+        const coordinationRules = this.getCoordinationRulesForCharacter(characterId);
+        
+        for (const rule of coordinationRules) {
+            const backgroundId = rule.backgroundId;
+            
+            // Skip if conditions not met
+            if (!this.evaluateCoordinationConditions(rule, characterPhaseData)) {
+                continue;
+            }
+            
+            // Determine target background phase
+            const targetBackgroundPhaseId = await this.determineTargetBackgroundPhase(
+                rule,
+                characterId,
+                newCharacterPhaseId,
+                characterPhaseData
+            );
+            
+            if (targetBackgroundPhaseId) {
+                // Schedule background phase change
+                await this.scheduleBackgroundPhaseChange(
+                    backgroundId,
+                    targetBackgroundPhaseId,
+                    rule
+                );
+            }
+        }
+    }
+
+    async determineTargetBackgroundPhase(rule, characterId, characterPhaseId, characterPhaseData) {
+        if (rule.phaseMapping === 'custom' && rule.customMappings[characterPhaseId]) {
+            return rule.customMappings[characterPhaseId];
+        }
+        
+        if (rule.phaseMapping === 'automatic') {
+            return await this.findCompatibleBackgroundPhase(
+                rule.backgroundId,
+                characterPhaseData
+            );
+        }
+        
+        if (rule.phaseMapping === 'synchronized') {
+            // Try to find background phase with same ID
+            const backgroundPhases = this.backgroundPhases.get(rule.backgroundId) || [];
+            const matchingPhase = backgroundPhases.find(p => p.id === characterPhaseId);
+            return matchingPhase ? matchingPhase.id : null;
+        }
+        
+        return null;
+    }
+
+    async findCompatibleBackgroundPhase(backgroundId, characterPhaseData) {
+        const backgroundPhases = this.backgroundPhases.get(backgroundId) || [];
+        
+        // Score phases by compatibility
+        const scoredPhases = backgroundPhases.map(phase => ({
+            phase,
+            score: this.calculatePhaseCompatibilityScore(phase, characterPhaseData)
+        }));
+        
+        // Sort by score and return best match
+        scoredPhases.sort((a, b) => b.score - a.score);
+        
+        return scoredPhases.length > 0 ? scoredPhases[0].phase.id : null;
+    }
+
+    calculatePhaseCompatibilityScore(backgroundPhase, characterPhaseData) {
+        let score = 0;
+        
+        // Mood compatibility
+        if (backgroundPhase.mood === characterPhaseData.mood) {
+            score += 40;
+        } else if (this.moodsAreCompatible(backgroundPhase.mood, characterPhaseData.mood)) {
+            score += 20;
+        }
+        
+        // Intensity compatibility
+        const intensityDiff = Math.abs(
+            this.getIntensityValue(backgroundPhase.intensity) - 
+            this.getIntensityValue(characterPhaseData.intensity)
+        );
+        score += Math.max(0, 30 - intensityDiff * 10);
+        
+        // Color scheme compatibility
+        if (backgroundPhase.colorScheme && characterPhaseData.colorScheme) {
+            score += this.calculateColorCompatibility(
+                backgroundPhase.colorScheme,
+                characterPhaseData.colorScheme
+            );
+        }
+        
+        // Tag overlap
+        const commonTags = backgroundPhase.tags.filter(tag => 
+            characterPhaseData.tags?.includes(tag)
+        );
+        score += commonTags.length * 5;
+        
+        return score;
+    }
+
+    /**
+     * BACKGROUND PHASE TRANSITIONS
+     */
+
+    async changeBackgroundPhase(backgroundId, newPhaseId, options = {}) {
+        const currentPhaseId = this.activeBackgroundPhases.get(backgroundId);
+        if (currentPhaseId === newPhaseId) return;
+        
+        const currentPhase = currentPhaseId ? 
+            await this.getBackgroundPhase(backgroundId, currentPhaseId) : null;
+        const newPhase = await this.getBackgroundPhase(backgroundId, newPhaseId);
+        
+        if (!newPhase) {
+            throw new Error(`Background phase not found: ${newPhaseId}`);
+        }
+        
+        const transition = {
+            id: `bg-transition-${Date.now()}`,
+            backgroundId,
+            fromPhase: currentPhase,
+            toPhase: newPhase,
+            startTime: performance.now(),
+            duration: options.duration || newPhase.transitionConfig.duration,
+            style: options.style || newPhase.transitionConfig.style,
+            easing: options.easing || newPhase.transitionConfig.easing,
+            progress: 0,
+            
+            // Layer-specific transitions
+            layerTransitions: new Map()
+        };
+        
+        // Initialize layer transitions
+        for (const layer of newPhase.layers) {
+            const layerTransition = {
+                fromState: currentPhase ? this.getLayerState(currentPhase, layer.type) : null,
+                toState: this.getLayerState(newPhase, layer.type),
+                progress: 0
+            };
+            transition.layerTransitions.set(layer.type, layerTransition);
+        }
+        
+        this.backgroundTransitions.set(transition.id, transition);
+        this.activeBackgroundPhases.set(backgroundId, newPhaseId);
+        
+        // Start transition
+        await this.executeBackgroundTransition(transition);
+        
+        this.eventBus.emit('background-phase:transition-started', {
+            backgroundId,
+            fromPhaseId: currentPhaseId,
+            toPhaseId: newPhaseId,
+            transition
+        });
+        
+        return transition;
+    }
+
+    async executeBackgroundTransition(transition) {
+        const { backgroundId, fromPhase, toPhase, style } = transition;
+        
+        // Execute based on transition style
+        switch (style) {
+            case 'crossfade':
+                await this.executeCrossfadeTransition(transition);
+                break;
+            case 'wipe':
+                await this.executeWipeTransition(transition);
+                break;
+            case 'dissolve':
+                await this.executeDissolveTransition(transition);
+                break;
+            case 'morphing':
+                await this.executeMorphingTransition(transition);
+                break;
+            case 'layered':
+                await this.executeLayeredTransition(transition);
+                break;
+            default:
+                await this.executeCrossfadeTransition(transition);
+        }
+        
+        // Start ambient audio transition if needed
+        if (toPhase.ambientAudio) {
+            await this.transitionAmbientAudio(fromPhase, toPhase, transition.duration);
+        }
+        
+        // Apply environmental effects
+        await this.applyEnvironmentalEffects(toPhase);
+    }
+
+    /**
+     * ENVIRONMENTAL EFFECTS
+     */
+
+    async applyEnvironmentalEffects(backgroundPhase) {
+        // Apply lighting changes
+        if (backgroundPhase.lighting) {
+            await this.applyLightingEffects(backgroundPhase.lighting);
+        }
+        
+        // Apply weather effects
+        if (backgroundPhase.weather && backgroundPhase.weather !== 'clear') {
+            await this.applyWeatherEffects(backgroundPhase.weather);
+        }
+        
+        // Apply ambient effects
+        for (const effect of backgroundPhase.effects) {
+            await this.applyAmbientEffect(effect);
+        }
+    }
+
+    async applyLightingEffects(lightingConfig) {
+        const lightingEffects = {
+            ambientColor: lightingConfig.ambientColor || '#ffffff',
+            directionalColor: lightingConfig.directionalColor || '#ffffff',
+            shadows: lightingConfig.shadows || false,
+            intensity: lightingConfig.intensity || 1.0,
+            direction: lightingConfig.direction || { x: 0, y: -1 }
+        };
+        
+        // Apply to background manager
+        await this.backgroundManager.updateLighting(lightingEffects);
+        
+        this.eventBus.emit('background-phase:lighting-changed', lightingEffects);
+    }
+
+    async applyWeatherEffects(weatherType) {
+        const weatherEffects = this.getWeatherEffects(weatherType);
+        
+        for (const effect of weatherEffects) {
+            await this.createWeatherEffect(effect);
+        }
+        
+        this.eventBus.emit('background-phase:weather-changed', { weatherType, weatherEffects });
+    }
+
+    getWeatherEffects(weatherType) {
+        const effects = {
+            rain: [
+                { type: 'particles', config: { particle: 'raindrop', count: 100, speed: 8 } },
+                { type: 'audio', config: { sound: 'rain-ambient', volume: 0.3 } },
+                { type: 'filter', config: { type: 'darken', amount: 0.2 } }
+            ],
+            snow: [
+                { type: 'particles', config: { particle: 'snowflake', count: 50, speed: 2 } },
+                { type: 'filter', config: { type: 'brighten', amount: 0.1 } }
+            ],
+            fog: [
+                { type: 'overlay', config: { texture: 'fog', opacity: 0.5, animation: 'drift' } },
+                { type: 'filter', config: { type: 'blur', amount: 1 } }
+            ],
+            wind: [
+                { type: 'animation', config: { target: 'foliage', type: 'sway', intensity: 0.7 } },
+                { type: 'audio', config: { sound: 'wind-ambient', volume: 0.2 } }
+            ]
+        };
+        
+        return effects[weatherType] || [];
+    }
+
+    /**
+     * PERFORMANCE OPTIMIZATION
+     */
+
+    optimizeBackgroundRendering(backgroundPhase, viewportBounds, performanceHint) {
+        const optimizedPhase = { ...backgroundPhase };
+        
+        // Level-of-detail based on performance
+        if (performanceHint === 'low') {
+            optimizedPhase.layers = this.reduceLOD(optimizedPhase.layers);
+            optimizedPhase.effects = this.simplifyEffects(optimizedPhase.effects);
+        }
+        
+        // Viewport culling
+        optimizedPhase.layers = optimizedPhase.layers.filter(layer => 
+            this.layerIntersectsViewport(layer, viewportBounds)
+        );
+        
+        // Preload optimization
+        this.preloadLayerAssets(optimizedPhase.layers);
+        
+        return optimizedPhase;
+    }
+
+    reduceLOD(layers) {
+        return layers.map(layer => ({
+            ...layer,
+            // Reduce quality for performance
+            quality: Math.min(layer.quality || 1.0, 0.7),
+            filters: layer.filters?.slice(0, 2) || [], // Limit filters
+            animations: layer.animations?.filter(a => a.priority === 'high') || []
+        }));
+    }
+
+    /**
+     * LAYER MANAGEMENT
+     */
+
+    getLayerZIndex(layerType) {
+        const zIndexMap = {
+            [this.layerTypes.SKYBOX]: -1000,
+            [this.layerTypes.DISTANT]: -800,
+            [this.layerTypes.MIDGROUND]: -600,
+            [this.layerTypes.FOREGROUND]: -400,
+            [this.layerTypes.OVERLAY]: 400,
+            [this.layerTypes.AMBIENT]: 200
+        };
+        
+        return zIndexMap[layerType] || 0;
+    }
+
+    getLayerState(phase, layerType) {
+        const layer = phase.layers.find(l => l.type === layerType);
+        return layer ? {
+            visible: layer.visible,
+            opacity: layer.opacity,
+            position: layer.position || { x: 0, y: 0 },
+            scale: layer.scale || { x: 1, y: 1 },
+            rotation: layer.rotation || 0,
+            filters: layer.filters || []
+        } : null;
+    }
+
+    /**
+     * EVENT HANDLERS
+     */
+
+    _setupEventHandlers() {
+        // Character phase changes
+        this.eventBus.on('phase:changed', async (data) => {
+            await this.coordinateWithCharacterPhase(
+                data.entityId,
+                data.newPhaseId,
+                data.phaseData
+            );
+        });
+        
+        // Performance events
+        this.eventBus.on('stage:performance_warning', (data) => {
+            // Reduce background complexity if performance is poor
+            this.optimizeForPerformance();
+        });
+    }
+
+    /**
+     * UTILITY METHODS
+     */
+
+    validateBackgroundPhase(phase) {
+        if (!phase.id || !phase.backgroundId) {
+            throw new Error('Background phase must have id and backgroundId');
+        }
+        
+        if (!Object.values(this.backgroundTypes).includes(phase.type)) {
+            throw new Error(`Invalid background type: ${phase.type}`);
+        }
+        
+        // Validate layers
+        for (const layer of phase.layers) {
+            if (!layer.type || !Object.values(this.layerTypes).includes(layer.type)) {
+                throw new Error(`Invalid layer type: ${layer.type}`);
+            }
+        }
+    }
+
+    async getBackgroundPhase(backgroundId, phaseId) {
+        const phases = this.backgroundPhases.get(backgroundId) || [];
+        return phases.find(p => p.id === phaseId);
+    }
+
+    getCoordinationRulesForCharacter(characterId) {
+        return Array.from(this.phaseCoordinationRules.values())
+            .filter(rule => rule.characterId === characterId);
+    }
+
+    evaluateCoordinationConditions(rule, characterPhaseData) {
+        // Evaluate any conditions for this coordination rule
+        for (const condition of rule.conditions) {
+            if (!this.evaluateCondition(condition, characterPhaseData)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    moodsAreCompatible(mood1, mood2) {
+        const compatibilityMap = {
+            happy: ['excited', 'cheerful', 'playful'],
+            sad: ['melancholy', 'somber', 'quiet'],
+            energetic: ['excited', 'intense', 'dramatic'],
+            calm: ['peaceful', 'serene', 'gentle']
+        };
+        
+        return compatibilityMap[mood1]?.includes(mood2) || 
+               compatibilityMap[mood2]?.includes(mood1);
+    }
+
+    getIntensityValue(intensity) {
+        const intensityMap = { low: 1, medium: 5, high: 10 };
+        return intensityMap[intensity] || 5;
+    }
+
+    dispose() {
+        this.backgroundPhases.clear();
+        this.activeBackgroundPhases.clear();
+        this.backgroundLayers.clear();
+        this.phaseCoordinationRules.clear();
+        this.ambientEffects.clear();
+        this.environmentalTriggers.clear();
+        this.backgroundTransitions.clear();
+        
+        this.eventBus.emit('background-phase-system:disposed');
+    }
+}
+```

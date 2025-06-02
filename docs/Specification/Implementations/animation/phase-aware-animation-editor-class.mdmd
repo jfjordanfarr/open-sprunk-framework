@@ -1,0 +1,691 @@
+```{unit}
+id: "phase-aware-animation-editor-class"
+title: "Phase-Aware Animation Editor Class"
+unit-type: "javascript-class-definition"
+source-ref: "../../src/animation/PhaseAwareAnimationEditor.js"
+status: "draft"
+see-also:
+  - "[[animation-editor-class]]"
+  - "[[direct-manipulation-editor-class]]"
+  - "[[phase-aware-animation-schema]]"
+  - "[[beat-sync-service-class]]"
+  - "[[phase-manager-class]]"
+  - "[[humanoid-animation-schema]]"
+```
+
+## Overview
+
+The **Phase-Aware Animation Editor** extends the base Animation Editor with comprehensive phase integration, enabling users to create and manage animations that are linked to specific character phases. This editor provides tools for creating phase-specific animations, coordinating with musical timing, and managing transitions between phase animations.
+
+## Core Features
+
+### Phase-Linked Animation Creation
+- **Phase Context Awareness**: All animation editing occurs within the context of a specific character phase
+- **Multi-Phase Animation Sets**: Manage complete animation sets for each character phase
+- **Phase-Specific Constraints**: Apply different movement constraints per phase
+- **Variation Management**: Create and manage animation variations within each phase
+
+### Musical Integration
+- **Beat-Synchronized Animations**: Align animation keyframes to musical beats and subdivisions
+- **Tempo-Adaptive Editing**: Animation timeline adapts to tempo changes
+- **Musical Phrase Awareness**: Support for longer animation sequences aligned to musical phrases
+- **Real-Time Beat Visualization**: Visual beat indicators in the animation timeline
+
+### Transition Animation System
+- **Phase Transition Authoring**: Create smooth transitions between phase animations
+- **Transition Templates**: Predefined transition patterns for common phase changes
+- **Beat-Aligned Transitions**: Ensure transitions occur on musically appropriate boundaries
+- **Preview System**: Real-time preview of phase transitions during editing
+
+## Technical Implementation
+
+```javascript
+class PhaseAwareAnimationEditor {
+    constructor(containerElement, eventBus, phaseManager, beatSyncService) {
+        this.container = containerElement;
+        this.eventBus = eventBus;
+        this.phaseManager = phaseManager;
+        this.beatSyncService = beatSyncService;
+        
+        // Base animation editor functionality
+        this.baseEditor = null;
+        this.timeline = null;
+        this.directManipulationEditor = null;
+        
+        // Phase-specific state
+        this.characterId = null;
+        this.currentPhaseId = null;
+        this.phaseAnimations = new Map(); // All animations for current character's phases
+        this.activeAnimationType = "primary"; // "primary" | "variation" | "transition"
+        
+        // Musical integration
+        this.beatGrid = null;
+        this.tempoAdaptation = true;
+        this.musicalAlignment = true;
+        
+        // UI elements
+        this.phaseSelector = null;
+        this.animationTypeSelector = null;
+        this.beatVisualization = null;
+        this.transitionPreview = null;
+        this.variationManager = null;
+        
+        // Animation editing state
+        this.currentAnimationData = null;
+        this.editingHistory = [];
+        this.previewMode = false;
+        this.previewCharacter = null;
+        
+        this.setupUI();
+        this.setupEventHandlers();
+    }
+    
+    async init() {
+        // Initialize base animation editor components
+        await this.initializeBaseEditor();
+        
+        // Initialize phase-specific components
+        await this.initializeBeatVisualization();
+        await this.initializeTransitionSystem();
+        
+        // Setup musical timing integration
+        this.setupMusicalIntegration();
+        
+        console.log('PhaseAwareAnimationEditor initialized');
+    }
+    
+    // Phase Management Methods
+    async loadCharacterPhases(characterId) {
+        this.characterId = characterId;
+        
+        // Load all phase animations for this character
+        const phaseData = await this.phaseManager.getCharacterPhases(characterId);
+        this.phaseAnimations.clear();
+        
+        for (const phase of phaseData.phases) {
+            if (phase.animation) {
+                this.phaseAnimations.set(phase.id, phase.animation);
+            } else {
+                // Create empty animation set for this phase
+                this.phaseAnimations.set(phase.id, this.createEmptyAnimationSet(phase.id));
+            }
+        }
+        
+        // Set initial active phase
+        if (this.phaseAnimations.size > 0) {
+            const firstPhaseId = phaseData.phases[0].id;
+            await this.setActivePhase(firstPhaseId);
+        }
+        
+        this.updatePhaseSelector();
+        this.eventBus.emit('character-phases-loaded', { characterId, phaseCount: this.phaseAnimations.size });
+    }
+    
+    async setActivePhase(phaseId) {
+        if (!this.phaseAnimations.has(phaseId)) {
+            console.error(`Phase ${phaseId} not found`);
+            return;
+        }
+        
+        // Save current animation work
+        if (this.currentPhaseId && this.currentAnimationData) {
+            await this.saveCurrentAnimation();
+        }
+        
+        this.currentPhaseId = phaseId;
+        
+        // Load phase animation data
+        const phaseAnimation = this.phaseAnimations.get(phaseId);
+        await this.loadPhaseAnimation(phaseAnimation);
+        
+        // Update UI to reflect active phase
+        this.updateActivePhaseUI();
+        
+        // Sync with musical timing for this phase
+        await this.syncWithPhaseMusic(phaseId);
+        
+        this.eventBus.emit('animation-phase-activated', { 
+            characterId: this.characterId, 
+            phaseId: phaseId 
+        });
+    }
+    
+    async loadPhaseAnimation(phaseAnimation) {
+        // Load the primary animation by default
+        this.activeAnimationType = "primary";
+        
+        if (phaseAnimation.animations.primary) {
+            this.currentAnimationData = phaseAnimation.animations.primary;
+            await this.loadAnimationIntoEditor(this.currentAnimationData);
+        } else {
+            // Create new primary animation
+            this.currentAnimationData = this.createNewPrimaryAnimation();
+            await this.loadAnimationIntoEditor(this.currentAnimationData);
+        }
+        
+        // Update beat grid based on animation timing
+        this.updateBeatGrid();
+        
+        // Load available variations
+        this.updateVariationManager(phaseAnimation.animations.variations);
+    }
+    
+    // Musical Integration Methods
+    async syncWithPhaseMusic(phaseId) {
+        // Get phase music data
+        const phase = await this.phaseManager.getPhase(this.characterId, phaseId);
+        if (!phase.music) return;
+        
+        // Configure beat sync service for this phase
+        if (phase.music.bpm) {
+            this.beatSyncService.setBPM(phase.music.bpm);
+        }
+        
+        if (phase.music.timeSignature) {
+            this.beatSyncService.setTimeSignature(phase.music.timeSignature);
+        }
+        
+        // Update animation timeline to match musical timing
+        this.alignTimelineToMusic(phase.music);
+    }
+    
+    alignTimelineToMusic(musicData) {
+        if (!this.timeline || !musicData.bpm) return;
+        
+        // Calculate beat spacing in timeline
+        const beatsPerSecond = musicData.bpm / 60;
+        const timelineScale = this.timeline.getTimeScale();
+        const beatSpacing = timelineScale / beatsPerSecond;
+        
+        // Update timeline grid
+        this.timeline.setBeatGrid({
+            spacing: beatSpacing,
+            bpm: musicData.bpm,
+            timeSignature: musicData.timeSignature,
+            enabled: this.musicalAlignment
+        });
+        
+        // Align existing keyframes to beat grid if enabled
+        if (this.musicalAlignment && this.currentAnimationData) {
+            this.alignKeyframesToBeats();
+        }
+    }
+    
+    alignKeyframesToBeats() {
+        if (!this.currentAnimationData?.keyframes) return;
+        
+        for (const keyframe of this.currentAnimationData.keyframes) {
+            const currentTime = keyframe.timestamp;
+            const quantizedTime = this.beatSyncService.getQuantizedTime(currentTime);
+            keyframe.timestamp = quantizedTime;
+            
+            // Update beat position metadata
+            keyframe.phaseData = keyframe.phaseData || {};
+            keyframe.phaseData.beatPosition = this.calculateBeatPosition(quantizedTime);
+        }
+        
+        // Refresh timeline display
+        this.timeline.refreshKeyframes();
+    }
+    
+    calculateBeatPosition(timestamp) {
+        const beats = this.beatSyncService.timeToBeats(timestamp);
+        return beats % 1; // Fractional part represents position within beat
+    }
+    
+    // Animation Creation and Editing
+    createNewPrimaryAnimation() {
+        return {
+            type: "loop",
+            keyframes: [
+                this.createDefaultKeyframe(0), // Start pose
+                this.createDefaultKeyframe(1000) // End pose (1 second)
+            ],
+            duration: 2000,
+            beatAlignment: {
+                enabled: true,
+                beatsPerLoop: 4,
+                subdivision: 0.25,
+                offset: 0
+            }
+        };
+    }
+    
+    createDefaultKeyframe(timestamp) {
+        return {
+            timestamp,
+            bodyParts: this.getDefaultHumanoidPose(),
+            phaseData: {
+                beatPosition: this.calculateBeatPosition(timestamp),
+                musicalEmphasis: 0.5,
+                appearanceSync: {},
+                transitionData: {
+                    isTransitionFrame: false,
+                    transitionType: null,
+                    blendWeight: 1.0
+                }
+            }
+        };
+    }
+    
+    async createAnimationVariation(baseAnimation, variationType) {
+        const variationId = `variation-${Date.now()}`;
+        
+        let variation;
+        switch (variationType) {
+            case "tempo-double":
+                variation = this.createTempoVariation(baseAnimation, 2.0);
+                break;
+            case "tempo-half":
+                variation = this.createTempoVariation(baseAnimation, 0.5);
+                break;
+            case "intensity-high":
+                variation = this.createIntensityVariation(baseAnimation, 1.5);
+                break;
+            case "intensity-low":
+                variation = this.createIntensityVariation(baseAnimation, 0.7);
+                break;
+            case "mirror":
+                variation = this.createMirrorVariation(baseAnimation);
+                break;
+            default:
+                variation = this.duplicateAnimation(baseAnimation);
+        }
+        
+        variation.id = variationId;
+        variation.probability = 0.3; // Default 30% chance
+        variation.triggers = ["beat", "phrase"];
+        
+        // Add to current phase animations
+        const phaseAnimation = this.phaseAnimations.get(this.currentPhaseId);
+        phaseAnimation.animations.variations.push(variation);
+        
+        this.updateVariationManager(phaseAnimation.animations.variations);
+        return variationId;
+    }
+    
+    createTempoVariation(baseAnimation, speedMultiplier) {
+        const variation = this.duplicateAnimation(baseAnimation);
+        
+        // Adjust all keyframe timestamps
+        for (const keyframe of variation.keyframes) {
+            keyframe.timestamp = keyframe.timestamp / speedMultiplier;
+        }
+        
+        variation.duration = variation.duration / speedMultiplier;
+        
+        // Update beat alignment
+        if (variation.beatAlignment) {
+            variation.beatAlignment.beatsPerLoop = variation.beatAlignment.beatsPerLoop / speedMultiplier;
+        }
+        
+        return variation;
+    }
+    
+    // Transition Animation System
+    async createPhaseTransition(fromPhaseId, toPhaseId, transitionType = "crossfade") {
+        const fromAnimation = this.phaseAnimations.get(fromPhaseId);
+        const toAnimation = this.phaseAnimations.get(toPhaseId);
+        
+        if (!fromAnimation || !toAnimation) {
+            console.error("Cannot create transition: missing phase animations");
+            return null;
+        }
+        
+        const transitionId = `${fromPhaseId}-to-${toPhaseId}`;
+        const transition = await this.generateTransitionAnimation(
+            fromAnimation.animations.primary,
+            toAnimation.animations.primary,
+            transitionType
+        );
+        
+        // Store transition in both phases
+        fromAnimation.animations.transitions.exit = fromAnimation.animations.transitions.exit || {};
+        fromAnimation.animations.transitions.exit.to = fromAnimation.animations.transitions.exit.to || {};
+        fromAnimation.animations.transitions.exit.to[toPhaseId] = transition;
+        
+        toAnimation.animations.transitions.enter = toAnimation.animations.transitions.enter || {};
+        toAnimation.animations.transitions.enter.from = toAnimation.animations.transitions.enter.from || {};
+        toAnimation.animations.transitions.enter.from[fromPhaseId] = transition;
+        
+        return transitionId;
+    }
+    
+    async generateTransitionAnimation(fromAnim, toAnim, transitionType) {
+        const duration = 1000; // 1 second transition
+        
+        switch (transitionType) {
+            case "crossfade":
+                return this.createCrossfadeTransition(fromAnim, toAnim, duration);
+            case "morphing":
+                return this.createMorphingTransition(fromAnim, toAnim, duration);
+            case "sequential":
+                return this.createSequentialTransition(fromAnim, toAnim, duration);
+            default:
+                return this.createCrossfadeTransition(fromAnim, toAnim, duration);
+        }
+    }
+    
+    createCrossfadeTransition(fromAnim, toAnim, duration) {
+        return {
+            type: "crossfade",
+            duration,
+            keyframes: [
+                {
+                    timestamp: 0,
+                    blend: { from: 1.0, to: 0.0 },
+                    bodyParts: this.getLastKeyframePose(fromAnim)
+                },
+                {
+                    timestamp: duration / 2,
+                    blend: { from: 0.5, to: 0.5 },
+                    bodyParts: this.blendPoses(
+                        this.getLastKeyframePose(fromAnim),
+                        this.getFirstKeyframePose(toAnim),
+                        0.5
+                    )
+                },
+                {
+                    timestamp: duration,
+                    blend: { from: 0.0, to: 1.0 },
+                    bodyParts: this.getFirstKeyframePose(toAnim)
+                }
+            ],
+            beatSync: {
+                startOnBeat: true,
+                beatAlignment: 1,
+                allowEarlyStart: false,
+                snapToGrid: true
+            },
+            effects: {
+                visual: {
+                    trailEffect: true,
+                    blurAmount: 0.2,
+                    scaleEffect: { start: 1.0, peak: 1.05, end: 1.0 }
+                },
+                audio: {
+                    crossfadeMusic: true,
+                    transitionSound: null,
+                    volumeRamp: "smooth"
+                }
+            }
+        };
+    }
+    
+    // Preview and Testing
+    async previewPhaseTransition(fromPhaseId, toPhaseId) {
+        this.previewMode = true;
+        
+        // Setup preview character
+        this.previewCharacter = await this.createPreviewCharacter();
+        
+        // Load from phase animation
+        await this.loadPhaseForPreview(fromPhaseId);
+        
+        // Play transition after a delay
+        setTimeout(async () => {
+            await this.executeTransitionPreview(fromPhaseId, toPhaseId);
+        }, 2000);
+        
+        // Show preview UI
+        this.showTransitionPreviewUI();
+    }
+    
+    async executeTransitionPreview(fromPhaseId, toPhaseId) {
+        const fromAnimation = this.phaseAnimations.get(fromPhaseId);
+        const transition = fromAnimation.animations.transitions.exit?.to?.[toPhaseId];
+        
+        if (!transition) {
+            console.warn("No transition found, using default");
+            await this.createPhaseTransition(fromPhaseId, toPhaseId);
+        }
+        
+        // Execute transition on preview character
+        await this.animateTransition(this.previewCharacter, transition);
+        
+        // Load target phase animation
+        await this.loadPhaseForPreview(toPhaseId);
+    }
+    
+    // Beat Visualization
+    setupBeatVisualization() {
+        this.beatVisualization = document.createElement('div');
+        this.beatVisualization.className = 'beat-visualization';
+        
+        // Create beat indicators
+        this.beatGrid = new BeatGrid(this.beatVisualization, this.beatSyncService);
+        
+        // Add to timeline
+        if (this.timeline) {
+            this.timeline.addOverlay(this.beatVisualization);
+        }
+        
+        // Listen for beat events
+        this.eventBus.on('beat-tick', (beatData) => {
+            this.updateBeatVisualization(beatData);
+        });
+    }
+    
+    updateBeatVisualization(beatData) {
+        if (!this.beatGrid) return;
+        
+        this.beatGrid.highlightBeat(beatData.beat);
+        this.beatGrid.updateTempo(beatData.bpm);
+        
+        // Update timeline cursor position
+        if (this.timeline) {
+            this.timeline.updateBeatCursor(beatData.beat);
+        }
+    }
+    
+    // UI Management
+    setupUI() {
+        this.createPhaseSelector();
+        this.createAnimationTypeSelector();
+        this.createVariationManager();
+        this.createTransitionPreviewPanel();
+        this.createMusicalAlignmentControls();
+    }
+    
+    createPhaseSelector() {
+        this.phaseSelector = document.createElement('select');
+        this.phaseSelector.className = 'phase-selector';
+        this.phaseSelector.innerHTML = '<option value="">Select Phase...</option>';
+        
+        this.phaseSelector.addEventListener('change', (e) => {
+            if (e.target.value) {
+                this.setActivePhase(e.target.value);
+            }
+        });
+        
+        // Add to UI
+        const toolbar = this.container.querySelector('.animation-toolbar');
+        if (toolbar) {
+            toolbar.prepend(this.phaseSelector);
+        }
+    }
+    
+    updatePhaseSelector() {
+        if (!this.phaseSelector) return;
+        
+        // Clear existing options
+        this.phaseSelector.innerHTML = '<option value="">Select Phase...</option>';
+        
+        // Add phase options
+        for (const [phaseId, _] of this.phaseAnimations) {
+            const option = document.createElement('option');
+            option.value = phaseId;
+            option.textContent = this.getPhaseDisplayName(phaseId);
+            this.phaseSelector.appendChild(option);
+        }
+        
+        // Set current selection
+        if (this.currentPhaseId) {
+            this.phaseSelector.value = this.currentPhaseId;
+        }
+    }
+    
+    // Event Handling
+    setupEventHandlers() {
+        // Phase Manager events
+        this.eventBus.on('phase-created', (data) => {
+            if (data.characterId === this.characterId) {
+                this.phaseAnimations.set(data.phaseId, this.createEmptyAnimationSet(data.phaseId));
+                this.updatePhaseSelector();
+            }
+        });
+        
+        this.eventBus.on('phase-deleted', (data) => {
+            if (data.characterId === this.characterId) {
+                this.phaseAnimations.delete(data.phaseId);
+                this.updatePhaseSelector();
+                
+                // Switch to another phase if this was active
+                if (this.currentPhaseId === data.phaseId) {
+                    const firstPhaseId = this.phaseAnimations.keys().next().value;
+                    if (firstPhaseId) {
+                        this.setActivePhase(firstPhaseId);
+                    }
+                }
+            }
+        });
+        
+        // Beat sync events
+        this.eventBus.on('beat-sync-started', () => {
+            this.setupBeatVisualization();
+        });
+        
+        // Timeline events
+        this.eventBus.on('keyframe-added', (keyframeData) => {
+            this.onKeyframeAdded(keyframeData);
+        });
+        
+        this.eventBus.on('keyframe-modified', (keyframeData) => {
+            this.onKeyframeModified(keyframeData);
+        });
+    }
+    
+    onKeyframeAdded(keyframeData) {
+        // Enhance keyframe with phase-specific data
+        keyframeData.phaseData = {
+            beatPosition: this.calculateBeatPosition(keyframeData.timestamp),
+            musicalEmphasis: 0.5,
+            appearanceSync: {},
+            transitionData: {
+                isTransitionFrame: false,
+                transitionType: null,
+                blendWeight: 1.0
+            }
+        };
+        
+        // Snap to beat grid if musical alignment is enabled
+        if (this.musicalAlignment) {
+            const quantizedTime = this.beatSyncService.getQuantizedTime(keyframeData.timestamp);
+            keyframeData.timestamp = quantizedTime;
+            keyframeData.phaseData.beatPosition = this.calculateBeatPosition(quantizedTime);
+        }
+    }
+    
+    // Utility Methods
+    async saveCurrentAnimation() {
+        if (!this.currentPhaseId || !this.currentAnimationData) return;
+        
+        const phaseAnimation = this.phaseAnimations.get(this.currentPhaseId);
+        
+        switch (this.activeAnimationType) {
+            case "primary":
+                phaseAnimation.animations.primary = this.currentAnimationData;
+                break;
+            case "variation":
+                // Update specific variation
+                break;
+            case "transition":
+                // Update specific transition
+                break;
+        }
+        
+        // Save to Phase Manager
+        await this.phaseManager.updatePhaseAnimation(this.characterId, this.currentPhaseId, phaseAnimation);
+    }
+    
+    createEmptyAnimationSet(phaseId) {
+        return {
+            phaseId,
+            phaseName: this.getPhaseDisplayName(phaseId),
+            animations: {
+                primary: null,
+                variations: [],
+                transitions: {
+                    enter: { from: {} },
+                    exit: { to: {} }
+                },
+                reactions: []
+            },
+            behavior: {
+                coordination: {
+                    mode: "independent",
+                    syncTarget: null,
+                    syncOffset: 0,
+                    syncTolerance: 0.1
+                },
+                performance: {
+                    enableLOD: true,
+                    minFrameRate: 30,
+                    complexityLevel: "medium",
+                    enableCaching: true,
+                    enablePrediction: true
+                },
+                musicality: {
+                    beatResponsive: true,
+                    tempoAdaptive: true,
+                    dynamicResponsive: true,
+                    phraseAware: true
+                }
+            },
+            constraints: {
+                inherits: "character",
+                overrides: {},
+                additions: {}
+            },
+            metadata: {
+                created: new Date().toISOString(),
+                modified: new Date().toISOString(),
+                author: "user",
+                description: "",
+                tags: [],
+                version: "1.0.0",
+                workflow: {
+                    createdFrom: "animation-first",
+                    sourcePhase: null,
+                    iterationCount: 1,
+                    lastEditType: "creation"
+                }
+            }
+        };
+    }
+    
+    getPhaseDisplayName(phaseId) {
+        // Get phase name from Phase Manager
+        return this.phaseManager.getPhaseName(this.characterId, phaseId) || phaseId;
+    }
+}
+```
+
+## Integration Features
+
+### Character Editor Coordination
+- **Phase Synchronization**: Automatically updates when phases are created/modified in Character Editor
+- **Appearance Awareness**: Animation editor can preview character appearance for current phase
+- **Cross-Editor Communication**: Bidirectional sync with character appearance changes
+
+### Music Editor Integration
+- **Musical Context**: Automatically syncs with music data from current phase
+- **Beat Grid Visualization**: Shows musical timing overlay on animation timeline
+- **Tempo Adaptation**: Animation timeline adjusts to music tempo changes
+
+### Performance Stage Coordination
+- **Live Preview**: Real-time preview of animations in performance context
+- **Multi-Character Sync**: Preview animations coordinated across multiple characters
+- **Transition Testing**: Test phase transitions in performance environment
+
+This Phase-Aware Animation Editor provides comprehensive tools for creating musically-synchronized, phase-specific character animations while maintaining an intuitive editing experience.

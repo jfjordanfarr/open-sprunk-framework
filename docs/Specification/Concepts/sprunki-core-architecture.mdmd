@@ -1,0 +1,68 @@
+<!-- filepath: docs/Compositions/sprunki-core-architecture.mdmd -->
+::: {composition}
+id: "sprunki-core-architecture"
+title: "Sprunki Core Architecture"
+composition-type: "software-architecture-overview"
+status: "draft"
+version: "0.2"
+brief: "High-level architecture showing the main modules and their relationships."
+see-also:
+  - "[[sprunki-game-project]]"
+  - "[[../../Definition/Requirements/client-side-architecture-requirement.mdmd]]"
+  - "[[../../Definition/Requirements/CoreSystemRequirements.mdmd]]"
+  - "[[../Definition/Vision/Idea.md]]"
+  - "[[app-core-module]]"
+  - "[[character-editor-module]]"
+  - "[[music-editor-module]]"
+  - "[[animation-editor-module]]"
+  - "[[stage-module]]"
+  - "[[data-manager-module]]"
+  - "[[vector-graphics-system]]"
+
+The application is organized into several key modules, each responsible for a distinct area of functionality, as outlined in the `[[sprunki-game-project]]` and detailed in `[[../Definition/Vision/Idea.md]]`. This architecture directly addresses the `[[../../Definition/Requirements/client-side-architecture-requirement.mdmd]]` and aims to fulfill the broader `[[core-system-requirements]]`. The `[[app-core-module]]` acts as the central orchestrator, managing transitions and interactions between the various editor modules (`[[character-editor-module]]`, `[[music-editor-module]]`, `[[animation-editor-module]]`) and the `[[stage-module]]`.
+
+All creative assets (characters, music, animations) are handled by the `[[data-manager-module]]`, which is responsible for their storage, retrieval, and serialization, enabling project saving and sharing.
+
+The main modules and their primary relationships are visualized below:
+
+```mermaid
+graph TD
+    subgraph "User-Facing Creative Modules"
+        CharEditor["Character Editor<br/>[[character-editor-module]]"]
+        MusicEditor["Music Editor<br/>[[music-editor-module]]"]
+        AnimEditor["Animation Editor<br/>[[animation-editor-module]]"]
+    end
+
+    subgraph "Core & Presentation"
+        AppCore["App Core<br/>[[app-core-module]]"]
+        Stage["Performance Stage<br/>[[stage-module]]"]
+        DataManager["Data Manager<br/>[[data-manager-module]]"]
+    end    subgraph "Supporting Units (Examples)"
+        VectorGraphics["Vector Graphics System<br/>[[vector-graphics-system]]"]
+        AudioEngine["Audio Engine<br/>[[../Implementations/music/audio-engine-class.mdmd]]"]
+        CharRenderer["Character Renderer<br/>[[../Implementations/stage/character-renderer-class.mdmd]]"]
+        ProjectFile["Project File Schema<br/>[[../Implementations/data/project-file-schema.mdmd]]"]
+    end
+
+    AppCore --> CharEditor
+    AppCore --> MusicEditor
+    AppCore --> AnimEditor
+    AppCore --> Stage
+    AppCore --> DataManager
+
+    CharEditor --- VectorGraphics
+    CharEditor --> DataManager
+    MusicEditor --> AudioEngine
+    MusicEditor --> DataManager
+    AnimEditor --> DataManager
+    AnimEditor -.-> CharRenderer // AnimEditor defines animations, Stage uses Renderer
+
+    Stage --> CharRenderer
+    Stage --> AudioEngine
+    Stage --> DataManager
+
+    DataManager -.-> ProjectFile // DataManager uses ProjectFile schema
+```
+
+Each module consists of implementable components that correspond to actual source files or further sub-compositions. The `[[vector-graphics-system]]` supports the `[[character-editor-module]]`, while the `[[../Implementations/music/audio-engine-class.mdmd]]` and `[[../Implementations/stage/character-renderer-class.mdmd]]` are key units utilized by the `[[music-editor-module]]` and `[[stage-module]]` respectively.
+:::

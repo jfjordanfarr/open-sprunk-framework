@@ -1,0 +1,48 @@
+<!-- filepath: docs/Compositions/sprunki-game-project.mdmd -->
+::: {composition}
+id: "sprunki-game-project"
+title: "Sprunki Game Project"
+composition-type: "web-application-project"
+status: "draft"
+version: "0.2"
+brief: "Complete specification for a client-side creative game with character creation, music composition, and animation."
+see-also:
+  - "[[core-system-requirements]]"
+  - "[[../../Definition/Requirements/client-side-architecture-requirement.mdmd]]"
+  - "[[../../Definition/Requirements/project-saving-requirement.mdmd]]"
+  - "[[../../Definition/Requirements/project-autosave-requirement.mdmd]]"
+  - "[[../../Definition/Requirements/html5-export-requirement.mdmd]]"
+  - "[[../../Definition/Requirements/undo-redo-requirement.mdmd]]"
+  - "[[../Definition/Vision/Idea.md]]"
+  - "[[../Definition/Vision/OriginatingPrompt.md]]"
+  - "[[sprunki-core-architecture]]"
+  - "[[sprunki-data-flow]]"
+  - "[[sprunki-module-structure]]"
+  - "[[../Implementations/html-main-page.mdmd]]"
+  - "[[../Implementations/app-main-bootstrap.mdmd]]"
+
+This document specifies the Sprunki-like game using MDMD principles focused on concrete, implementable components, aiming to fulfill the `[[../../Definition/Requirements/CoreSystemRequirements.mdmd]]` as envisioned in `[[../Definition/Vision/Idea.md]]` and `[[../Definition/Vision/OriginatingPrompt.md]]`. Every `{unit}` in this specification corresponds to an actual file that will be created in the `src/` directory.
+
+## Vision & Core Principles
+
+This is a 100% client-side, open-source creative game where users design characters, compose music loops, and create animations. The experience emphasizes:
+
+- **User Creation Focus**: Primary gameplay is creative expression
+- **Client-Side Simplicity**: No server dependencies for core functionality `[[../../Definition/Requirements/client-side-architecture-requirement.mdmd]]`
+- **Open Source & Modular**: Built with extensibility using existing open-source libraries
+- **Interpolation-Based Animation**: Smooth procedural animation rather than frame-by-frame
+- **Project Persistence**: Support for saving, loading, and exporting projects `[[../../Definition/Requirements/project-saving-requirement.mdmd]]`, `[[../../Definition/Requirements/project-autosave-requirement.mdmd]]`, `[[../../Definition/Requirements/html5-export-requirement.mdmd]]`
+- **User-Friendly Operations**: Full undo/redo support `[[../../Definition/Requirements/undo-redo-requirement.mdmd]]`
+
+## Technology Stack
+
+- **Core**: HTML5, CSS3, ES6+ JavaScript with main page `[[../Implementations/html-main-page.mdmd]]` and bootstrap `[[../Implementations/app-main-bootstrap.mdmd]]`
+- **Rendering**: PixiJS for character display and animation
+- **Vector Graphics**: Fabric.js for character creation interface
+- **Audio**: Tone.js for music composition and playback
+- **Animation**: Custom tween system built on requestAnimationFrame
+- **UI**: Vanilla JavaScript with component-based architecture
+- **Data**: JSON serialization with localStorage persistence
+
+The implementation is structured around five core modules: `[[sprunki-core-architecture]]`
+:::

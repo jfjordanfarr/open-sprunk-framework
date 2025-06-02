@@ -1,0 +1,808 @@
+```{unit}
+id: "phase-template-system-class"
+title: "Phase Template System Class"
+unit-type: "javascript-class-definition"
+source-ref: "../../src/phase/PhaseTemplateSystem.js"
+status: "draft"
+see-also:
+  - "[[phase-manager-class]]"
+  - "[[phase-data-store-class]]"
+  - "[[phase-aware-character-editor-class]]"
+  - "[[../animation/phase-aware-animation-editor-class]]"
+  - "[[../music/phase-aware-music-editor-class]]"
+  - "[[../Concepts/phase-system-architecture]]"
+  - "[[../../Definition/Requirements/phase-system-requirement]]"
+```
+
+## Overview
+
+The PhaseTemplateSystem provides a comprehensive library of predefined phase templates to accelerate content creation. It includes template categories, customization tools, and automated phase generation based on musical and thematic patterns, enabling rapid prototyping and consistent quality across all creative modalities.
+
+## Key Capabilities
+
+- **Template Library Management**: Comprehensive catalog of predefined phase templates
+- **Multi-Modal Templates**: Templates covering appearance, animation, and music combinations
+- **Template Customization**: Tools for adapting templates to specific creative needs
+- **Automated Generation**: AI-assisted template creation based on patterns and themes
+- **Template Sharing**: Community template sharing and collaboration features
+- **Quick Prototyping**: Rapid phase creation for iterative creative workflows
+
+## Class Definition
+
+```javascript
+/**
+ * Manages predefined phase templates for rapid content creation
+ * Provides template library, customization tools, and automated generation
+ */
+export class PhaseTemplateSystem {
+    constructor(eventBus, phaseManager, dataStore) {
+        this.eventBus = eventBus;
+        this.phaseManager = phaseManager;
+        this.dataStore = dataStore;
+        
+        // Template management
+        this.templateLibrary = new Map(); // templateId -> templateData
+        this.templateCategories = new Map(); // categoryId -> category
+        this.templateCollections = new Map(); // collectionId -> templateIds[]
+        this.userTemplates = new Map(); // userId -> templateIds[]
+        
+        // Template metadata
+        this.templateUsageStats = new Map(); // templateId -> usageData
+        this.templateRatings = new Map(); // templateId -> ratingData
+        this.templateTags = new Map(); // tag -> templateIds[]
+        
+        // Generation system
+        this.generationRules = new Map(); // ruleId -> generationRule
+        this.patternLibrary = new Map(); // patternId -> patternData
+        this.themePresets = new Map(); // themeId -> themeData
+        
+        // Template categories
+        this.categories = {
+            MUSICAL_GENRE: 'musical-genre',
+            CHARACTER_ARCHETYPE: 'character-archetype',
+            MOOD_EMOTION: 'mood-emotion',
+            ANIMATION_STYLE: 'animation-style',
+            VISUAL_THEME: 'visual-theme',
+            NARRATIVE_MOMENT: 'narrative-moment',
+            PERFORMANCE_TYPE: 'performance-type',
+            TECHNICAL_DEMO: 'technical-demo'
+        };
+        
+        // Template types
+        this.templateTypes = {
+            COMPLETE_PHASE: 'complete-phase',        // Full tri-modal phase
+            APPEARANCE_ONLY: 'appearance-only',      // Visual-only template
+            ANIMATION_ONLY: 'animation-only',        // Animation-only template
+            MUSIC_ONLY: 'music-only',               // Music-only template
+            TRANSITION: 'transition',                // Phase transition template
+            VARIATION: 'variation',                  // Variation of existing phase
+            COLLECTION: 'collection'                 // Multiple related phases
+        };
+        
+        this._initializeDefaultTemplates();
+        this._setupEventHandlers();
+    }
+
+    /**
+     * TEMPLATE LIBRARY MANAGEMENT
+     */
+
+    async loadTemplateLibrary() {
+        // Load built-in templates
+        await this.loadBuiltInTemplates();
+        
+        // Load user templates
+        await this.loadUserTemplates();
+        
+        // Load community templates
+        await this.loadCommunityTemplates();
+        
+        this.eventBus.emit('template-system:library-loaded', {
+            totalTemplates: this.templateLibrary.size,
+            categories: this.templateCategories.size
+        });
+    }
+
+    async createTemplate(templateData) {
+        const template = {
+            id: templateData.id || `template-${Date.now()}`,
+            name: templateData.name || 'Untitled Template',
+            description: templateData.description || '',
+            type: templateData.type || this.templateTypes.COMPLETE_PHASE,
+            category: templateData.category || this.categories.VISUAL_THEME,
+            
+            // Template content
+            appearanceTemplate: templateData.appearanceTemplate || null,
+            animationTemplate: templateData.animationTemplate || null,
+            musicTemplate: templateData.musicTemplate || null,
+            transitionTemplate: templateData.transitionTemplate || null,
+            
+            // Customization parameters
+            customizableProperties: templateData.customizableProperties || [],
+            variationPoints: templateData.variationPoints || [],
+            constraints: templateData.constraints || [],
+            
+            // Metadata
+            tags: templateData.tags || [],
+            difficulty: templateData.difficulty || 'beginner',
+            estimatedTime: templateData.estimatedTime || '5-10 minutes',
+            previewImage: templateData.previewImage || null,
+            
+            // Template configuration
+            parameters: templateData.parameters || {},
+            defaultValues: templateData.defaultValues || {},
+            validationRules: templateData.validationRules || [],
+            
+            // Usage and community
+            author: templateData.author || 'System',
+            version: templateData.version || '1.0.0',
+            isPublic: templateData.isPublic !== false,
+            license: templateData.license || 'MIT',
+            
+            // Analytics
+            usageCount: 0,
+            rating: 0,
+            downloadCount: 0,
+            
+            created: new Date(),
+            modified: new Date()
+        };
+        
+        // Validate template
+        this.validateTemplate(template);
+        
+        // Store template
+        this.templateLibrary.set(template.id, template);
+        
+        // Update categories and tags
+        this.updateTemplateCategorization(template);
+        
+        // Store in data store
+        await this.dataStore.storeTemplate(template);
+        
+        this.eventBus.emit('template-system:template-created', { template });
+        
+        return template;
+    }
+
+    async applyTemplate(templateId, targetEntityId, customizations = {}) {
+        const template = this.templateLibrary.get(templateId);
+        if (!template) {
+            throw new Error(`Template not found: ${templateId}`);
+        }
+        
+        // Apply customizations to template
+        const customizedTemplate = await this.customizeTemplate(template, customizations);
+        
+        // Generate phase data from template
+        const phaseData = await this.generatePhaseFromTemplate(customizedTemplate, targetEntityId);
+        
+        // Create the actual phase
+        const phase = await this.phaseManager.createPhase(targetEntityId, phaseData);
+        
+        // Update usage statistics
+        this.updateTemplateUsage(templateId);
+        
+        this.eventBus.emit('template-system:template-applied', {
+            templateId,
+            targetEntityId,
+            phaseId: phase.id,
+            customizations
+        });
+        
+        return phase;
+    }
+
+    async customizeTemplate(template, customizations) {
+        const customized = JSON.parse(JSON.stringify(template)); // Deep clone
+        
+        // Apply parameter customizations
+        for (const [param, value] of Object.entries(customizations.parameters || {})) {
+            if (customized.customizableProperties.includes(param)) {
+                customized.parameters[param] = value;
+            }
+        }
+        
+        // Apply appearance customizations
+        if (customizations.appearance && customized.appearanceTemplate) {
+            customized.appearanceTemplate = await this.customizeAppearanceTemplate(
+                customized.appearanceTemplate,
+                customizations.appearance
+            );
+        }
+        
+        // Apply animation customizations
+        if (customizations.animation && customized.animationTemplate) {
+            customized.animationTemplate = await this.customizeAnimationTemplate(
+                customized.animationTemplate,
+                customizations.animation
+            );
+        }
+        
+        // Apply music customizations
+        if (customizations.music && customized.musicTemplate) {
+            customized.musicTemplate = await this.customizeMusicTemplate(
+                customized.musicTemplate,
+                customizations.music
+            );
+        }
+        
+        return customized;
+    }
+
+    /**
+     * TEMPLATE GENERATION
+     */
+
+    async generatePhaseFromTemplate(template, entityId) {
+        const phaseData = {
+            id: `phase-from-${template.id}-${Date.now()}`,
+            name: `${template.name} Phase`,
+            description: `Generated from template: ${template.name}`,
+            entityId,
+            
+            // Apply template parameters
+            ...template.parameters,
+            
+            // Generate appearance data
+            appearanceData: template.appearanceTemplate ? 
+                await this.generateAppearanceFromTemplate(template.appearanceTemplate, entityId) : null,
+            
+            // Generate animation data
+            animationData: template.animationTemplate ?
+                await this.generateAnimationFromTemplate(template.animationTemplate, entityId) : null,
+            
+            // Generate music data
+            musicData: template.musicTemplate ?
+                await this.generateMusicFromTemplate(template.musicTemplate, entityId) : null,
+            
+            // Generate transition configuration
+            transitionConfig: template.transitionTemplate ?
+                await this.generateTransitionFromTemplate(template.transitionTemplate) : {},
+            
+            // Copy metadata
+            tags: [...template.tags, 'template-generated'],
+            difficulty: template.difficulty,
+            templateId: template.id,
+            templateVersion: template.version
+        };
+        
+        // Validate generated phase
+        await this.validateGeneratedPhase(phaseData);
+        
+        return phaseData;
+    }
+
+    async generateAppearanceFromTemplate(appearanceTemplate, entityId) {
+        const appearance = {
+            // Base colors from template
+            colorScheme: this.processTemplateColors(appearanceTemplate.colorScheme),
+            
+            // Body parts configuration
+            bodyParts: {},
+            
+            // Accessories and props
+            accessories: [],
+            
+            // Visual effects
+            effects: appearanceTemplate.effects || [],
+            
+            // Texture and materials
+            textures: {},
+            materials: {}
+        };
+        
+        // Process body parts
+        for (const [partName, partTemplate] of Object.entries(appearanceTemplate.bodyParts || {})) {
+            appearance.bodyParts[partName] = {
+                texture: await this.processTemplateTexture(partTemplate.texture),
+                color: this.processTemplateColor(partTemplate.color),
+                scale: partTemplate.scale || { x: 1, y: 1 },
+                offset: partTemplate.offset || { x: 0, y: 0 },
+                visible: partTemplate.visible !== false,
+                ...partTemplate
+            };
+        }
+        
+        // Process accessories
+        for (const accessoryTemplate of appearanceTemplate.accessories || []) {
+            const accessory = {
+                id: `${entityId}-accessory-${accessoryTemplate.type}`,
+                type: accessoryTemplate.type,
+                texture: await this.processTemplateTexture(accessoryTemplate.texture),
+                position: accessoryTemplate.position || { x: 0, y: 0 },
+                scale: accessoryTemplate.scale || { x: 1, y: 1 },
+                rotation: accessoryTemplate.rotation || 0,
+                visible: accessoryTemplate.visible !== false,
+                ...accessoryTemplate
+            };
+            
+            appearance.accessories.push(accessory);
+        }
+        
+        return appearance;
+    }
+
+    async generateAnimationFromTemplate(animationTemplate, entityId) {
+        const animation = {
+            // Animation sets for different contexts
+            sets: {},
+            
+            // Default animation configuration
+            defaultSet: animationTemplate.defaultSet || 'idle',
+            
+            // Timing configuration
+            bpm: animationTemplate.bpm || 120,
+            timeSignature: animationTemplate.timeSignature || '4/4',
+            
+            // Animation properties
+            looping: animationTemplate.looping !== false,
+            beatAligned: animationTemplate.beatAligned !== false,
+            
+            // Performance settings
+            quality: animationTemplate.quality || 'high',
+            lodLevels: animationTemplate.lodLevels || ['high', 'medium', 'low']
+        };
+        
+        // Process animation sets
+        for (const [setName, setTemplate] of Object.entries(animationTemplate.sets || {})) {
+            animation.sets[setName] = {
+                keyframes: await this.processAnimationKeyframes(setTemplate.keyframes, entityId),
+                duration: setTemplate.duration || 4.0,
+                easing: setTemplate.easing || 'ease-in-out',
+                variations: setTemplate.variations || [],
+                transitions: setTemplate.transitions || {}
+            };
+        }
+        
+        return animation;
+    }
+
+    async generateMusicFromTemplate(musicTemplate, entityId) {
+        const music = {
+            // Audio configuration
+            bpm: musicTemplate.bpm || 120,
+            key: musicTemplate.key || 'C',
+            scale: musicTemplate.scale || 'major',
+            timeSignature: musicTemplate.timeSignature || '4/4',
+            
+            // Loop configuration
+            loopDuration: musicTemplate.loopDuration || 8, // bars
+            loopPoints: musicTemplate.loopPoints || { start: 0, end: 8 },
+            
+            // Audio data
+            audioBuffer: null, // Will be generated
+            samples: [],
+            synthConfig: musicTemplate.synthConfig || {},
+            
+            // Effects chain
+            effects: musicTemplate.effects || [],
+            
+            // Performance settings
+            volume: musicTemplate.volume || 0.8,
+            pan: musicTemplate.pan || 0,
+            
+            // Generation instructions
+            generationConfig: {
+                style: musicTemplate.style || 'electronic',
+                mood: musicTemplate.mood || 'neutral',
+                complexity: musicTemplate.complexity || 'medium',
+                instruments: musicTemplate.instruments || ['synth', 'drums']
+            }
+        };
+        
+        // Generate actual audio if requested
+        if (musicTemplate.generateAudio) {
+            music.audioBuffer = await this.generateAudioFromTemplate(musicTemplate, entityId);
+        }
+        
+        return music;
+    }
+
+    /**
+     * BUILT-IN TEMPLATE LIBRARY
+     */
+
+    async _initializeDefaultTemplates() {
+        // Musical genre templates
+        await this.createMusicalGenreTemplates();
+        
+        // Character archetype templates
+        await this.createCharacterArchetypeTemplates();
+        
+        // Mood and emotion templates
+        await this.createMoodEmotionTemplates();
+        
+        // Animation style templates
+        await this.createAnimationStyleTemplates();
+        
+        // Technical demo templates
+        await this.createTechnicalDemoTemplates();
+    }
+
+    async createMusicalGenreTemplates() {
+        const genres = [
+            {
+                id: 'electronic-dance',
+                name: 'Electronic Dance',
+                category: this.categories.MUSICAL_GENRE,
+                description: 'High-energy electronic dance music with synchronized animations',
+                musicTemplate: {
+                    bpm: 128,
+                    key: 'A',
+                    scale: 'minor',
+                    style: 'electronic',
+                    mood: 'energetic',
+                    instruments: ['synth-lead', 'synth-bass', 'drums-electronic', 'fx-sweep']
+                },
+                animationTemplate: {
+                    sets: {
+                        dance: {
+                            keyframes: this.getElectronicDanceKeyframes(),
+                            duration: 4.0,
+                            variations: ['intense', 'moderate', 'subtle']
+                        }
+                    },
+                    beatAligned: true,
+                    quality: 'high'
+                },
+                appearanceTemplate: {
+                    colorScheme: {
+                        primary: '#00ffff',
+                        secondary: '#ff00ff',
+                        accent: '#ffff00'
+                    },
+                    effects: ['neon-glow', 'pulse-on-beat']
+                }
+            },
+            {
+                id: 'jazz-smooth',
+                name: 'Smooth Jazz',
+                category: this.categories.MUSICAL_GENRE,
+                description: 'Sophisticated jazz with smooth character movements',
+                musicTemplate: {
+                    bpm: 95,
+                    key: 'F',
+                    scale: 'major',
+                    style: 'jazz',
+                    mood: 'relaxed',
+                    instruments: ['piano', 'saxophone', 'upright-bass', 'drums-acoustic']
+                },
+                animationTemplate: {
+                    sets: {
+                        sway: {
+                            keyframes: this.getJazzSwayKeyframes(),
+                            duration: 8.0,
+                            variations: ['subtle', 'expressive']
+                        }
+                    },
+                    beatAligned: true,
+                    quality: 'high'
+                },
+                appearanceTemplate: {
+                    colorScheme: {
+                        primary: '#8B4513',
+                        secondary: '#FFD700',
+                        accent: '#4B0082'
+                    },
+                    accessories: [
+                        { type: 'hat', subtype: 'fedora' },
+                        { type: 'instrument', subtype: 'saxophone' }
+                    ]
+                }
+            }
+        ];
+        
+        for (const genreTemplate of genres) {
+            await this.createTemplate(genreTemplate);
+        }
+    }
+
+    async createCharacterArchetypeTemplates() {
+        const archetypes = [
+            {
+                id: 'hero-protagonist',
+                name: 'Hero Protagonist',
+                category: this.categories.CHARACTER_ARCHETYPE,
+                description: 'Classic hero character with confident animations and uplifting music',
+                appearanceTemplate: {
+                    colorScheme: {
+                        primary: '#1E90FF',
+                        secondary: '#FFD700',
+                        accent: '#FFFFFF'
+                    },
+                    bodyParts: {
+                        body: { texture: 'hero-outfit', scale: { x: 1.1, y: 1.1 } },
+                        head: { texture: 'determined-expression' }
+                    },
+                    accessories: [
+                        { type: 'cape', texture: 'flowing-cape' }
+                    ]
+                },
+                animationTemplate: {
+                    sets: {
+                        heroic: {
+                            keyframes: this.getHeroicPoseKeyframes(),
+                            duration: 6.0,
+                            variations: ['confident', 'inspiring', 'determined']
+                        }
+                    },
+                    quality: 'high'
+                },
+                musicTemplate: {
+                    bpm: 110,
+                    key: 'C',
+                    scale: 'major',
+                    style: 'cinematic',
+                    mood: 'heroic',
+                    instruments: ['orchestra', 'choir', 'percussion']
+                }
+            },
+            {
+                id: 'mysterious-villain',
+                name: 'Mysterious Villain',
+                category: this.categories.CHARACTER_ARCHETYPE,
+                description: 'Dark, mysterious antagonist with sinister animations and ominous music',
+                appearanceTemplate: {
+                    colorScheme: {
+                        primary: '#2F2F2F',
+                        secondary: '#8B0000',
+                        accent: '#4B0082'
+                    },
+                    bodyParts: {
+                        body: { texture: 'dark-cloak' },
+                        head: { texture: 'mysterious-mask' }
+                    },
+                    effects: ['shadow-aura', 'dark-particles']
+                },
+                animationTemplate: {
+                    sets: {
+                        menacing: {
+                            keyframes: this.getMenacingKeyframes(),
+                            duration: 8.0,
+                            variations: ['subtle-threat', 'obvious-menace']
+                        }
+                    },
+                    quality: 'high'
+                },
+                musicTemplate: {
+                    bpm: 85,
+                    key: 'D',
+                    scale: 'minor',
+                    style: 'dark-ambient',
+                    mood: 'ominous',
+                    instruments: ['strings-dark', 'choir-ethereal', 'percussion-tribal']
+                }
+            }
+        ];
+        
+        for (const archetype of archetypes) {
+            await this.createTemplate(archetype);
+        }
+    }
+
+    async createMoodEmotionTemplates() {
+        const moods = [
+            {
+                id: 'joyful-celebration',
+                name: 'Joyful Celebration',
+                category: this.categories.MOOD_EMOTION,
+                description: 'Exuberant joy with celebratory animations and upbeat music',
+                tags: ['happy', 'celebration', 'party', 'energetic']
+            },
+            {
+                id: 'melancholic-reflection',
+                name: 'Melancholic Reflection',
+                category: this.categories.MOOD_EMOTION,
+                description: 'Thoughtful sadness with gentle animations and somber music',
+                tags: ['sad', 'reflective', 'emotional', 'gentle']
+            },
+            {
+                id: 'intense-focus',
+                name: 'Intense Focus',
+                category: this.categories.MOOD_EMOTION,
+                description: 'Deep concentration with precise animations and driving music',
+                tags: ['focused', 'intense', 'determined', 'precise']
+            }
+        ];
+        
+        for (const mood of moods) {
+            await this.createTemplate(mood);
+        }
+    }
+
+    /**
+     * TEMPLATE SEARCH AND DISCOVERY
+     */
+
+    searchTemplates(query, filters = {}) {
+        const results = [];
+        
+        for (const template of this.templateLibrary.values()) {
+            let score = 0;
+            
+            // Text search in name and description
+            if (template.name.toLowerCase().includes(query.toLowerCase())) {
+                score += 10;
+            }
+            if (template.description.toLowerCase().includes(query.toLowerCase())) {
+                score += 5;
+            }
+            
+            // Tag matching
+            for (const tag of template.tags) {
+                if (tag.toLowerCase().includes(query.toLowerCase())) {
+                    score += 3;
+                }
+            }
+            
+            // Apply filters
+            if (filters.category && template.category !== filters.category) continue;
+            if (filters.type && template.type !== filters.type) continue;
+            if (filters.difficulty && template.difficulty !== filters.difficulty) continue;
+            if (filters.minRating && template.rating < filters.minRating) continue;
+            
+            if (score > 0) {
+                results.push({ template, score });
+            }
+        }
+        
+        // Sort by score and return
+        results.sort((a, b) => b.score - a.score);
+        return results.map(r => r.template);
+    }
+
+    getTemplatesByCategory(categoryId) {
+        return Array.from(this.templateLibrary.values())
+            .filter(template => template.category === categoryId);
+    }
+
+    getTemplatesByTags(tags) {
+        return Array.from(this.templateLibrary.values())
+            .filter(template => 
+                tags.some(tag => template.tags.includes(tag))
+            );
+    }
+
+    getPopularTemplates(limit = 10) {
+        return Array.from(this.templateLibrary.values())
+            .sort((a, b) => b.usageCount - a.usageCount)
+            .slice(0, limit);
+    }
+
+    getRecommendedTemplates(entityId, context = {}) {
+        // Get recommendations based on current entity state and usage history
+        const recommendations = [];
+        
+        // Add logic for smart recommendations based on:
+        // - Current entity appearance/animation/music
+        // - User's previous template usage
+        // - Popular templates in similar contexts
+        // - Template compatibility with existing phases
+        
+        return recommendations;
+    }
+
+    /**
+     * TEMPLATE UTILITIES
+     */
+
+    validateTemplate(template) {
+        if (!template.id || !template.name) {
+            throw new Error('Template must have id and name');
+        }
+        
+        if (!Object.values(this.templateTypes).includes(template.type)) {
+            throw new Error(`Invalid template type: ${template.type}`);
+        }
+        
+        if (!Object.values(this.categories).includes(template.category)) {
+            throw new Error(`Invalid template category: ${template.category}`);
+        }
+        
+        // Validate template content based on type
+        this.validateTemplateContent(template);
+    }
+
+    validateTemplateContent(template) {
+        switch (template.type) {
+            case this.templateTypes.COMPLETE_PHASE:
+                if (!template.appearanceTemplate && !template.animationTemplate && !template.musicTemplate) {
+                    throw new Error('Complete phase template must have at least one modality');
+                }
+                break;
+            
+            case this.templateTypes.APPEARANCE_ONLY:
+                if (!template.appearanceTemplate) {
+                    throw new Error('Appearance template must have appearance data');
+                }
+                break;
+            
+            case this.templateTypes.ANIMATION_ONLY:
+                if (!template.animationTemplate) {
+                    throw new Error('Animation template must have animation data');
+                }
+                break;
+            
+            case this.templateTypes.MUSIC_ONLY:
+                if (!template.musicTemplate) {
+                    throw new Error('Music template must have music data');
+                }
+                break;
+        }
+    }
+
+    updateTemplateCategorization(template) {
+        // Update category mappings
+        if (!this.templateCategories.has(template.category)) {
+            this.templateCategories.set(template.category, []);
+        }
+        this.templateCategories.get(template.category).push(template.id);
+        
+        // Update tag mappings
+        for (const tag of template.tags) {
+            if (!this.templateTags.has(tag)) {
+                this.templateTags.set(tag, []);
+            }
+            this.templateTags.get(tag).push(template.id);
+        }
+    }
+
+    updateTemplateUsage(templateId) {
+        const template = this.templateLibrary.get(templateId);
+        if (template) {
+            template.usageCount++;
+            template.lastUsed = new Date();
+            
+            // Update usage statistics
+            if (!this.templateUsageStats.has(templateId)) {
+                this.templateUsageStats.set(templateId, {
+                    totalUses: 0,
+                    uniqueUsers: new Set(),
+                    contexts: new Map(),
+                    averageCustomizations: 0
+                });
+            }
+            
+            const stats = this.templateUsageStats.get(templateId);
+            stats.totalUses++;
+            
+            this.eventBus.emit('template-system:usage-updated', { templateId, stats });
+        }
+    }
+
+    /**
+     * EVENT HANDLERS
+     */
+
+    _setupEventHandlers() {
+        // Phase creation events
+        this.eventBus.on('phase:created', (data) => {
+            if (data.templateId) {
+                this.updateTemplateUsage(data.templateId);
+            }
+        });
+        
+        // Template feedback events
+        this.eventBus.on('template:rated', (data) => {
+            this.updateTemplateRating(data.templateId, data.rating);
+        });
+    }
+
+    /**
+     * CLEANUP
+     */
+
+    dispose() {
+        this.templateLibrary.clear();
+        this.templateCategories.clear();
+        this.templateCollections.clear();
+        this.userTemplates.clear();
+        this.templateUsageStats.clear();
+        this.templateRatings.clear();
+        this.templateTags.clear();
+        
+        this.eventBus.emit('template-system:disposed');
+    }
+}
+```

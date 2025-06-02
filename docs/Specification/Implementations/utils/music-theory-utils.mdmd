@@ -1,0 +1,229 @@
+::: {unit}
+id: "music-theory-utils"
+title: "Music Theory Utilities"
+unit-type: "javascript-module-definition"
+language: "javascript"
+status: "draft"
+version: "0.1"
+brief: "Utilities for music theory calculations, scales, and key highlighting support."
+source-ref: "../../src/utils/MusicTheoryUtils.js"
+see-also:
+  - "[[../music/piano-roll-class]]" # Implementation dependency (piano roll uses this for key highlighting)
+  - "[[../music/music-data-schema]]" # Architectural association (works with music note data)
+
+Provides music theory utilities including scale definitions, note relationships, and key-based highlighting logic for the piano roll interface.
+
+```javascript
+// Music theory utilities for scale-aware piano roll highlighting
+
+export class MusicTheoryUtils {
+    static CHROMATIC_NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    
+    // Scale patterns (semitone intervals from root)
+    static SCALE_PATTERNS = {
+        'major': [0, 2, 4, 5, 7, 9, 11],
+        'minor': [0, 2, 3, 5, 7, 8, 10],
+        'dorian': [0, 2, 3, 5, 7, 9, 10],
+        'phrygian': [0, 1, 3, 5, 7, 8, 10],
+        'lydian': [0, 2, 4, 6, 7, 9, 11],
+        'mixolydian': [0, 2, 4, 5, 7, 9, 10],
+        'locrian': [0, 1, 3, 5, 6, 8, 10],
+        'blues': [0, 3, 5, 6, 7, 10],
+        'pentatonic_major': [0, 2, 4, 7, 9],
+        'pentatonic_minor': [0, 3, 5, 7, 10],
+        'chromatic': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    };
+    
+    // Common chord patterns for highlighting chord tones
+    static CHORD_PATTERNS = {
+        'triad_major': [0, 4, 7],
+        'triad_minor': [0, 3, 7],
+        'seventh_major': [0, 4, 7, 11],
+        'seventh_minor': [0, 3, 7, 10],
+        'seventh_dominant': [0, 4, 7, 10]
+    };
+
+    /**
+     * Convert note name to MIDI number
+     * @param {string} noteName - Note name (e.g., 'C4', 'A#3')
+     * @returns {number} MIDI note number
+     */
+    static noteNameToMidi(noteName) {
+        const match = noteName.match(/^([A-G]#?)(-?\d+)$/);
+        if (!match) throw new Error(`Invalid note name: ${noteName}`);
+        
+        const [, note, octave] = match;
+        const noteIndex = this.CHROMATIC_NOTES.indexOf(note);
+        if (noteIndex === -1) throw new Error(`Invalid note: ${note}`);
+        
+        return (parseInt(octave) + 1) * 12 + noteIndex;
+    }
+
+    /**
+     * Convert MIDI number to note name
+     * @param {number} midiNumber - MIDI note number
+     * @returns {string} Note name (e.g., 'C4')
+     */
+    static midiToNoteName(midiNumber) {
+        const octave = Math.floor(midiNumber / 12) - 1;
+        const noteIndex = midiNumber % 12;
+        return this.CHROMATIC_NOTES[noteIndex] + octave;
+    }
+
+    /**
+     * Get the chromatic distance between two notes
+     * @param {number} note1 - First MIDI note
+     * @param {number} note2 - Second MIDI note
+     * @returns {number} Semitone distance (0-11)
+     */
+    static getChromaticDistance(note1, note2) {
+        return ((note2 - note1) % 12 + 12) % 12;
+    }
+
+    /**
+     * Check if a note is in a given scale/key
+     * @param {number} midiNote - MIDI note number to check
+     * @param {string} rootNote - Root note name (e.g., 'C', 'F#')
+     * @param {string} scaleType - Scale type from SCALE_PATTERNS
+     * @returns {boolean} True if note is in scale
+     */
+    static isNoteInScale(midiNote, rootNote, scaleType = 'major') {
+        const rootMidi = this.noteNameToMidi(rootNote + '0'); // Use octave 0 for calculation
+        const pattern = this.SCALE_PATTERNS[scaleType];
+        if (!pattern) throw new Error(`Unknown scale type: ${scaleType}`);
+        
+        const chromaticDistance = this.getChromaticDistance(rootMidi, midiNote);
+        return pattern.includes(chromaticDistance);
+    }
+
+    /**
+     * Get the scale degree of a note in a given key
+     * @param {number} midiNote - MIDI note number
+     * @param {string} rootNote - Root note name
+     * @param {string} scaleType - Scale type
+     * @returns {number|null} Scale degree (1-based) or null if not in scale
+     */
+    static getScaleDegree(midiNote, rootNote, scaleType = 'major') {
+        const rootMidi = this.noteNameToMidi(rootNote + '0');
+        const pattern = this.SCALE_PATTERNS[scaleType];
+        if (!pattern) return null;
+        
+        const chromaticDistance = this.getChromaticDistance(rootMidi, midiNote);
+        const degreeIndex = pattern.indexOf(chromaticDistance);
+        return degreeIndex === -1 ? null : degreeIndex + 1;
+    }
+
+    /**
+     * Check if a note is a chord tone in the given key
+     * @param {number} midiNote - MIDI note number
+     * @param {string} rootNote - Root note name
+     * @param {string} chordType - Chord type from CHORD_PATTERNS
+     * @returns {boolean} True if note is a chord tone
+     */
+    static isChordTone(midiNote, rootNote, chordType = 'triad_major') {
+        const rootMidi = this.noteNameToMidi(rootNote + '0');
+        const pattern = this.CHORD_PATTERNS[chordType];
+        if (!pattern) throw new Error(`Unknown chord type: ${chordType}`);
+        
+        const chromaticDistance = this.getChromaticDistance(rootMidi, midiNote);
+        return pattern.includes(chromaticDistance);
+    }
+
+    /**
+     * Get highlighting information for a note in a musical context
+     * @param {number} midiNote - MIDI note number
+     * @param {Object} musicalContext - Context with root, scale, and chord info
+     * @returns {Object} Highlighting info with classes and labels
+     */
+    static getNoteHighlighting(midiNote, musicalContext) {
+        const { 
+            rootNote = 'C', 
+            scaleType = 'major', 
+            chordType = 'triad_major',
+            showChordTones = true 
+        } = musicalContext;
+
+        const isInScale = this.isNoteInScale(midiNote, rootNote, scaleType);
+        const scaleDegree = this.getScaleDegree(midiNote, rootNote, scaleType);
+        const isChordToneNote = showChordTones && this.isChordTone(midiNote, rootNote, chordType);
+        
+        const classes = [];
+        let label = '';
+        let priority = 0; // Higher priority for more important highlighting
+
+        if (isInScale) {
+            classes.push('note-in-scale');
+            label = `${scaleDegree}`;
+            priority = 1;
+            
+            if (isChordToneNote) {
+                classes.push('note-chord-tone');
+                priority = 3;
+                
+                // Special highlighting for root note
+                if (scaleDegree === 1) {
+                    classes.push('note-root');
+                    priority = 4;
+                }
+            } else {
+                classes.push('note-passing');
+                priority = 2;
+            }
+        } else {
+            classes.push('note-out-of-scale');
+            priority = 0;
+        }
+
+        return {
+            classes,
+            label,
+            priority,
+            scaleDegree,
+            isInScale,
+            isChordTone: isChordToneNote,
+            noteName: this.midiToNoteName(midiNote)
+        };
+    }
+
+    /**
+     * Get a list of all available scales
+     * @returns {Array<Object>} Array of scale info objects
+     */
+    static getAvailableScales() {
+        return Object.keys(this.SCALE_PATTERNS).map(scaleType => ({
+            id: scaleType,
+            name: this.formatScaleName(scaleType),
+            pattern: this.SCALE_PATTERNS[scaleType]
+        }));
+    }
+
+    /**
+     * Format scale type for display
+     * @param {string} scaleType - Scale type key
+     * @returns {string} Formatted name
+     */
+    static formatScaleName(scaleType) {
+        return scaleType
+            .replace(/_/g, ' ')
+            .replace(/\b\w/g, l => l.toUpperCase());
+    }
+
+    /**
+     * Get scale notes for a given root and scale type
+     * @param {string} rootNote - Root note name
+     * @param {string} scaleType - Scale type
+     * @returns {Array<string>} Array of note names in the scale
+     */
+    static getScaleNotes(rootNote, scaleType = 'major') {
+        const rootMidi = this.noteNameToMidi(rootNote + '0');
+        const pattern = this.SCALE_PATTERNS[scaleType];
+        if (!pattern) throw new Error(`Unknown scale type: ${scaleType}`);
+        
+        return pattern.map(interval => {
+            const noteMidi = rootMidi + interval;
+            return this.midiToNoteName(noteMidi).replace(/\d+$/, ''); // Remove octave
+        });
+    }
+}
+```
+:::

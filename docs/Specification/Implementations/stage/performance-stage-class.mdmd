@@ -1,0 +1,371 @@
+<!-- filepath: docs/Units/stage/performance-stage-class.mdmd -->
+::: {unit}
+id: "performance-stage-class"
+title: "Performance Stage Class"
+unit-type: "javascript-class-definition"
+language: "javascript"
+status: "draft"
+version: "0.3"
+brief: "Renders the final animated performance with unified music-animation synchronization."
+source-ref: "../../src/stage/PerformanceStage.js"
+see-also:
+  - "[[character-renderer-class]]" # Implementation dependency (uses CharacterRenderer for character display)
+  - "[[background-manager-class]]" # Implementation dependency (uses BackgroundManager for backgrounds)
+  - "[[../core/event-bus-class.mdmd]]" # Implementation dependency (uses EventBus for stage events)
+  - "[[../animation/tween-engine-class.mdmd]]" # Implementation dependency (uses TweenEngine for animations)
+  - "[[../animation/timeline-class]]" # Implementation dependency (coordinates with unified timeline)
+  - "[[../music/audio-engine-class.mdmd]]" # Implementation dependency (uses AudioEngine for synchronized audio)
+  - "[[../../Definition/Requirements/unified-timeline-requirement]]" # Traceability (implements synchronized rendering)
+  - "[[../Concepts/stage-module.mdmd]]" # Parent composition
+
+Renders the final animated performance by coordinating characters, backgrounds, animations, and audio in perfect synchronization. Implements the unified playback experience required by `[[../../Definition/Requirements/unified-timeline-requirement]]`.
+
+```javascript
+export class PerformanceStage {
+    constructor(canvas, eventBus, timeline, audioEngine) {
+        this.canvas = canvas;
+        this.ctx = canvas.getContext('2d');
+        this.eventBus = eventBus;
+        this.timeline = timeline;
+        this.audioEngine = audioEngine;
+        
+        // Rendering components
+        this.characterRenderer = null;
+        this.backgroundManager = null;
+        this.tweenEngine = null;
+        
+        // Synchronized state
+        this.isPlaying = false;
+        this.currentTime = 0;
+        this.lastFrameTime = 0;
+        this.syncTolerance = 0.01; // 10ms sync tolerance
+        
+        // Performance tracking
+        this.frameCount = 0;
+        this.fps = 60;
+        this.fpsHistory = [];
+        
+        // Animation frame tracking
+        this.animationFrameId = null;
+        
+        this.setupEventHandlers();
+        this.initialize();
+    }
+
+    async initialize() {
+        // Initialize rendering components
+        this.characterRenderer = new CharacterRenderer(this.eventBus);
+        this.backgroundManager = new BackgroundManager(this.eventBus);
+        this.tweenEngine = new TweenEngine(this.eventBus);
+        
+        // Set up canvas
+        this.resizeCanvas();
+        
+        // Initial render
+        this.render(0);
+        
+        this.eventBus.emit('stage:initialized');
+    }
+
+    /**
+     * UNIFIED PLAYBACK COORDINATION
+     * Implements requirement for synchronized audio-visual playback
+     */
+    
+    async startPlayback() {
+        if (this.isPlaying) return;
+        
+        this.isPlaying = true;
+        this.lastFrameTime = performance.now();
+        
+        // Start unified timeline
+        await this.timeline.play();
+        
+        // Start render loop
+        this.animationFrameId = requestAnimationFrame(() => this.renderLoop());
+        
+        this.eventBus.emit('stage:playback_started', {
+            currentTime: this.currentTime
+        });
+    }
+    
+    pausePlayback() {
+        if (!this.isPlaying) return;
+        
+        this.isPlaying = false;
+        
+        // Pause timeline (which handles audio)
+        this.timeline.pause();
+        
+        // Stop render loop
+        if (this.animationFrameId) {
+            cancelAnimationFrame(this.animationFrameId);
+            this.animationFrameId = null;
+        }
+        
+        this.eventBus.emit('stage:playback_paused', {
+            currentTime: this.currentTime
+        });
+    }
+    
+    stopPlayback() {
+        this.pausePlayback();
+        
+        // Stop timeline
+        this.timeline.stop();
+        
+        // Reset to beginning
+        this.setCurrentTime(0);
+        
+        this.eventBus.emit('stage:playback_stopped');
+    }
+
+    /**
+     * SYNCHRONIZED RENDERING
+     * Implements requirement for synchronized visual and audio rendering
+     */
+    
+    renderLoop() {
+        if (!this.isPlaying) return;
+        
+        const now = performance.now();
+        const deltaTime = (now - this.lastFrameTime) / 1000;
+        this.lastFrameTime = now;
+        
+        // Get current time from timeline (authoritative)
+        this.currentTime = this.timeline.currentTime;
+        
+        // Verify audio sync
+        const audioTime = this.audioEngine.getCurrentTime();
+        const syncDrift = Math.abs(this.currentTime - audioTime);
+        
+        if (syncDrift > this.syncTolerance) {
+            // Emit sync warning but continue (timeline handles correction)
+            this.eventBus.emit('stage:sync_drift', {
+                visualTime: this.currentTime,
+                audioTime: audioTime,
+                drift: syncDrift
+            });
+        }
+        
+        // Render current frame
+        this.render(this.currentTime);
+        
+        // Update performance metrics
+        this.updatePerformanceMetrics(deltaTime);
+        
+        // Schedule next frame
+        this.animationFrameId = requestAnimationFrame(() => this.renderLoop());
+    }
+    
+    render(time) {
+        // Clear canvas
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        // Render background
+        this.backgroundManager.render(this.ctx, time);
+        
+        // Get current animation states from timeline
+        const animationStates = this.getAnimationStates(time);
+        
+        // Apply animations through tween engine
+        const tweenedStates = this.tweenEngine.apply(animationStates, time);
+        
+        // Render characters with current states
+        this.characterRenderer.render(this.ctx, tweenedStates, time);
+        
+        // Render timeline overlay if enabled
+        if (this.showTimelineOverlay) {
+            this.renderTimelineOverlay(time);
+        }
+        
+        this.frameCount++;
+    }
+    
+    getAnimationStates(time) {
+        const states = new Map();
+        
+        // Get states from timeline for each character
+        this.timeline.animationTracks.forEach((track, trackId) => {
+            const activeKeyframes = this.timeline.getActiveKeyframes(track, time);
+            states.set(trackId, activeKeyframes);
+        });
+        
+        return states;
+    }
+
+    /**
+     * TIMELINE SCRUBBING SUPPORT
+     * Implements requirement for scrubbing with visual feedback
+     */
+    
+    setCurrentTime(time) {
+        this.currentTime = time;
+        
+        // Update timeline
+        this.timeline.setCurrentTime(time);
+        
+        // Render current frame (even when not playing)
+        this.render(time);
+        
+        this.eventBus.emit('stage:time_changed', {
+            currentTime: this.currentTime
+        });
+    }
+
+    /**
+     * PERFORMANCE MONITORING
+     * Implements requirement for 60fps animation rendering
+     */
+    
+    updatePerformanceMetrics(deltaTime) {
+        // Calculate FPS
+        this.fps = 1 / deltaTime;
+        this.fpsHistory.push(this.fps);
+        
+        // Keep only recent history
+        if (this.fpsHistory.length > 60) {
+            this.fpsHistory.shift();
+        }
+        
+        // Check for performance issues
+        const avgFps = this.fpsHistory.reduce((a, b) => a + b, 0) / this.fpsHistory.length;
+        
+        if (avgFps < 30) {
+            this.eventBus.emit('stage:performance_warning', {
+                currentFps: this.fps,
+                averageFps: avgFps,
+                frameCount: this.frameCount
+            });
+        }
+        
+        // Emit performance stats periodically
+        if (this.frameCount % 60 === 0) {
+            this.eventBus.emit('stage:performance_stats', {
+                fps: this.fps,
+                averageFps: avgFps,
+                frameCount: this.frameCount,
+                currentTime: this.currentTime
+            });
+        }
+    }
+
+    /**
+     * TIMELINE OVERLAY RENDERING
+     * Optional visual indicators for development and debugging
+     */
+    
+    renderTimelineOverlay(time) {
+        const ctx = this.ctx;
+        
+        // Draw time indicator
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        ctx.font = '14px monospace';
+        ctx.fillText(`Time: ${time.toFixed(3)}s`, 10, 25);
+        
+        // Draw beat indicators if available
+        const currentBeat = this.timeline.secondsToBeats(time);
+        ctx.fillText(`Beat: ${currentBeat.toFixed(2)}`, 10, 45);
+        
+        // Draw sync status
+        const audioTime = this.audioEngine.getCurrentTime();
+        const syncStatus = Math.abs(time - audioTime) < this.syncTolerance ? 'SYNC' : 'DRIFT';
+        ctx.fillStyle = syncStatus === 'SYNC' ? 'green' : 'red';
+        ctx.fillText(`Sync: ${syncStatus}`, 10, 65);
+    }
+
+    /**
+     * CANVAS MANAGEMENT
+     */
+    
+    resizeCanvas() {
+        const rect = this.canvas.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+        
+        this.canvas.width = rect.width * dpr;
+        this.canvas.height = rect.height * dpr;
+        
+        this.ctx.scale(dpr, dpr);
+        
+        this.eventBus.emit('stage:canvas_resized', {
+            width: this.canvas.width,
+            height: this.canvas.height,
+            dpr: dpr
+        });
+    }
+
+    /**
+     * EVENT HANDLERS
+     */
+    
+    setupEventHandlers() {
+        // Timeline events
+        this.eventBus.on('timeline:playback_started', () => {
+            // Timeline started, stage should be in sync
+        });
+        
+        this.eventBus.on('timeline:playback_paused', () => {
+            // Timeline paused, ensure stage is paused
+            if (this.isPlaying) {
+                this.pausePlayback();
+            }
+        });
+        
+        this.eventBus.on('timeline:time_changed', (data) => {
+            // Timeline scrubbed, update stage
+            if (!this.isPlaying) {
+                this.render(data.currentTime);
+            }
+        });
+        
+        // Audio sync events
+        this.eventBus.on('audio:beat', (data) => {
+            // Beat event for visual sync indicators
+            this.eventBus.emit('stage:beat', data);
+        });
+        
+        // Window resize
+        window.addEventListener('resize', () => {
+            this.resizeCanvas();
+        });
+    }
+
+    /**
+     * CONFIGURATION
+     */
+    
+    setShowTimelineOverlay(show) {
+        this.showTimelineOverlay = show;
+    }
+    
+    setSyncTolerance(tolerance) {
+        this.syncTolerance = tolerance;
+    }
+
+    /**
+     * CLEANUP
+     */
+    
+    dispose() {
+        this.stopPlayback();
+        
+        if (this.characterRenderer) {
+            this.characterRenderer.dispose();
+        }
+        
+        if (this.backgroundManager) {
+            this.backgroundManager.dispose();
+        }
+        
+        if (this.tweenEngine) {
+            this.tweenEngine.dispose();
+        }
+        
+        // Remove event listeners
+        window.removeEventListener('resize', this.resizeCanvas);
+        
+        this.eventBus.emit('stage:disposed');
+    }
+}
+```
+:::

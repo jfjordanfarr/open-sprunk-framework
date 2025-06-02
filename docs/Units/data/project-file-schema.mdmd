@@ -1,9 +1,0 @@
-<!-- filepath: docs/Units/data/project-file-schema.mdmd -->
-```{unit} Project File Schema
-id: project-file-schema
-source-ref: ../../src/data/ProjectFileSchema.js
-source-type: javascript-object
-spec-version: 0.1.0
----
-Defines the structure of the project file.
-```

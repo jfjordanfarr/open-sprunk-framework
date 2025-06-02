@@ -1,0 +1,19 @@
+<!-- filepath: docs/Units/utils/vector2d-utils.mdmd -->
+::: {unit}
+id: "vector2d-utils"
+title: "Vector2D Utils"
+unit-type: "javascript-module-definition"
+language: "javascript"
+status: "draft"
+version: "0.2"
+brief: "Provides utility functions for 2D vector operations."
+source-ref: "../../src/utils/Vector2D.js"
+see-also:
+  - "[[../Concepts/vector-graphics-system.mdmd]]" # Parent composition
+
+Provides utility functions for 2D vector operations including addition, subtraction, dot product, and normalization.
+
+```javascript
+// Vector2D Utils implementation placeholder
+```
+:::

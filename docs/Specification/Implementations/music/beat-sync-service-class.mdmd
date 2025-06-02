@@ -1,0 +1,315 @@
+```{unit}
+id: "beat-sync-service-class"
+title: "Beat Synchronization Service Class"
+unit-type: "javascript-class-definition"
+source-ref: "../../src/music/BeatSyncService.js"
+status: "draft"
+see-also:
+  - "[[phase-transition-engine-class]]"
+  - "[[audio-engine-class]]"
+  - "[[phase-system-architecture]]"
+  - "[[multi-modal-audio-input-requirement]]"
+```
+
+## Overview
+
+The **Beat Synchronization Service** provides precise musical timing coordination for phase transitions, ensuring that visual and animation changes occur at musically appropriate moments. This service is essential for creating smooth, beat-aligned phase transitions that feel natural and rhythmically coherent.
+
+## Core Responsibilities
+
+### Beat Detection and Tracking
+- **Real-time BPM Analysis**: Automatically detect tempo from audio content
+- **Beat Prediction**: Predict upcoming beat positions for transition scheduling
+- **Manual BPM Override**: Allow user-specified tempo when auto-detection is insufficient
+- **Time Signature Support**: Handle various time signatures (4/4, 3/4, 6/8, etc.)
+
+### Transition Scheduling
+- **Beat-Aligned Scheduling**: Schedule phase transitions to occur on beat boundaries
+- **Subdivision Support**: Support transitions on beat subdivisions (1/2, 1/4, 1/8 notes)
+- **Look-Ahead Buffering**: Pre-calculate transition timing for smooth execution
+- **Latency Compensation**: Account for audio/visual processing delays
+
+### Synchronization Coordination
+- **Multi-Entity Sync**: Coordinate phase changes across multiple characters
+- **Master Clock**: Provide authoritative timing reference for all phase transitions
+- **Drift Correction**: Automatically correct timing drift during long performances
+- **Pause/Resume Handling**: Maintain sync state during performance interruptions
+
+## Technical Implementation
+
+```javascript
+class BeatSyncService {
+    constructor(audioEngine, eventBus) {
+        this.audioEngine = audioEngine;
+        this.eventBus = eventBus;
+        
+        // Beat detection state
+        this.bpm = 120; // Default BPM
+        this.timeSignature = { numerator: 4, denominator: 4 };
+        this.isPlaying = false;
+        this.startTime = 0;
+        this.lastBeatTime = 0;
+        
+        // Scheduling state
+        this.scheduledTransitions = new Map();
+        this.lookAheadTime = 0.25; // 250ms look-ahead
+        this.scheduleUpdateInterval = 0.050; // 50ms update rate
+        
+        // Beat detection
+        this.beatDetector = null;
+        this.manualBpmOverride = false;
+        
+        this.setupBeatDetection();
+        this.startScheduler();
+    }
+    
+    // Beat Detection Methods
+    setupBeatDetection() {
+        // Initialize real-time beat detection using Web Audio API
+        // Onset detection, tempo estimation, beat tracking
+    }
+    
+    detectBPM(audioBuffer) {
+        // Analyze audio buffer for tempo
+        // Return detected BPM and confidence level
+    }
+    
+    setBPM(bpm, manual = false) {
+        // Set BPM manually or from detection
+        // Update all timing calculations
+    }
+    
+    // Timing Methods
+    getCurrentBeat() {
+        // Calculate current beat position based on elapsed time
+        const elapsedTime = this.audioEngine.getCurrentTime() - this.startTime;
+        const beatsPerSecond = this.bpm / 60;
+        return elapsedTime * beatsPerSecond;
+    }
+    
+    getNextBeatTime(subdivision = 1) {
+        // Calculate time of next beat boundary
+        // subdivision: 1 = beat, 0.5 = half-beat, 0.25 = quarter-beat
+    }
+    
+    getTimeUntilBeat(targetBeat) {
+        // Calculate time remaining until specific beat
+    }
+    
+    // Transition Scheduling Methods
+    schedulePhaseTransition(entityId, phaseId, timing) {
+        // Schedule a phase transition for specific timing
+        // timing: { type: 'beat'|'time'|'immediate', value: number }
+        
+        const transitionTime = this.calculateTransitionTime(timing);
+        const transitionId = `${entityId}-${Date.now()}`;
+        
+        this.scheduledTransitions.set(transitionId, {
+            entityId,
+            phaseId,
+            scheduledTime: transitionTime,
+            status: 'scheduled'
+        });
+        
+        return transitionId;
+    }
+    
+    calculateTransitionTime(timing) {
+        switch (timing.type) {
+            case 'immediate':
+                return this.audioEngine.getCurrentTime();
+            case 'beat':
+                return this.getNextBeatTime(timing.subdivision || 1);
+            case 'time':
+                return this.audioEngine.getCurrentTime() + timing.value;
+            case 'measure':
+                return this.getNextMeasureTime();
+            default:
+                return this.getNextBeatTime();
+        }
+    }
+    
+    cancelScheduledTransition(transitionId) {
+        // Cancel a previously scheduled transition
+        if (this.scheduledTransitions.has(transitionId)) {
+            this.scheduledTransitions.delete(transitionId);
+            return true;
+        }
+        return false;
+    }
+    
+    // Scheduler Loop
+    startScheduler() {
+        // High-precision scheduler loop
+        const scheduleLoop = () => {
+            const currentTime = this.audioEngine.getCurrentTime();
+            
+            // Check for transitions ready to execute
+            for (const [transitionId, transition] of this.scheduledTransitions) {
+                if (currentTime >= transition.scheduledTime - this.lookAheadTime) {
+                    this.executeTransition(transition);
+                    this.scheduledTransitions.delete(transitionId);
+                }
+            }
+            
+            // Emit beat events for UI updates
+            this.checkBeatEvents(currentTime);
+            
+            setTimeout(scheduleLoop, this.scheduleUpdateInterval * 1000);
+        };
+        
+        scheduleLoop();
+    }
+    
+    executeTransition(transition) {
+        // Execute the scheduled phase transition
+        this.eventBus.emit('phase-transition-execute', {
+            entityId: transition.entityId,
+            phaseId: transition.phaseId,
+            timing: 'beat-synchronized'
+        });
+    }
+    
+    // Beat Event Methods
+    checkBeatEvents(currentTime) {
+        const currentBeat = this.getCurrentBeat();
+        
+        // Emit beat events for UI visualization
+        if (Math.floor(currentBeat) > Math.floor(this.lastBeatTime)) {
+            this.eventBus.emit('beat-tick', {
+                beat: Math.floor(currentBeat),
+                measure: Math.floor(currentBeat / this.timeSignature.numerator),
+                bpm: this.bpm,
+                timestamp: currentTime
+            });
+        }
+        
+        this.lastBeatTime = currentBeat;
+    }
+    
+    // Synchronization Methods
+    syncToMasterClock(masterTime, masterBeat) {
+        // Synchronize to external master clock
+        // Used for multi-instance coordination
+    }
+    
+    correctDrift(referenceTime, referenceBeat) {
+        // Correct timing drift during performance
+        // Gradual adjustment to maintain smooth playback
+    }
+    
+    // Control Methods
+    start(startTime = null) {
+        this.startTime = startTime || this.audioEngine.getCurrentTime();
+        this.isPlaying = true;
+        this.lastBeatTime = 0;
+        
+        this.eventBus.emit('beat-sync-started', {
+            bpm: this.bpm,
+            timeSignature: this.timeSignature,
+            startTime: this.startTime
+        });
+    }
+    
+    stop() {
+        this.isPlaying = false;
+        this.scheduledTransitions.clear();
+        
+        this.eventBus.emit('beat-sync-stopped');
+    }
+    
+    pause() {
+        this.isPlaying = false;
+        // Preserve scheduled transitions for resume
+    }
+    
+    resume() {
+        this.isPlaying = true;
+        // Recalculate transition times based on pause duration
+    }
+    
+    // Utility Methods
+    beatsToTime(beats) {
+        return beats * (60 / this.bpm);
+    }
+    
+    timeToBeats(time) {
+        return time * (this.bpm / 60);
+    }
+    
+    getQuantizedTime(time, subdivision = 1) {
+        // Quantize time to nearest beat subdivision
+        const beats = this.timeToBeats(time);
+        const quantizedBeats = Math.round(beats / subdivision) * subdivision;
+        return this.beatsToTime(quantizedBeats);
+    }
+}
+```
+
+## Integration Points
+
+### Phase Transition Engine
+- **Timing Coordination**: Provides precise timing for smooth phase transitions
+- **Beat-Aligned Changes**: Ensures visual changes occur on musical beats
+- **Multi-Entity Sync**: Coordinates phase changes across multiple characters
+
+### Audio Engine Integration
+- **Master Clock Reference**: Uses audio engine's high-precision timing
+- **Audio Analysis**: Analyzes audio content for automatic BPM detection
+- **Latency Compensation**: Accounts for audio processing delays
+
+### Event Bus Communication
+- **Beat Events**: Emits regular beat tick events for UI visualization
+- **Transition Events**: Coordinates with Phase Manager for scheduled transitions
+- **Sync Events**: Communicates synchronization state changes
+
+## Usage Examples
+
+### Basic Beat-Synchronized Transition
+```javascript
+// Schedule a phase transition on the next beat
+const transitionId = beatSyncService.schedulePhaseTransition(
+    'character-1',
+    'dancing-phase',
+    { type: 'beat', subdivision: 1 }
+);
+```
+
+### Multi-Character Synchronized Transition
+```javascript
+// Schedule synchronized transitions for multiple characters
+['char-1', 'char-2', 'char-3'].forEach(charId => {
+    beatSyncService.schedulePhaseTransition(
+        charId,
+        'chorus-phase',
+        { type: 'measure' } // Next measure boundary
+    );
+});
+```
+
+### Manual BPM Control
+```javascript
+// Override auto-detected BPM
+beatSyncService.setBPM(128, true); // 128 BPM, manual override
+
+// Schedule transition in 4 beats
+beatSyncService.schedulePhaseTransition(
+    'character-1',
+    'outro-phase',
+    { type: 'beat', value: beatSyncService.getCurrentBeat() + 4 }
+);
+```
+
+## Performance Considerations
+
+### Precision Requirements
+- **High-Frequency Updates**: 50ms scheduler update rate for responsive timing
+- **Look-Ahead Buffering**: 250ms buffer prevents late transition execution
+- **Drift Correction**: Automatic timing adjustment maintains long-term accuracy
+
+### Resource Management
+- **Efficient Beat Detection**: Optimized onset detection algorithms
+- **Memory Management**: Automatic cleanup of completed transitions
+- **CPU Optimization**: Minimal overhead during playback
+
+This service provides the musical timing foundation essential for creating rhythmically coherent phase transitions throughout the Open Sprunk Framework.
