@@ -37,8 +37,10 @@ export class AppCore {
         console.log('[AppCore] Initializing application core...');
 
         // Initialize core services
-        this.eventBus = new EventBus();
-        this.eventBus.setDebugMode(true); // Enable debug logging for development
+        this.eventBus = new EventBus({
+            debugMode: true, // Enable debug logging for development
+            suppressedDebugEvents: ['stage:mouse_move']
+        });
         
         this.stateManager = new StateManager(this.eventBus);
         await this.stateManager.init();

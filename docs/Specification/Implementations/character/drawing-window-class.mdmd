@@ -11,8 +11,9 @@ see-also:
   - "[[character-authoring-ux-composition]]" # Parent UX design
   - "[[character-data-schema]]" # Data structure
   - "[[character-editor-module]]" # Overall architecture
+  - "[[event-bus-class]]" # For decoupled communication with sub-components
 
-This unit implements the core drawing interface for creating and editing individual Sprunki character parts. The interface follows Scratch editor patterns with a left part library, central drawing canvas, right style palette, and bottom timeline integration.
+This unit implements the core drawing interface for creating and editing individual Sprunki character parts. The interface follows Scratch editor patterns with a left part library, central drawing canvas, right style palette, and bottom timeline integration. It relies on the [[event-bus-class]] for decoupled communication between itself and its managed components like the Part Library and Style Palette, as well as for broader application integration.
 
 ```javascript
 /**

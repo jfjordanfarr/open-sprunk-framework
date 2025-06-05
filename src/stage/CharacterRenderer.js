@@ -62,7 +62,7 @@ export class CharacterRenderer {
         console.log('🎨 CharacterRenderer: Event handlers set up');
     }
 
-    render(ctx, currentTime) {
+    render(ctx, currentTime, stageTransform) {
         // Get current project characters from state
         const projectData = this.stateManager.get('project');
         if (!projectData || !projectData.characters) {
@@ -78,7 +78,7 @@ export class CharacterRenderer {
         for (const placement of stageData.characters) {
             const character = projectData.characters.find(c => c.id === placement.characterId);
             if (character) {
-                this.renderCharacter(ctx, character, placement, currentTime);
+                this.renderCharacter(ctx, character, placement, currentTime, stageTransform);
             }
         }
     }

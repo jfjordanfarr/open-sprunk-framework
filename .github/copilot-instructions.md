@@ -108,20 +108,3 @@ graph TD
 
 By following these guidelines, you will help create a well-structured, traceable, and maintainable set of specifications for the Open Sprunk Framework.
 ```
-
-I have updated the instructions to reflect the `docs/Definition/[Vision|Requirements]/` and `docs/Specification/[Concepts|Implementations]/` directory structure as the standard for this project. The "MDMD Flow" and "File Naming and Location" sections, along with examples, now adhere to this "Strata Organization."
-
-The next step, as outlined in `AgentOps/AI_SESSION_STATE.md`, is to analyze the workspace for MDMD files in non-standard locations. Shall I proceed with that?path/to/file.mdmd```` to assemble the full specification. When you create new MDMD files in the strata directories, remind the user that they might need to add an `include` directive to `SpunkiGameSpec.mdmd.md` or another relevant aggregate file.
-
-## Tool Usage:
-*   When editing or creating files, use the `insert_edit_into_file` tool.
-*   Always update `AgentOps/AI_SESSION_STATE.md` as the first step of your response.
-*   Refer to `AgentOps/Reference/MDMD_Specification_Standard/` and `AgentOps/MDMD_Specification-Dump.md` for the base MDMD syntax and strata model if needed, but prioritize project-specific conventions observed in existing `open-sprunk-framework` documents.
-
-## Current Task Focus:
-*   Refer to `AgentOps/AI_SESSION_STATE.md` for the immediate task.
-*   Focus on creating and refining MDMD documents according to the **Strata Organization**.
-*   Pay close attention to creating correct `[[id]]` links and `source-ref` paths.
-
-By following these guidelines, you will help create a well-structured, traceable, and maintainable set of specifications for the Open Sprunk Framework.
-```

@@ -85,19 +85,21 @@
                 <div id="stage-canvas-container" class="stage-container">
                     <!-- Stage content will be rendered here -->
                 </div>
-                <div id="stage-controls" class="stage-controls">
-                    <button class="stage-btn" id="play-pause" aria-label="Play/Pause">
-                        <span class="icon">▶️</span>
-                    </button>
-                    <button class="stage-btn" id="stop" aria-label="Stop">
-                        <span class="icon">⏹️</span>
-                    </button>
-                    <div class="stage-timeline">
-                        <input type="range" id="timeline-scrubber" min="0" max="100" value="0" aria-label="Timeline">
-                    </div>
-                </div>
             </div>
         </main>
+        
+        <!-- Move stage-controls outside of app-main for global fixed positioning -->
+        <div id="stage-controls" class="stage-controls">
+            <button class="stage-btn" id="play-pause" aria-label="Play/Pause">
+                <span class="icon">▶️</span>
+            </button>
+            <button class="stage-btn" id="stop" aria-label="Stop">
+                <span class="icon">⏹️</span>
+            </button>
+            <div class="stage-timeline">
+                <input type="range" id="timeline-scrubber" min="0" max="100" value="0" aria-label="Timeline">
+            </div>
+        </div>
     </div>
     
     <script src="console-logger.js"></script>

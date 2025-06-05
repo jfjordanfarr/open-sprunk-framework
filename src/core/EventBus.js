@@ -12,10 +12,18 @@ export class EventBus {
     /**
      * Create an EventBus instance
      */
-    constructor() {
+    constructor(options = {}) {
         this.events = new Map();
         this.wildcardListeners = new Map();
-        this.debugMode = false;
+        this.debugMode = options.debugMode || false;
+        this.suppressedDebugEvents = Array.isArray(options.suppressedDebugEvents) ? options.suppressedDebugEvents : [];
+
+        if (this.debugMode) {
+            console.log('[EventBus] Initialized. Debug mode ON.');
+            if (this.suppressedDebugEvents.length > 0) {
+                console.log(`[EventBus] Suppressing debug logs for: ${this.suppressedDebugEvents.join(', ')}`);
+            }
+        }
     }
 
     /**
@@ -78,7 +86,7 @@ export class EventBus {
      * @param {...any} args - Arguments to pass to listeners
      */
     emit(eventName, ...args) {
-        if (this.debugMode) {
+        if (this.debugMode && !this.suppressedDebugEvents.includes(eventName)) {
             console.log(`[EventBus] Emitting: ${eventName}`, args);
         }
 

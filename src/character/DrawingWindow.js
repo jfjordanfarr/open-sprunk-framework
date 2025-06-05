@@ -8,9 +8,10 @@ import { StylePaletteManager } from './StylePaletteManager.js';
  * Features: Visual part library, checkered canvas, real-time preview
  * Optimized with extracted component architecture
  */
-class DrawingWindow {
-  constructor(containerId, options = {}) {
-    this.container = document.getElementById(containerId);
+export class DrawingWindow {
+  constructor(containerElement, eventBus, options = {}) {
+    this.container = containerElement;
+    this.eventBus = eventBus;
     this.options = {
       canvasWidth: 800,
       canvasHeight: 600,
@@ -31,17 +32,25 @@ class DrawingWindow {
     this.drawingMode = false;
     
     // Event system for cross-window coordination
-    this.eventBus = null;
     
     // Drawing state
     this.fabricCanvas = null;
     this.partGeometry = new Map(); // Part ID -> Fabric objects
     this.undoStack = [];
     this.redoStack = [];
+    this.currentDrawingColor = '#000000'; // Default drawing color
+    this.currentBrushWidth = 5; // Default brush width
+    this.currentBrushOpacity = 1; // Default brush opacity
+    this.currentBrushOpacity = 1; // Default brush opacity
     
     // Component managers
     this.partLibraryManager = null;
     this.stylePaletteManager = null;
+
+    // Pre-bind event handlers for shape drawing to ensure they can be removed
+    this.boundOnShapeMouseDown = this.onShapeMouseDown.bind(this);
+    this.boundOnShapeMouseMove = this.onShapeMouseMove.bind(this);
+    this.boundOnShapeMouseUp = this.onShapeMouseUp.bind(this);
     
     this.init();
   }
@@ -66,7 +75,14 @@ class DrawingWindow {
     const stylePaletteContainer = this.container.querySelector('.style-palette-content');
     
     this.partLibraryManager = new PartLibraryManager(partLibraryContainer, this.eventBus);
+    if (this.partLibraryManager.init) {
+      this.partLibraryManager.init();
+    }
+
     this.stylePaletteManager = new StylePaletteManager(stylePaletteContainer, this.eventBus);
+    if (this.stylePaletteManager.init) {
+      this.stylePaletteManager.init();
+    }
     
     // Set up component event listeners
     this.setupComponentEventListeners();
@@ -76,20 +92,99 @@ class DrawingWindow {
    * Set up event listeners for extracted components
    */
   setupComponentEventListeners() {
+    console.log('[DrawingWindow] Entering setupComponentEventListeners. Attaching EventBus listeners.'); // Debug log added
+    console.log('[DrawingWindow] Entering setupComponentEventListeners'); // Debug log added
     // Listen for part selection events from PartLibraryManager
-    document.addEventListener('part-selected', (event) => {
-      this.handlePartSelection(event.detail);
+    this.eventBus.on('partLibrary:partSelected', (partData) => {
+      this.handlePartSelection(partData);
     });
     
     // Listen for style changes from StylePaletteManager
-    document.addEventListener('style-applied', (event) => {
-      this.handleStyleApplication(event.detail);
+    // This now listens to property changes (e.g., fill, stroke) for a selected object
+    this.eventBus.on('stylePalette:propertyChanged', (eventPayload) => {
+      this.handleStyleApplication(eventPayload);
     });
     
     // Listen for tool changes from StylePaletteManager
-    document.addEventListener('tool-changed', (event) => {
-      this.handleToolChange(event.detail);
+    this.eventBus.on('stylePalette:toolSelected', (toolData) => {
+      this.handleToolChange(toolData);
     });
+
+    // Listen for color changes from StylePaletteManager
+    this.eventBus.on('stylePalette:colorSelected', (colorData) => {
+    console.log('[DrawingWindow] DEBUG: stylePalette:colorSelected event received. Current handleStyleApplication might make this redundant for property panel changes.', colorData);
+      this.handleColorSelection(colorData);
+    });
+
+    // Initialize Fabric.js event listeners
+    if (this.fabricCanvas) {
+      console.log('[DrawingWindow] Setting up Fabric.js canvas event listeners.');
+
+      this.fabricCanvas.on('object:selected', (e) => {
+        if (e.target) {
+          if (e.target.sprunkiPartId) {
+            this.selectedPart = e.target.sprunkiPartId;
+            console.log(`[DrawingWindow] Fabric object selected (via object:selected): ${this.selectedPart}`, e.target);
+            this.eventBus.emit('drawingWindow:partSelectedOnCanvas', { partId: this.selectedPart, fabricObject: e.target });
+          } else {
+            const tempId = e.target.id || `fabric-object-${Date.now()}`;
+            e.target.id = tempId;
+            this.selectedPart = tempId;
+            console.log(`[DrawingWindow] Generic Fabric object selected (via object:selected): ${this.selectedPart}`, e.target);
+            this.eventBus.emit('drawingWindow:genericObjectSelectedOnCanvas', { objectId: this.selectedPart, fabricObject: e.target });
+          }
+        } else {
+          console.warn('[DrawingWindow] object:selected event fired with no target.');
+        }
+      });
+
+      this.fabricCanvas.on('selection:cleared', (e) => {
+        console.log('[DrawingWindow] Fabric selection:cleared event. Current selectedPart before clearing:', this.selectedPart, 'Event details:', e);
+        this.selectedPart = null;
+        console.log('[DrawingWindow] Fabric selection cleared. this.selectedPart is now null.');
+        this.eventBus.emit('drawingWindow:selectionClearedOnCanvas');
+      });
+
+      this.fabricCanvas.on('path:created', (e) => { // Anonymous listener in setupComponentEventListeners
+        console.log('[DrawingWindow AnnListener] Fabric path:created event:', e);
+        if (e.path) {
+          const pathId = `path-${Date.now()}`;
+          e.path.sprunkiPartId = pathId; // Assign a unique ID
+
+          // Ensure this.currentBrushOpacity has a default if undefined or null
+          const brushOpacity = (this.currentBrushOpacity !== undefined && this.currentBrushOpacity !== null) 
+                               ? parseFloat(this.currentBrushOpacity) 
+                               : 1;
+          // Ensure brushWidth has a default if undefined or null from the Fabric brush
+          const brushWidth = (this.fabricCanvas.freeDrawingBrush.width !== undefined && this.fabricCanvas.freeDrawingBrush.width !== null)
+                               ? parseFloat(this.fabricCanvas.freeDrawingBrush.width)
+                               : (this.currentBrushWidth !== undefined && this.currentBrushWidth !== null ? parseFloat(this.currentBrushWidth) : 1); // Fallback to this.currentBrushWidth if brush itself is not set
+          const brushColor = this.fabricCanvas.freeDrawingBrush.color || this.currentDrawingColor || '#000000';
+
+          e.path.set({
+            fill: 'lime', // Debug fill
+            stroke: brushColor,
+            strokeWidth: brushWidth,
+            opacity: brushOpacity,
+            visible: true,
+            objectCaching: false // Attempt to force style refresh and prevent caching issues
+          });
+
+          console.log(`[DrawingWindow AnnListener] Path properties AFTER SET, BEFORE RENDER. ID: ${pathId}. Opacity: ${e.path.opacity}, Stroke: ${e.path.stroke}, Fill: ${e.path.fill}, StrokeWidth: ${e.path.strokeWidth}, Visible: ${e.path.visible}, ObjectCaching: ${e.path.objectCaching}`);
+          // For more detailed inspection if needed:
+          // console.log('[DrawingWindow AnnListener] Full path object after set:', e.path.toJSON(['sprunkiPartId', 'fill', 'stroke', 'strokeWidth', 'opacity', 'visible', 'objectCaching']));
+
+          this.recordAction('path-created', { partId: pathId, pathData: e.path.toJSON(['sprunkiPartId']) });
+          this.fabricCanvas.requestRenderAll();
+          console.log(`[DrawingWindow AnnListener] requestRenderAll called. Canvas objects: ${this.fabricCanvas.getObjects().length}`);
+        } else {
+          console.error('[DrawingWindow AnnListener] path:created event fired without e.path');
+        }
+      });
+      console.log('[DrawingWindow] Fabric.js canvas event listeners configured.');
+    } else {
+      console.error('[DrawingWindow] setupComponentEventListeners: fabricCanvas is NOT initialized. Fabric event listeners NOT attached. This is a problem!');
+    }
   }
   
   /**
@@ -104,26 +199,100 @@ class DrawingWindow {
     
     // Update style palette for selected part
     if (this.stylePaletteManager) {
-      this.stylePaletteManager.updateForPart(partData);
+      const activeObject = this.fabricCanvas.getActiveObject();
+      this.stylePaletteManager.updatePropertyControls(activeObject);
     }
   }
   
   /**
    * Handle style application from style palette
    */
-  handleStyleApplication(styleData) {
-    if (!this.selectedPart) return;
-    
-    this.applyStyleToPart(this.selectedPart, styleData);
-    this.recordAction('style-change', { part: this.selectedPart, style: styleData });
+  handleStyleApplication(eventPayload) {
+    console.log('[DrawingWindow] handleStyleApplication - Received eventPayload:', JSON.parse(JSON.stringify(eventPayload)));
+    console.log(`[DrawingWindow] handleStyleApplication - Current tool: ${this.currentTool}, Selected part: ${this.selectedPart}, Brush width: ${this.currentBrushWidth}`);
+
+    const { property, value } = eventPayload;
+
+    // 1. Apply styles to the brush if the current tool is 'brush' or 'pen'
+    if (this.currentTool === 'brush' || this.currentTool === 'pen') {
+      if (this.fabricCanvas && this.fabricCanvas.freeDrawingBrush) {
+        if (property === 'strokeWidth') {
+          const newWidth = parseFloat(value);
+          if (!isNaN(newWidth) && newWidth > 0) {
+            this.currentBrushWidth = newWidth;
+            this.fabricCanvas.freeDrawingBrush.width = this.currentBrushWidth;
+            console.log(`[DrawingWindow] Brush strokeWidth set to: ${this.fabricCanvas.freeDrawingBrush.width}`);
+          } else {
+            console.warn(`[DrawingWindow] Invalid strokeWidth value for brush: ${value}`);
+          }
+        } else if (property === 'stroke') { // 'stroke' is used for brush color
+          this.fabricCanvas.freeDrawingBrush.color = value;
+          console.log(`[DrawingWindow] Brush stroke color set to: ${this.fabricCanvas.freeDrawingBrush.color}`);
+        } else if (eventPayload.property === 'opacity') { // Corrected to use eventPayload.property
+          this.currentBrushOpacity = parseFloat(eventPayload.value);
+          // Opacity for freeDrawingBrush itself is not a direct property.
+          // It will be applied to paths upon creation.
+          console.log(`[DrawingWindow] Current brush opacity set to: ${this.currentBrushOpacity}`);
+        }
+      } else {
+        console.warn('[DrawingWindow] Brush tool active, but fabricCanvas or freeDrawingBrush is not available.');
+      }
+    }
+
+    // 2. Apply styles to the selected Fabric object (if one is active)
+    const activeObject = this.fabricCanvas.getActiveObject();
+    if (activeObject) {
+      // If this.selectedPart is set, only style if activeObject matches.
+      // If this.selectedPart is NOT set, style the activeObject directly (e.g. a newly drawn path that became active).
+      if (this.selectedPart && activeObject.sprunkiPartId !== this.selectedPart && activeObject.id !== this.selectedPart) {
+        console.warn(`[DrawingWindow] Active object (${activeObject.sprunkiPartId || activeObject.id}) does not match selectedPart (${this.selectedPart}). Style NOT applied to this active object.`);
+      } else {
+        console.log(`[DrawingWindow] Applying style to active object: ${activeObject.sprunkiPartId || activeObject.id || 'unknown ID'}, Property: ${property}, Value: ${value}`);
+        activeObject.set(property, value);
+        
+        // Special handling for fill/stroke on complex objects like path-groups if needed
+        // Example: if (property === 'fill' && activeObject.type === 'group') { ... }
+
+        this.fabricCanvas.requestRenderAll();
+        const styleUpdate = { [property]: value };
+        this.recordAction('style-change', { part: activeObject.sprunkiPartId || activeObject.id || 'activeObject', style: styleUpdate });
+        console.log(`[DrawingWindow] Style applied to ${activeObject.sprunkiPartId || activeObject.id}. Object after set:`, activeObject.toJSON(['sprunkiPartId', 'id']));
+      }
+    } else if (this.selectedPart) {
+      // this.selectedPart is set, but no Fabric object is active on canvas.
+      // This could happen if selection is managed externally and not reflected on canvas, or if the object was removed.
+      console.warn(`[DrawingWindow] A part (${this.selectedPart}) is selected (this.selectedPart), but no Fabric object is currently active on canvas. Style not applied.`);
+    } else {
+      // No selectedPart and no active object. Nothing to style for objects.
+      // console.log('[DrawingWindow] No selected part and no active object. Style application skipped for objects.');
+    }
   }
   
   /**
    * Handle tool change from style palette
    */
   handleToolChange(toolData) {
+    console.log('[DrawingWindow] handleToolChange received toolData:', toolData);
     this.currentTool = toolData.tool;
+    console.log('[DrawingWindow] this.currentTool set to:', this.currentTool);
     this.updateCanvasMode();
+  }
+
+  /**
+   * Handle color selection from style palette
+   */
+  handleColorSelection(colorData) {
+    console.log('[DrawingWindow] handleColorSelection received colorData:', colorData);
+    if (colorData && colorData.color) {
+      this.currentDrawingColor = colorData.color;
+      console.log('[DrawingWindow] handleColorSelection - currentDrawingColor set to:', this.currentDrawingColor);
+      // If a drawing tool is active, update its brush color immediately
+      if (this.fabricCanvas && this.fabricCanvas.isDrawingMode) {
+        console.log(`[DrawingWindow] handleColorSelection - Attempting to set freeDrawingBrush.color to: ${this.currentDrawingColor}`);
+        this.fabricCanvas.freeDrawingBrush.color = this.currentDrawingColor;
+        console.log(`[DrawingWindow] handleColorSelection - freeDrawingBrush.color is now: ${this.fabricCanvas.freeDrawingBrush.color}`);
+      }
+    }
   }
   
   /**
@@ -156,7 +325,12 @@ class DrawingWindow {
               <h2 class="panel-title">Parts</h2>
             </div>
             <div class="part-library-content">
-              <!-- Content will be populated by PartLibraryManager -->
+              <div class="part-category" data-category="primary">
+                <!-- Primary parts will go here -->
+              </div>
+              <div class="part-category head-subparts" data-category="head-subparts" style="display: none;">
+                <!-- Head sub-parts will go here -->
+              </div>
             </div>
           </aside>
           
@@ -192,7 +366,9 @@ class DrawingWindow {
               <h2 class="panel-title">Style</h2>
             </div>
             <div class="style-palette-content">
-              <!-- Content will be populated by StylePaletteManager -->
+              <div data-category="drawing"></div>
+              <div data-category="colors"></div>
+              <div data-category="properties"></div>
             </div>
           </aside>
         </main>
@@ -366,7 +542,8 @@ class DrawingWindow {
   /**
    * Load character part geometry into canvas
    */
-  loadPartIntoCanvas(partId) {
+  async loadPartIntoCanvas(partId, partDefinition = null) {
+    console.log(`[DrawingWindow LPICT] Before operations for ${partId}. Objects on canvas: ${this.fabricCanvas.getObjects().length}`);
     if (!this.fabricCanvas) {
       console.warn('Cannot load part into canvas - no fabric canvas');
       return;
@@ -374,9 +551,9 @@ class DrawingWindow {
     
     console.log(`Loading part into canvas: ${partId}`);
     
-    // Clear canvas
-    this.fabricCanvas.clear();
-    this.addCheckeredBackground();
+    // Clear canvas (Temporarily disabled for debugging visibility)
+    // this.fabricCanvas.clear();
+    // this.addCheckeredBackground();
     
     // Load existing part geometry if available
     if (this.characterData && this.characterData.parts[partId]) {
@@ -385,15 +562,16 @@ class DrawingWindow {
       // TODO: Convert part data to Fabric objects and add to canvas
     } else {
       console.log(`No existing data for ${partId}, creating default geometry`);
-      // Create default geometry for new parts
-      this.createDefaultPartGeometry(partId);
+      console.log(`[DrawingWindow LPICT] Before createDefaultPartGeometry for ${partId}. Objects on canvas: ${this.fabricCanvas.getObjects().length}`);
+      await this.createDefaultPartGeometry(partId);
+      console.log(`[DrawingWindow LPICT] After createDefaultPartGeometry for ${partId}. Objects on canvas: ${this.fabricCanvas.getObjects().length}`);
     }
   }
   
   /**
    * Create default geometry for a part
    */
-  createDefaultPartGeometry(partId) {
+  async createDefaultPartGeometry(partId) {
     if (!this.fabricCanvas) return;
     
     const centerX = this.fabricCanvas.width / 2;
@@ -405,9 +583,9 @@ class DrawingWindow {
       case 'head':
         shape = new fabric.Circle({
           radius: 60,
-          fill: '#FFE4B5',
-          stroke: '#DDD',
-          strokeWidth: 2,
+          fill: 'rgba(255, 0, 0, 0.7)', // DIAGNOSTIC: Bright Red Fill
+          stroke: '#FFFF00', // DIAGNOSTIC: Bright Yellow Stroke
+          strokeWidth: 5, // DIAGNOSTIC: Thick Stroke
           left: centerX - 60,
           top: centerY - 60
         });
@@ -421,9 +599,9 @@ class DrawingWindow {
           { x: centerX - 50, y: centerY + 40 }
         ];
         shape = new fabric.Polygon(points, {
-          fill: '#87CEEB',
-          stroke: '#DDD',
-          strokeWidth: 2
+          fill: 'rgba(255, 0, 0, 0.7)', // DIAGNOSTIC: Bright Red Fill
+          stroke: '#FFFF00', // DIAGNOSTIC: Bright Yellow Stroke
+          strokeWidth: 5 // DIAGNOSTIC: Thick Stroke
         });
         break;
         
@@ -431,9 +609,9 @@ class DrawingWindow {
         // Create left hand
         const leftHand = new fabric.Circle({
           radius: 25,
-          fill: '#FFB6C1',
-          stroke: '#DDD',
-          strokeWidth: 2,
+          fill: 'rgba(255, 0, 0, 0.7)', // DIAGNOSTIC: Bright Red Fill
+          stroke: '#FFFF00', // DIAGNOSTIC: Bright Yellow Stroke
+          strokeWidth: 5, // DIAGNOSTIC: Thick Stroke
           left: centerX - 100,
           top: centerY - 25
         });
@@ -441,15 +619,39 @@ class DrawingWindow {
         // Create right hand
         const rightHand = new fabric.Circle({
           radius: 25,
-          fill: '#FFB6C1',
-          stroke: '#DDD',
-          strokeWidth: 2,
+          fill: 'rgba(255, 0, 0, 0.7)', // DIAGNOSTIC: Bright Red Fill
+          stroke: '#FFFF00', // DIAGNOSTIC: Bright Yellow Stroke
+          strokeWidth: 5, // DIAGNOSTIC: Thick Stroke
           left: centerX + 75,
           top: centerY - 25
         });
         
         this.fabricCanvas.add(leftHand, rightHand);
-        this.fabricCanvas.renderAll();
+        console.log('[DrawingWindow] Hands added. Objects on canvas:', this.fabricCanvas.getObjects().length);
+        leftHand.visible = true;
+        leftHand.opacity = 1;
+        leftHand.objectCaching = false;
+        this.fabricCanvas.bringToFront(leftHand);
+        console.log(`[DrawingWindow] Left Hand properties AFTER explicit settings & BEFORE render:`, {
+          fill: leftHand.fill, stroke: leftHand.stroke, strokeWidth: leftHand.strokeWidth,
+          width: leftHand.width, height: leftHand.height, left: leftHand.left, top: leftHand.top,
+          visible: leftHand.visible, opacity: leftHand.opacity, dirty: leftHand.dirty
+        });
+        rightHand.visible = true;
+        rightHand.opacity = 1;
+        rightHand.objectCaching = false;
+        this.fabricCanvas.bringToFront(rightHand);
+        console.log(`[DrawingWindow] Right Hand properties AFTER explicit settings & BEFORE render:`, {
+          fill: rightHand.fill, stroke: rightHand.stroke, strokeWidth: rightHand.strokeWidth,
+          width: rightHand.width, height: rightHand.height, left: rightHand.left, top: rightHand.top,
+          visible: rightHand.visible, opacity: rightHand.opacity, dirty: rightHand.dirty
+        });
+        leftHand.dirty = true;
+        rightHand.dirty = true;
+        // For now, set leftHand as active. This might need refinement for multi-part objects.
+        this.fabricCanvas.setActiveObject(leftHand);
+        this.fabricCanvas.requestRenderAll();
+        console.log('[DrawingWindow] Hands - requestRenderAll() called.');
         return; // Early return for hands since we added both shapes
         
       default:
@@ -465,7 +667,20 @@ class DrawingWindow {
     
     if (shape) {
       this.fabricCanvas.add(shape);
-      this.fabricCanvas.renderAll();
+      console.log('[DrawingWindow] Shape added to canvas. Objects on canvas:', this.fabricCanvas.getObjects().length);
+      shape.visible = true;
+      shape.opacity = 1;
+      shape.objectCaching = false;
+      this.fabricCanvas.bringToFront(shape);
+      console.log(`[DrawingWindow] Shape properties AFTER explicit settings & BEFORE render:`, {
+        fill: shape.fill, stroke: shape.stroke, strokeWidth: shape.strokeWidth,
+        width: shape.width, height: shape.height, left: shape.left, top: shape.top,
+        visible: shape.visible, opacity: shape.opacity, dirty: shape.dirty
+      });
+      shape.dirty = true;
+      this.fabricCanvas.setActiveObject(shape);
+      this.fabricCanvas.requestRenderAll();
+      console.log('[DrawingWindow] Shape - requestRenderAll() called.');
     }
   }
   
@@ -473,31 +688,64 @@ class DrawingWindow {
    * Update canvas mode based on current tool
    */
   updateCanvasMode() {
-    if (!this.fabricCanvas) return;
-    
-    // Reset canvas modes
+    console.log('[DrawingWindow] updateCanvasMode called. Current tool:', this.currentTool);
+    if (!this.fabricCanvas) {
+      console.warn('[DrawingWindow] updateCanvasMode: fabricCanvas is not available!');
+      return;
+    }
+
+    // Reset canvas modes before applying tool-specific settings
     this.fabricCanvas.isDrawingMode = false;
-    this.fabricCanvas.selection = true;
-    
+    this.fabricCanvas.selection = true; // Default to selection enabled
+    // Make sure to turn off shape drawing listeners if they were on
+    this.disableShapeDrawingListeners(); 
+
     switch (this.currentTool) {
       case 'select':
         this.fabricCanvas.selection = true;
+        this.fabricCanvas.isDrawingMode = false;
         break;
-        
       case 'pen':
       case 'brush':
         this.fabricCanvas.isDrawingMode = true;
-        this.fabricCanvas.freeDrawingBrush.width = 5;
-        this.fabricCanvas.freeDrawingBrush.color = '#000000';
+        this.fabricCanvas.selection = false; // Disable object selection when drawing
+        if (this.fabricCanvas.freeDrawingBrush) {
+          this.fabricCanvas.freeDrawingBrush.width = this.currentBrushWidth || 5; // Use stored or default width
+          this.fabricCanvas.freeDrawingBrush.color = this.currentDrawingColor || '#000000'; // Use stored or default color
+          console.log(`[DrawingWindow] updateCanvasMode (pen/brush) - Brush width: ${this.fabricCanvas.freeDrawingBrush.width}, color: ${this.fabricCanvas.freeDrawingBrush.color}`);
+        } else {
+          console.warn('[DrawingWindow] updateCanvasMode: freeDrawingBrush not available to set properties.');
+        }
         break;
-        
       case 'circle':
       case 'rectangle':
-        this.enableShapeDrawing(this.currentTool);
+        this.fabricCanvas.isDrawingMode = false; // Ensure free drawing mode is off for shapes
+        this.fabricCanvas.selection = false; // Shape drawing tools typically don't allow simultaneous selection
+        this.enableShapeDrawing(this.currentTool); // This will set up specific listeners for shape drawing
+        break;
+      default:
+        console.log(`[DrawingWindow] updateCanvasMode: Tool '${this.currentTool}' not explicitly handled, defaulting to selection mode.`);
+        this.fabricCanvas.selection = true;
+        this.fabricCanvas.isDrawingMode = false;
         break;
     }
+    console.log('[DrawingWindow] updateCanvasMode finished. isDrawingMode:', this.fabricCanvas.isDrawingMode, 'selection:', this.fabricCanvas.selection);
   }
-  
+
+  /**
+   * Enable shape drawing mode
+   */
+  disableShapeDrawingListeners() {
+    if (this.fabricCanvas) {
+      console.log('[DrawingWindow] Disabling shape drawing listeners.');
+      this.fabricCanvas.off('mouse:down', this.boundOnShapeMouseDown);
+      this.fabricCanvas.off('mouse:move', this.boundOnShapeMouseMove);
+      this.fabricCanvas.off('mouse:up', this.boundOnShapeMouseUp);
+    } else {
+      console.warn('[DrawingWindow] disableShapeDrawingListeners: fabricCanvas not available.');
+    }
+  }
+
   /**
    * Enable shape drawing mode
    */
@@ -506,10 +754,10 @@ class DrawingWindow {
     this.fabricCanvas.selection = false;
     this.currentShapeType = shapeType;
     
-    // Add shape drawing listeners
-    this.fabricCanvas.on('mouse:down', this.onShapeMouseDown.bind(this));
-    this.fabricCanvas.on('mouse:move', this.onShapeMouseMove.bind(this));
-    this.fabricCanvas.on('mouse:up', this.onShapeMouseUp.bind(this));
+    // Add shape drawing listeners using pre-bound handlers
+    this.fabricCanvas.on('mouse:down', this.boundOnShapeMouseDown);
+    this.fabricCanvas.on('mouse:move', this.boundOnShapeMouseMove);
+    this.fabricCanvas.on('mouse:up', this.boundOnShapeMouseUp);
   }
   
   /**
@@ -559,7 +807,19 @@ class DrawingWindow {
   }
   
   onPathCreated(e) {
-    this.recordAction('path-created', { path: e.path });
+    if (!e || !e.path) {
+      console.error('[DrawingWindow] onPathCreated called without a path.', e);
+      return;
+    }
+    // Ensure the path is visible
+    e.path.visible = true;
+    this.recordAction('path-created', { path: e.path.toObject() });
+    
+    if (this.fabricCanvas) {
+      e.path.dirty = true;
+      this.fabricCanvas.requestRenderAll();
+      console.log('[DrawingWindow] Path created, requestRenderAll() called. Objects on canvas:', this.fabricCanvas.getObjects().length);
+    }
   }
   
   onSelectionCreated(e) {
@@ -623,7 +883,12 @@ class DrawingWindow {
         this.fabricCanvas.setZoom(this.fabricCanvas.getZoom() * 0.9);
         break;
       case 'center':
-        this.fabricCanvas.viewportCenterObject();
+        if (this.fabricCanvas.getActiveObject()) {
+          this.fabricCanvas.viewportCenterObject();
+        } else {
+          console.warn('[DrawingWindow] Center action: No object selected to center.');
+          // Optionally, notify the user: this.eventBus.emit('notification', { message: 'Please select an object to center.', type: 'info' });
+        }
         break;
     }
   }
@@ -696,9 +961,4 @@ class DrawingWindow {
       this.announceToScreenReader('Character saved successfully');
     }
   }
-}
-
-// Export for module usage
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = DrawingWindow;
 }

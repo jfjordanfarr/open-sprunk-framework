@@ -133,6 +133,7 @@ body {
     position: relative; /* For absolute positioning of editor-panels */
     overflow: hidden; /* Prevent scrollbars if panels overflow */
     background: #e9ecef; /* A slightly different background for the main work area */
+    height: calc(100vh - 70px); /* Prevents overflow behind fixed controls */
 }
 
 .editor-panel {
@@ -147,6 +148,7 @@ body {
 
 .editor-panel.active {
     display: block; /* Show active panel */
+    height: 100%; /* Fill .app-main, which is now calc(100vh - 70px) */
 }
 
 @keyframes fadeIn {
@@ -238,22 +240,27 @@ body {
 }
 
 /* Performance Stage (id="performance-stage" in index.html) */
-#performance-stage .stage-container { /* Targeting child of #performance-stage */
-    width: 100%;
-    height: calc(100% - 70px); /* Adjusted height for controls */
-    background: #2c3e50; /* Dark stage background */
-    position: relative;
-    overflow: hidden;
-}
-
-#performance-stage .stage-controls { /* Targeting child of #performance-stage */
-    height: 70px; /* Adjusted height */
+#performance-stage .stage-controls {
+    position: fixed;
+    left: 0;
+    bottom: 0;
+    width: 100vw;
+    height: 70px;
     background: #34495e; /* Controls background */
     padding: 15px 20px; /* Adjusted padding */
     display: flex;
     align-items: center;
     gap: 12px; /* Adjusted gap */
     box-shadow: 0 -2px 8px rgba(0,0,0,0.1);
+    z-index: 200;
+}
+
+.stage-container {
+    width: 100%;
+    height: calc(100vh - 70px); /* Use viewport height minus controls */
+    background: #2c3e50; /* Dark stage background */
+    position: relative;
+    overflow: hidden;
 }
 
 .stage-btn {

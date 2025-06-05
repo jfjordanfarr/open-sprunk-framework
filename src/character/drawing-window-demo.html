@@ -77,6 +77,8 @@
 
     <!-- Load the EventBus and DrawingWindow classes -->
     <script type="module">
+        import { DrawingWindow } from './DrawingWindow.js';
+
         // Simple EventBus implementation for demo
         class EventBus {
             constructor() {
@@ -122,15 +124,6 @@
                 }
             }
         }
-        
-        // Load DrawingWindow class
-        const response = await fetch('DrawingWindow.js');
-        const drawingWindowCode = await response.text();
-        
-        // Create a script element to load the DrawingWindow class
-        const script = document.createElement('script');
-        script.textContent = drawingWindowCode;
-        document.head.appendChild(script);
         
         // Initialize the demo
         let drawingWindow;

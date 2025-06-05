@@ -258,9 +258,11 @@ class CharacterAuthoringIntegration {
   }
   
   setupEventBus() {
-    // Import and create EventBus (simplified for demo)
-    this.eventBus = new EventBus();
-    this.eventBus.setDebugMode(true);
+    // Import and create EventBus
+    this.eventBus = new EventBus({
+      debugMode: true, // Set desired debug mode for this integration
+      suppressedDebugEvents: ['stage:mouse_move']
+    });
   }
   
   setupDrawingWindow() {

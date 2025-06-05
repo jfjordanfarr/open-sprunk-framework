@@ -41,15 +41,31 @@ export class AudioEngine {
             // Create audio context
             this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
             
-            // Resume context if suspended (browser autoplay policy)
+            // If context is suspended, attempt to resume it on first user gesture
             if (this.audioContext.state === 'suspended') {
-                await this.audioContext.resume();
+                console.log('🎵 AudioEngine: AudioContext is suspended. Waiting for user gesture to resume.');
+                const resumeAudio = async () => {
+                    try {
+                        await this.audioContext.resume();
+                        console.log('🎵 AudioEngine: AudioContext resumed successfully after user gesture.');
+                        this.eventBus.emit('audio_engine:resumed_by_user_gesture');
+                    } catch (e) {
+                        console.error('🎵 AudioEngine: Error resuming AudioContext after user gesture:', e);
+                    }
+                    // Remove event listeners once resumed or failed
+                    document.removeEventListener('click', resumeAudio);
+                    document.removeEventListener('mousedown', resumeAudio);
+                    document.removeEventListener('touchstart', resumeAudio);
+                };
+                document.addEventListener('click', resumeAudio, { once: true });
+                document.addEventListener('mousedown', resumeAudio, { once: true });
+                document.addEventListener('touchstart', resumeAudio, { once: true });
             }
             
             this.isInitialized = true;
-            console.log('🎵 AudioEngine: Web Audio API initialized');
+            console.log('🎵 AudioEngine: Web Audio API initialized (context state: ' + this.audioContext.state + ')');
             
-            this.eventBus.emit('audio_engine:initialized');
+            this.eventBus.emit('audio_engine:initialized', { initialState: this.audioContext.state });
         } catch (error) {
             console.error('🎵 AudioEngine: Failed to initialize Web Audio API:', error);
             throw error;

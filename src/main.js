@@ -10,7 +10,7 @@
  */
 import { AppCore } from './core/AppCore.js';
 import { PerformanceStage } from './stage/PerformanceStage.js';
-import { CharacterEditor } from './character/CharacterEditor.js';
+import { DrawingWindow } from './character/DrawingWindow.js';
 import { AnimationTimelineEditor } from './animation/AnimationTimelineEditor.js';
 
 class SpunkiApp {
@@ -112,19 +112,27 @@ class SpunkiApp {
     }
 
     async createCharacterEditor() {
-        console.log('🎨 Creating Character Editor with stage integration...');
-        
-        // Create Character Editor instance with Performance Stage integration
-        const characterEditor = new CharacterEditor(
-            this.editors.stage,
-            this.appCore.getEventBus(),
-            this.appCore.getStateManager()
+        console.log('🎨 Creating Drawing Window...'); // Updated log
+        const editorContainer = document.getElementById('character-editor');
+        if (!editorContainer) {
+            console.warn('Character editor container (#character-editor) not found. Drawing Window will not be initialized.'); // Updated log
+            // Return a placeholder or handle error appropriately if DrawingWindow cannot be created
+            // For now, let's assume we might want a specific placeholder for this.
+            // Or, if DrawingWindow is critical, we might throw an error or return a more specific null/error object.
+            // For consistency with existing pattern:
+            return new PlaceholderEditor('drawing-window-placeholder', this.appCore.getEventBus()); 
+        }
+
+        const characterEditor = new DrawingWindow( // Instantiating DrawingWindow
+            editorContainer,                     // Correct container
+            this.appCore.getEventBus()           // Correct eventBus
+            // No stateManager needed for DrawingWindow's current constructor
         );
         
-        // Initialize Character Editor
-        await characterEditor.initialize();
-        
-        console.log('🎨 Character Editor created and initialized with stage integration');
+        // Constructor of DrawingWindow calls init(), so this explicit call is redundant
+        // and was causing duplicate event listener registration.
+        // await characterEditor.init(); 
+        console.log('SpunkiApp: DrawingWindow instance created, constructor handles init.');
         return characterEditor;
     }
 
@@ -150,72 +158,92 @@ class SpunkiApp {
         // Move authoring controls into the stage area
         const stagePanel = document.getElementById('performance-stage');
         if (stagePanel) {
-            const authoringControls = document.createElement('div');
-            authoringControls.id = 'authoring-controls';
-            authoringControls.style.cssText = `
-                padding: 15px;
-                background: rgba(255, 255, 255, 0.95);
-                border-bottom: 1px solid #ddd;
-                display: flex;
-                gap: 10px;
-                align-items: center;
-                justify-content: center;
-            `;
-            authoringControls.innerHTML = `
-                <h4 style="margin: 0; color: #333;">🎨 Unified Stage Authoring</h4>
-                <button id="start-character-drawing" style="padding: 10px 20px; background: #007acc; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">
-                    Start Drawing on Stage
-                </button>
-                <button id="stop-character-drawing" style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 6px; cursor: pointer;" disabled>
-                    Exit Drawing Mode
-                </button>
-                <button id="start-animation-timeline" style="padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">
-                    🎬 Animation Timeline
-                </button>
-                <button id="stop-animation-timeline" style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 6px; cursor: pointer;" disabled>
-                    Exit Timeline
-                </button>
-            `;
-            stagePanel.insertBefore(authoringControls, stagePanel.firstChild);
-            document.getElementById('start-character-drawing').addEventListener('click', () => {
-                this.startCharacterDrawing();
-            });
-            document.getElementById('stop-character-drawing').addEventListener('click', () => {
-                this.stopCharacterDrawing();
-            });
-            document.getElementById('start-animation-timeline').addEventListener('click', () => {
-                this.startAnimationTimeline();
-            });
-            document.getElementById('stop-animation-timeline').addEventListener('click', () => {
-                this.stopAnimationTimeline();
-            });
-        }
+            // const authoringControls = document.createElement('div');
+            // authoringControls.id = 'authoring-controls';
+            // authoringControls.style.cssText = `
+            //     padding: 15px;
+            //     background: rgba(255, 255, 255, 0.95);
+            //     border-bottom: 1px solid #ddd;
+            //     display: flex;
+            //     gap: 10px;
+            //     align-items: center;
+            //     justify-content: center;
+            // `;
+            // authoringControls.innerHTML = `
+            //     <h4 style="margin: 0; color: #333;">🎨 Unified Stage Authoring</h4>
+            //     <button id="start-character-drawing" style="padding: 10px 20px; background: #007acc; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">
+            //         Start Drawing on Stage
+            //     </button>
+            //     <button id="stop-character-drawing" style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 6px; cursor: pointer;" disabled>
+            //         Exit Drawing Mode
+            //     </button>
+            //     <button id="start-animation-timeline" style="padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">
+            //         🎬 Animation Timeline
+            //     </button>
+            //     <button id="stop-animation-timeline" style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 6px; cursor: pointer;" disabled>
+            //         Exit Timeline
+            //     </button>
+            // `;
+            // stagePanel.insertBefore(authoringControls, stagePanel.firstChild);
+            console.log('🎭 [INFO] Unified Stage Authoring controls UI creation has been disabled.');
+            // if (startCharDrawingBtn) {
+            //     startCharDrawingBtn.addEventListener('click', () => {
+            //         this.startCharacterDrawing();
+            //         if(startCharDrawingBtn) startCharDrawingBtn.disabled = true;
+            //         if(stopCharDrawingBtn) stopCharDrawingBtn.disabled = false;
+            //         if(startAnimTimelineBtn) startAnimTimelineBtn.disabled = true;
+            //         if(stopAnimTimelineBtn) stopAnimTimelineBtn.disabled = true;
+            //     });
+            // }
+            // if (stopCharDrawingBtn) {
+            //     stopCharDrawingBtn.addEventListener('click', () => {
+            //         this.stopCharacterDrawing();
+            //         if(startCharDrawingBtn) startCharDrawingBtn.disabled = false;
+            //         if(stopCharDrawingBtn) stopCharDrawingBtn.disabled = true;
+            //         if(startAnimTimelineBtn) startAnimTimelineBtn.disabled = false;
+            //         // stopAnimTimelineBtn state depends on whether animation was running
+            //     });
+            // }
+        } 
         console.log('🎭 Unified authoring controls set up');
     }
 
     startCharacterDrawing() {
-        console.log('🎨 Starting character drawing on stage...');
-        
-        // Switch to stage view if not already there
-        if (this.currentView !== 'stage') {
-            this.switchView('stage');
-        }
-        
-        // Start character editing mode
-        if (this.editors.character && this.editors.character.startCharacterEditing) {
-            this.editors.character.startCharacterEditing();
-        }
-        
-        // Update button states
-        document.getElementById('start-character-drawing').disabled = true;
-        document.getElementById('stop-character-drawing').disabled = false;
-        
-        this.showNotification('🎨 Character drawing mode activated on stage!', 'success');
+        console.log('🎨 Attempted to call startCharacterDrawing() - This functionality is being deprecated.');
+        // console.log('🎨 Starting character drawing on stage...');
+        // if (this.editors.stage && typeof this.editors.stage.setAuthoringMode === 'function') {
+        //     this.editors.stage.setAuthoringMode('character');
+        //     this.showNotification('Character drawing mode activated!', 'info');
+        //     console.log('[SpunkiApp] SUCCESS: 🎨 Character drawing mode activated on stage!');
+            
+        //     // Additional logic for character drawing mode if needed
+        //     // e.g., show specific tools, hide others
+        //     document.body.classList.add('character-drawing-active');
+        //     this.appCore.getEventBus().emit('character_editor:drawing_started');
+
+        // } else {
+        //     console.error('[SpunkiApp] ERROR: PerformanceStage not available or setAuthoringMode is not a function.');
+        //     this.showErrorMessage('Could not activate character drawing mode.');
+        // }
     }
 
     stopCharacterDrawing() {
-        console.log('🎨 Stopping character drawing...');
-        
+        console.log('🎨 Attempted to call stopCharacterDrawing() - This functionality is being deprecated.');
+        // console.log('🎨 Stopping character drawing...');
+        // if (this.editors.stage && typeof this.editors.stage.setAuthoringMode === 'function') {
+        //     this.editors.stage.setAuthoringMode('default');
+        //     this.showNotification('Character drawing mode deactivated', 'info');
+        //     console.log('[SpunkiApp] SUCCESS: 🎨 Character drawing mode deactivated on stage!');
+            
+        //     // Additional logic for character drawing mode if needed
+        //     // e.g., hide specific tools, show others
+        //     document.body.classList.remove('character-drawing-active');
+        //     this.appCore.getEventBus().emit('character_editor:drawing_stopped');
+
+        // } else {
+        //     console.error('[SpunkiApp] ERROR: PerformanceStage not available or setAuthoringMode is not a function.');
+        //     this.showErrorMessage('Could not deactivate character drawing mode.');
+        // }
         // Stop character editing mode
         if (this.editors.character && this.editors.character.stopCharacterEditing) {
             this.editors.character.stopCharacterEditing();
@@ -261,13 +289,13 @@ class SpunkiApp {
         document.getElementById('stop-animation-timeline').disabled = true;
         
         this.showNotification('🎬 Animation timeline deactivated', 'info');
-    }
+    } // End of stopAnimationTimeline
 
     addTestData() {
         console.log('🧪 Adding test data for Performance Stage demonstration...');
         
-        const stateManager = this.appCore.getStateManager();
-        const eventBus = this.appCore.getEventBus();
+        const stateManager = this.appCore.getStateManager(); // Assuming this.appCore is accessible
+        const eventBus = this.appCore.getEventBus(); // Assuming this.appCore is accessible
         
         // Add test characters
         const testCharacters = [
@@ -331,7 +359,7 @@ class SpunkiApp {
         
         console.log('🧪 Test data added - 3 Sprunki characters placed on stage!');
         eventBus.emit('test:data-loaded');
-    }
+    } // End of addTestData
 
     addStageControls() {
         const stageContainer = document.getElementById('stage-controls');

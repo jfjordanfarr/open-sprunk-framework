@@ -1,12 +1,11 @@
-/* Drawing Window Styles - Scratch-inspired Character Creator */
-
 .drawing-window {
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  width: 100vw;
+  height: 100%;
+  width: 100%;
   background: #f8f9fa;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  -webkit-user-select: none; /* Safari */
   user-select: none;
 }
 

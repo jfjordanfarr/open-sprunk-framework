@@ -182,7 +182,7 @@ export class StylePaletteManager {
     
     // Emit tool selection event
     this.eventBus?.emit('stylePalette:toolSelected', {
-      toolId: toolId,
+      tool: toolId,
       timestamp: Date.now()
     });
   }
@@ -218,18 +218,53 @@ export class StylePaletteManager {
    */
   updatePropertyControls(activeObject) {
     this.selectedObject = activeObject;
-    
+
+    const formatHexColor = (colorString) => {
+      let hex = new fabric.Color(colorString).toHex().toUpperCase();
+      if (hex.length === 3) {
+        hex = hex.split('').map(char => char + char).join('');
+      }
+      return '#' + hex;
+    };
+
     if (activeObject) {
       const fillInput = this.container.querySelector('[data-property="fill"]');
       const strokeInput = this.container.querySelector('[data-property="stroke"]');
       const strokeWidthInput = this.container.querySelector('[data-property="strokeWidth"]');
       const opacityInput = this.container.querySelector('[data-property="opacity"]');
-      
-      if (fillInput) fillInput.value = activeObject.fill || '#000000';
-      if (strokeInput) strokeInput.value = activeObject.stroke || '#000000';
-      if (strokeWidthInput) strokeWidthInput.value = activeObject.strokeWidth || 0;
-      if (opacityInput) opacityInput.value = activeObject.opacity || 1;
-      
+
+      let fillColorValue = activeObject.fill;
+      let strokeColorValue = activeObject.stroke;
+
+      if (fillInput) {
+        if (fillColorValue) {
+          try {
+            fillInput.value = formatHexColor(fillColorValue);
+          } catch (e) {
+            console.warn('[StylePaletteManager] Could not convert fill color to hex:', fillColorValue, e);
+            fillInput.value = '#000000'; // Fallback
+          }
+        } else {
+          fillInput.value = '#000000'; // Default if no fill
+        }
+      }
+
+      if (strokeInput) {
+        if (strokeColorValue) {
+          try {
+            strokeInput.value = formatHexColor(strokeColorValue);
+          } catch (e) {
+            console.warn('[StylePaletteManager] Could not convert stroke color to hex:', strokeColorValue, e);
+            strokeInput.value = '#000000'; // Fallback
+          }
+        } else {
+          strokeInput.value = '#000000'; // Default if no stroke
+        }
+      }
+
+      if (strokeWidthInput) strokeWidthInput.value = activeObject.strokeWidth !== undefined ? activeObject.strokeWidth : 0;
+      if (opacityInput) opacityInput.value = activeObject.opacity !== undefined ? activeObject.opacity : 1;
+
       // Update value displays
       this.updateValueDisplays();
     }
@@ -239,18 +274,17 @@ export class StylePaletteManager {
    * Update property of selected object
    */
   updateSelectedObjectProperty(property, value) {
-    if (!this.selectedObject) return;
-    
-    // Emit property change event
+    // Always update the displayed value for sliders first, so the UI is responsive.
+    this.updateValueDisplays();
+
+    // Emit property change event regardless of whether an object is selected.
+    // DrawingWindow will determine if this applies to the brush or a selected object.
     this.eventBus?.emit('stylePalette:propertyChanged', {
       property: property,
       value: value,
-      object: this.selectedObject,
+      object: this.selectedObject, // This will be null if no object is currently selected
       timestamp: Date.now()
     });
-    
-    // Update displayed value for sliders
-    this.updateValueDisplays();
   }
 
   /**
