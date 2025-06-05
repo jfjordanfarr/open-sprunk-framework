@@ -1,7 +1,26 @@
 /**
  * Character Renderer Class
  * 
- * Handles rendering of characters on the stage with support for animations,
+ * Han    render(ctx, currentTime, stageTransform = null) {
+        // Get current project characters from state
+        const projectData = this.stateManager.get('project');
+        if (!projectData || !projectData.characters) {
+            return;
+        }
+
+        // Get stage layout information
+        const stageData = this.stateManager.get('project.stages.main') || {
+            characters: []
+        };
+
+        // Render each character placed on the stage
+        for (const placement of stageData.characters) {
+            const character = projectData.characters.find(c => c.id === placement.characterId);
+            if (character) {
+                this.renderCharacter(ctx, character, placement, currentTime, stageTransform);
+            }
+        }
+    }aracters on the stage with support for animations,
  * transformations, and phase-aware display. This is a foundational component
  * for bringing characters to life on the performance stage.
  */
@@ -15,12 +34,15 @@ export class CharacterRenderer {
         this.characters = new Map(); // character ID -> character data
         this.characterTextures = new Map(); // character ID -> rendered texture cache
         
-        // Rendering settings
-        this.defaultSize = 100; // Default character size in pixels
+        // Rendering settings - sized for ~8 characters on 800px stage width
+        this.defaultSize = 40; // Reduced from 60 to allow ~8 characters across stage (800px / 8 = 100px per character slot)
         this.enableAnimations = true;
         this.enablePhases = true;
         
-        console.log('🎨 CharacterRenderer: Constructor initialized');
+        // Store characters in relative coordinates (0-1) for viewport independence
+        this.useRelativeCoordinates = true;
+        
+        console.log('🎨 CharacterRenderer: Constructor initialized with relative coordinates');
         this.setupEventHandlers();
     }
 
@@ -42,13 +64,13 @@ export class CharacterRenderer {
 
     render(ctx, currentTime) {
         // Get current project characters from state
-        const projectData = this.stateManager.getState('project');
+        const projectData = this.stateManager.get('project');
         if (!projectData || !projectData.characters) {
             return;
         }
 
         // Get stage layout information
-        const stageData = this.stateManager.getState('project.stages.main') || {
+        const stageData = this.stateManager.get('project.stages.main') || {
             characters: []
         };
 
@@ -61,17 +83,39 @@ export class CharacterRenderer {
         }
     }
 
-    renderCharacter(ctx, character, placement, currentTime) {
+    renderCharacter(ctx, character, placement, currentTime, stageTransform) {
         ctx.save();
         
         try {
-            // Apply transformations
-            ctx.translate(placement.x || 400, placement.y || 300); // Default to center
+            // Convert stage coordinates to canvas coordinates accounting for letterboxing
+            const stageX = placement.x || 400; // Default to stage center
+            const stageY = placement.y || 300;
+            
+            // Apply stage-to-canvas transformation if provided
+            let canvasX, canvasY;
+            if (stageTransform) {
+                // Transform stage coordinates (0-800, 0-600) to canvas coordinates
+                canvasX = stageTransform.renderX + (stageX / 800) * stageTransform.renderWidth;
+                canvasY = stageTransform.renderY + (stageY / 600) * stageTransform.renderHeight;
+            } else {
+                // Fallback to direct positioning
+                canvasX = stageX;
+                canvasY = stageY;
+            }
+            
+            // Apply transformations in canvas space
+            ctx.translate(canvasX, canvasY);
             ctx.scale(placement.scale || 1, placement.scale || 1);
             ctx.rotate((placement.rotation || 0) * Math.PI / 180);
             
             // Get character appearance for current phase/time
             const appearance = this.getCharacterAppearance(character, currentTime);
+            
+            // Scale character size based on stage scale if using stage transform
+            if (stageTransform) {
+                const stageScale = Math.min(stageTransform.renderWidth / 800, stageTransform.renderHeight / 600);
+                appearance.size = (appearance.size || this.defaultSize) * stageScale;
+            }
             
             // Render character based on current implementation state
             this.renderCharacterPlaceholder(ctx, character, appearance);
@@ -98,34 +142,55 @@ export class CharacterRenderer {
     }
 
     renderCharacterPlaceholder(ctx, character, appearance) {
-        // Render a simple humanoid placeholder
-        // This will be replaced with actual character rendering later
-        
-        const size = appearance.size;
-        const color = appearance.color;
-        
-        // Character body (rectangle for now)
-        ctx.fillStyle = color;
-        ctx.fillRect(-size/4, -size/2, size/2, size);
-        
-        // Character head (circle)
+        // Basic Sprunki: trapezoid body, circle head, two circle hands
+        const bodyWidthTop = appearance.size * 0.6;
+        const bodyWidthBottom = appearance.size * 1.0;
+        const bodyHeight = appearance.size * 1.2;
+        const headRadius = appearance.size * 0.28;
+        const handRadius = appearance.size * 0.16;
+        const bodyColor = appearance.color || '#ff6b6b';
+        const headColor = '#fff';
+        const handColor = '#fff';
+
+        // Draw trapezoid body
         ctx.beginPath();
-        ctx.arc(0, -size/2 - size/8, size/8, 0, Math.PI * 2);
+        ctx.moveTo(-bodyWidthTop/2, -bodyHeight/2); // top left
+        ctx.lineTo(bodyWidthTop/2, -bodyHeight/2); // top right
+        ctx.lineTo(bodyWidthBottom/2, bodyHeight/2); // bottom right
+        ctx.lineTo(-bodyWidthBottom/2, bodyHeight/2); // bottom left
+        ctx.closePath();
+        ctx.fillStyle = bodyColor;
         ctx.fill();
-        
-        // Character label
-        ctx.fillStyle = '#ffffff';
-        ctx.font = '12px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText(character.name || character.id, 0, size/2 + 20);
-        
-        // Selection indicator if character is selected
-        const selectedCharacterId = this.stateManager.getState('ui.selectedCharacter');
-        if (selectedCharacterId === character.id) {
-            ctx.strokeStyle = '#00ff00';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(-size/4 - 5, -size/2 - size/8 - 5, size/2 + 10, size + size/4 + 10);
-        }
+        ctx.strokeStyle = '#222';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Draw head (circle)
+        ctx.beginPath();
+        ctx.arc(0, -bodyHeight/2 - headRadius, headRadius, 0, 2 * Math.PI);
+        ctx.fillStyle = headColor;
+        ctx.fill();
+        ctx.strokeStyle = '#222';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Draw left hand (circle)
+        ctx.beginPath();
+        ctx.arc(-bodyWidthBottom/2 - handRadius * 0.7, bodyHeight/2 - handRadius, handRadius, 0, 2 * Math.PI);
+        ctx.fillStyle = handColor;
+        ctx.fill();
+        ctx.strokeStyle = '#222';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Draw right hand (circle)
+        ctx.beginPath();
+        ctx.arc(bodyWidthBottom/2 + handRadius * 0.7, bodyHeight/2 - handRadius, handRadius, 0, 2 * Math.PI);
+        ctx.fillStyle = handColor;
+        ctx.fill();
+        ctx.strokeStyle = '#222';
+        ctx.lineWidth = 2;
+        ctx.stroke();
     }
 
     renderErrorPlaceholder(ctx, character) {
@@ -176,29 +241,39 @@ export class CharacterRenderer {
         console.log('🎨 CharacterRenderer: Character placed on stage:', data);
         
         // Update stage data in state manager
-        const currentStage = this.stateManager.getState('project.stages.main') || { characters: [] };
+        const currentStage = this.stateManager.get('project.stages.main') || { characters: [] };
         
         // Check if character is already placed
         const existingIndex = currentStage.characters.findIndex(p => p.characterId === data.characterId);
+        
+        // If no position specified, use optimal grid position
+        let position = { x: data.x, y: data.y };
+        if (!data.x || !data.y) {
+            const optimalPos = this.getNextAvailablePosition();
+            position = { x: optimalPos.x, y: optimalPos.y };
+            console.log('🎨 CharacterRenderer: Using optimal grid position:', position);
+        }
         
         if (existingIndex >= 0) {
             // Update existing placement
             currentStage.characters[existingIndex] = {
                 ...currentStage.characters[existingIndex],
-                ...data
+                ...data,
+                x: position.x,
+                y: position.y
             };
         } else {
             // Add new placement
             currentStage.characters.push({
                 characterId: data.characterId,
-                x: data.x || 400,
-                y: data.y || 300,
+                x: position.x,
+                y: position.y,
                 scale: data.scale || 1,
                 rotation: data.rotation || 0
             });
         }
         
-        this.stateManager.setState('project.stages.main', currentStage);
+        this.stateManager.set('project.stages.main', currentStage);
     }
 
     onCharacterMoved(data) {
@@ -217,12 +292,82 @@ export class CharacterRenderer {
     }
 
     /**
+     * CHARACTER POSITIONING UTILITIES
+     */
+
+    getOptimalCharacterPosition(characterIndex, totalCharacters = 8) {
+        // Calculate optimal grid layout for characters on 800x600 stage
+        const stageWidth = 800;
+        const stageHeight = 600;
+        const margin = 60; // Leave margins on edges
+        
+        // For 8 characters, use 4x2 grid or horizontal line depending on preference
+        const useGrid = totalCharacters > 6;
+        
+        if (useGrid) {
+            // Grid layout (4x2 for 8 characters)
+            const cols = Math.ceil(Math.sqrt(totalCharacters));
+            const rows = Math.ceil(totalCharacters / cols);
+            
+            const usableWidth = stageWidth - (margin * 2);
+            const usableHeight = stageHeight - (margin * 2);
+            
+            const cellWidth = usableWidth / cols;
+            const cellHeight = usableHeight / rows;
+            
+            const col = characterIndex % cols;
+            const row = Math.floor(characterIndex / cols);
+            
+            return {
+                x: margin + (cellWidth * col) + (cellWidth / 2),
+                y: margin + (cellHeight * row) + (cellHeight / 2)
+            };
+        } else {
+            // Horizontal line layout
+            const usableWidth = stageWidth - (margin * 2);
+            const spacing = usableWidth / (totalCharacters - 1);
+            
+            return {
+                x: margin + (spacing * characterIndex),
+                y: stageHeight / 2 // Center vertically
+            };
+        }
+    }
+    
+    getNextAvailablePosition() {
+        // Find next optimal position for a new character
+        const stageData = this.stateManager.get('project.stages.main') || { characters: [] };
+        const existingCount = stageData.characters.length;
+        
+        return this.getOptimalCharacterPosition(existingCount);
+    }
+
+    /**
+     * VIEWPORT MANAGEMENT
+     */
+
+    onViewportResize() {
+        console.log('🎨 CharacterRenderer: Viewport resize detected');
+        
+        // Clear texture cache to force re-rendering at new scale
+        this.clearTextureCache();
+        
+        // Emit event to notify other components of viewport change
+        this.eventBus.emit('character_renderer:viewport_resized', {
+            timestamp: Date.now(),
+            useRelativeCoordinates: this.useRelativeCoordinates
+        });
+        
+        console.log('🎨 CharacterRenderer: Viewport resize handling complete');
+    }
+
+    /**
      * UTILITY METHODS
      */
 
     getCharacterAtPosition(x, y) {
         // Hit testing for character selection
-        const stageData = this.stateManager.getState('project.stages.main');
+        const stageData = this.stateManager.get('project.stages.main');
         if (!stageData || !stageData.characters) return null;
         
         // Check each character placement (in reverse order for top-most first)
@@ -249,7 +394,7 @@ export class CharacterRenderer {
     }
 
     getCharacterBounds(characterId) {
-        const stageData = this.stateManager.getState('project.stages.main');
+        const stageData = this.stateManager.get('project.stages.main');
         if (!stageData || !stageData.characters) return null;
         
         const placement = stageData.characters.find(p => p.characterId === characterId);

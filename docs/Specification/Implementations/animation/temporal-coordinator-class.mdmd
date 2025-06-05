@@ -1,0 +1,174 @@
+---
+id: "temporal-coordinator-class"
+title: "Temporal Coordinator Class"
+unit-type: "javascript-class-definition"
+source-ref: "../../../src/animation/TemporalCoordinator.js"
+status: "implemented"
+priority: "medium"
+owner: "timeline-optimization-team"
+see-also:
+  - "[[timeline-class]]"
+  - "[[track-manager-class]]"
+  - "[[time-converter-class]]"
+  - "[[req-tempo-changes]]"
+  - "[[req-cross-domain-copying]]"
+---
+
+# Temporal Coordinator Class
+
+The TemporalCoordinator class manages advanced temporal operations including tempo changes, cross-domain copying, and timeline synchronization. This component was extracted from Timeline.js to provide specialized coordination features for complex timeline operations.
+
+## Architectural Role
+
+The TemporalCoordinator serves as the advanced timing operations manager:
+- Tempo change scaling and event adjustment
+- Cross-domain copying between animation and music tracks
+- Timeline synchronization and seeking operations
+- Complex temporal transformations
+
+## Core Interface
+
+```javascript
+class TemporalCoordinator {
+    constructor(eventBus) {
+        this.eventBus = eventBus;
+        this.tempo = 120;
+        this.timeSignature = { numerator: 4, denominator: 4 };
+    }
+
+    // Tempo management
+    setTempo(tempo) { ... }
+    setTimeSignature(timeSignature) { ... }
+    scaleTempo(oldTempo, newTempo, trackManager) { ... }
+
+    // Cross-domain operations
+    copyTimeRange(startTime, endTime, trackManager) { ... }
+    pasteTimeRange(targetTime, selection, trackManager) { ... }
+
+    // Timeline transformations
+    scaleTimeRange(startTime, endTime, scaleFactor, trackManager) { ... }
+    shiftTimeRange(startTime, endTime, timeOffset, trackManager) { ... }
+
+    // Synchronization utilities
+    syncToMeasure(measure, trackManager) { ... }
+    alignToBeat(beatSubdivision, trackManager) { ... }
+}
+```
+
+## Tempo Scaling Algorithm
+
+**Proportional Time Adjustment:**
+1. Calculate tempo ratio (newTempo / oldTempo)
+2. Scale all animation keyframe times by inverse ratio
+3. Scale all music note times by inverse ratio  
+4. Maintain relative timing relationships
+5. Preserve musical and animation structure
+
+**Example:**
+- 120 BPM → 60 BPM (2x slower)
+- All event times scaled by 2.0
+- 2-second animation becomes 4-second animation
+- Maintains synchronization relationships
+
+## Cross-Domain Copying
+
+**Selection Structure:**
+```javascript
+{
+    startTime: number,
+    endTime: number,
+    animationData: Map<trackId, keyframes[]>,
+    musicData: Map<trackId, notes[]>
+}
+```
+
+**Copy Process:**
+1. Extract all animation keyframes in time range
+2. Extract all music notes in time range
+3. Create relative time references from selection start
+4. Package for clipboard or direct paste operation
+
+**Paste Process:**
+1. Calculate time offset from selection to target
+2. Clone and adjust all animation keyframes
+3. Clone and adjust all music notes
+4. Generate new unique IDs for all events
+5. Add to target tracks via TrackManager
+
+## Integration Pattern
+
+This component is used by:
+- **Timeline**: Primary consumer for tempo and copy operations
+- **TrackManager**: Receives scaled/copied track data
+- **TimelineUI**: For user-initiated copy/paste operations
+- **PerformanceStage**: For live tempo adjustments
+
+## Optimization Impact
+
+**Line Count Reduction:**
+- Extracted ~80-100 lines of complex temporal logic from Timeline.js
+- Centralized advanced timing operations
+- Improved testability of complex algorithms
+
+**Benefits:**
+- **Complexity Management**: Isolated complex temporal math
+- **Reusability**: Advanced operations available to other components
+- **Performance**: Optimized batch operations for large datasets
+- **Reliability**: Focused testing of critical timing features
+
+## Advanced Features
+
+**Intelligent Scaling:**
+- Preserves musical relationships during tempo changes
+- Maintains animation easing curves and timing
+- Handles edge cases (zero duration, negative times)
+
+**Smart Copying:**
+- Relative time preservation across domains
+- Intelligent track creation for missing destinations
+- Conflict resolution for overlapping paste operations
+
+**Synchronization Utilities:**
+- Measure-boundary alignment operations
+- Beat subdivision snapping
+- Cross-track timing coordination
+
+## Dependencies
+
+- **EventBus**: For operation result notifications
+- **TrackManager**: For track data access and modification
+- **TimeConverter**: For beat/measure calculations (indirect)
+
+## Event Emissions
+
+```javascript
+// Tempo operations
+'timeline:tempo_scaled' { oldTempo, newTempo, affectedTracks }
+
+// Copy/paste operations
+'timeline:selection_copied' { selection }
+'timeline:selection_pasted' { targetTime, selection, timeOffset }
+
+// Timeline transformations
+'timeline:time_range_scaled' { startTime, endTime, scaleFactor }
+'timeline:time_range_shifted' { startTime, endTime, timeOffset }
+```
+
+## Performance Considerations
+
+**Batch Processing:**
+- Groups operations to minimize individual track updates
+- Defers event emissions until operation completion
+- Optimizes for large timeline datasets
+
+**Memory Efficiency:**
+- Streams large copy operations to avoid memory spikes
+- Lazy evaluation of transformation calculations
+- Cleanup of temporary operation data
+
+## Testing Considerations
+
+- Verify tempo scaling preserves musical relationships
+- Test copy/paste accuracy across large time ranges
+- Validate edge cases (empty selections, boundary conditions)
+- Performance testing with complex multi-track timelines

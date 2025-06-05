@@ -1,0 +1,163 @@
+---
+id: "track-manager-class"
+title: "Track Manager Class"
+unit-type: "javascript-class-definition"
+source-ref: "../../../src/animation/TrackManager.js"
+status: "implemented"
+priority: "high"
+owner: "timeline-optimization-team"
+see-also:
+  - "[[timeline-class]]"
+  - "[[time-converter-class]]"
+  - "[[req-animation-keyframes]]"
+  - "[[req-music-sequencing]]"
+  - "[[req-unified-timeline]]"
+---
+
+# Track Manager Class
+
+The TrackManager class handles all track-related operations for both animation and music in the unified timeline. This component was extracted from Timeline.js to provide specialized track management with better organization and performance.
+
+## Architectural Role
+
+The TrackManager serves as the data management center for timeline content:
+- Animation keyframe track management
+- Music note track management
+- Track creation, deletion, and organization
+- Grid snapping and quantization
+- Cross-domain track operations
+
+## Core Interface
+
+```javascript
+class TrackManager {
+    constructor(eventBus) {
+        this.eventBus = eventBus;
+        this.animationTracks = new Map();
+        this.musicTracks = new Map();
+        this.snapToGrid = true;
+        this.gridSubdivision = 0.25;
+    }
+
+    // Animation track operations
+    addAnimationKeyframe(trackId, time, properties) { ... }
+    removeAnimationKeyframe(trackId, keyframeId) { ... }
+    getAnimationTracks() { ... }
+
+    // Music track operations
+    addMusicNote(trackId, time, note) { ... }
+    removeMusicNote(trackId, noteId) { ... }
+    getMusicTracks() { ... }
+
+    // Track management
+    createTrack(trackId, type) { ... }
+    removeTrack(trackId, type) { ... }
+    getMaxTime() { ... }
+
+    // Configuration
+    setSnapToGrid(enabled) { ... }
+    setGridSubdivision(subdivision) { ... }
+}
+```
+
+## Data Structures
+
+**Animation Keyframe:**
+```javascript
+{
+    id: string,           // Unique keyframe identifier
+    time: number,         // Time position in seconds
+    properties: {         // Animation properties to interpolate
+        x?: number,
+        y?: number,
+        rotation?: number,
+        scale?: number,
+        opacity?: number
+    }
+}
+```
+
+**Music Note:**
+```javascript
+{
+    id: string,           // Unique note identifier
+    time: number,         // Time position in seconds
+    note: {               // Music note data
+        pitch: string,    // Note name (C4, F#5, etc.)
+        duration: number, // Note length in seconds
+        velocity: number  // Volume (0-127)
+    }
+}
+```
+
+## Integration Pattern
+
+This component is used by:
+- **Timeline**: Primary consumer for all track operations
+- **TemporalCoordinator**: For tempo scaling operations
+- **TimelineUI**: For track visualization and editing
+- **ExpressionSystem**: For animation keyframe data
+
+## Optimization Impact
+
+**Line Count Reduction:**
+- Extracted ~100-120 lines of track management from Timeline.js
+- Centralized all track data operations
+- Improved data access patterns and caching
+
+**Benefits:**
+- **Organization**: Clear separation of track vs. playback concerns
+- **Performance**: Optimized track sorting and searching
+- **Scalability**: Efficient handling of many tracks/events
+- **Data Integrity**: Centralized validation and consistency
+
+## Grid Snapping Features
+
+**Smart Quantization:**
+- Configurable grid subdivision (whole, half, quarter, eighth notes)
+- Optional snap-to-grid for precise timing
+- Preserves user intent when snapping disabled
+
+**Grid Calculations:**
+- Uses TimeConverter for beat-based quantization
+- Supports various time signatures and tempos
+- Maintains accuracy across tempo changes
+
+## Performance Optimizations
+
+**Efficient Storage:**
+- Map-based track storage for O(1) track access
+- Sorted arrays within tracks for O(log n) time-based operations
+- Lazy sorting only when tracks modified
+
+**Batch Operations:**
+- Bulk track operations with single event emission
+- Optimized track copying for tempo changes
+- Efficient cleanup of empty tracks
+
+## Dependencies
+
+- **EventBus**: For track change notifications
+- **TimeConverter**: For grid quantization (indirect via Timeline)
+- Configured by Timeline for snap settings and subdivisions
+
+## Event Emissions
+
+```javascript
+// Track content changes
+'timeline:keyframe_added' { trackId, keyframe, type: 'animation' }
+'timeline:note_added' { trackId, musicEvent, type: 'music' }
+'timeline:keyframe_removed' { trackId, keyframeId }
+'timeline:note_removed' { trackId, noteId }
+
+// Track structure changes
+'timeline:track_created' { trackId, type }
+'timeline:track_removed' { trackId, type }
+```
+
+## Testing Considerations
+
+- Verify track data integrity across operations
+- Test performance with large numbers of keyframes/notes
+- Validate grid snapping accuracy at various subdivisions
+- Test concurrent access patterns for real-time editing

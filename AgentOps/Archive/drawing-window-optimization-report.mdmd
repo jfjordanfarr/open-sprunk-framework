@@ -1,0 +1,120 @@
+```{unit}
+id: "drawing-window-optimized-class"
+title: "Optimized Drawing Window Class"
+unit-type: "javascript-class-definition"
+source-ref: "../../src/character/DrawingWindow.js"
+status: "optimized"
+brief: "Main drawing interface optimized with extracted component architecture for enhanced maintainability"
+see-also:
+  - "[[part-library-manager-class]]"
+  - "[[style-palette-manager-class]]"
+  - "[[drawing-canvas-class]]"
+  - "[[expression-system-class]]"
+```
+
+## Optimization Summary
+
+**BEFORE OPTIMIZATION:**
+- **File Size**: 1,168 lines
+- **Architecture**: Monolithic class with all functionality embedded
+- **Maintainability**: Difficult to modify individual features
+- **Testing**: Complex integration testing required
+
+**AFTER OPTIMIZATION:**
+- **File Size**: 705 lines (463 line reduction, 40% decrease)
+- **Architecture**: Component-based with extracted managers
+- **Maintainability**: Clear separation of concerns
+- **Testing**: Individual components can be tested independently
+
+## Extracted Components
+
+This optimization extracted the following components into separate, reusable classes:
+
+1. **`[[part-library-manager-class]]`** (354 lines) - Manages visual part library with Sprunki anatomy
+2. **`[[style-palette-manager-class]]`** (365 lines) - Handles drawing tools, colors, and style properties
+
+## Core Functionality Retained
+
+The optimized DrawingWindow class maintains all essential functionality while delegating specialized responsibilities:
+
+```javascript
+class DrawingWindow {
+  constructor(containerId, options = {}) {
+    // Core state management
+    this.selectedPart = null;
+    this.currentTool = 'select';
+    this.fabricCanvas = null;
+    
+    // Component managers for extracted functionality
+    this.partLibraryManager = null;
+    this.stylePaletteManager = null;
+  }
+  
+  initializeComponents() {
+    // Initialize extracted component managers
+    this.partLibraryManager = new PartLibraryManager(container, eventBus);
+    this.stylePaletteManager = new StylePaletteManager(container, eventBus);
+  }
+  
+  setupComponentEventListeners() {
+    // Coordinate between components via event system
+    document.addEventListener('part-selected', (event) => {
+      this.handlePartSelection(event.detail);
+    });
+    
+    document.addEventListener('style-applied', (event) => {
+      this.handleStyleApplication(event.detail);
+    });
+  }
+}
+```
+
+## Event-Driven Integration
+
+Components communicate through a standardized event system:
+
+- **Part Selection**: `part-selected` events from PartLibraryManager
+- **Style Changes**: `style-applied` events from StylePaletteManager  
+- **Tool Changes**: `tool-changed` events for canvas mode updates
+- **Cross-Window Coordination**: EventBus integration for real-time sync
+
+## Canvas Management
+
+Retained direct canvas management for core drawing functionality:
+
+- Fabric.js integration for vector drawing
+- Checkered background pattern generation
+- Shape drawing modes (circle, rectangle, freehand)
+- Undo/redo state management
+- Part-specific geometry loading
+
+## Accessibility & UX
+
+Preserved all accessibility features:
+
+- Screen reader announcements
+- High contrast mode support
+- Large touch targets
+- Keyboard navigation
+- ARIA live regions for dynamic updates
+
+## Architecture Benefits
+
+**Modularity**: Each component has a single responsibility
+**Reusability**: Components can be used in other drawing contexts
+**Testability**: Individual components can be unit tested
+**Maintainability**: Changes to part library don't affect style palette
+**Performance**: Smaller main class loads faster, components lazy-load
+
+## Integration Strategy
+
+The optimized DrawingWindow acts as a coordinator:
+
+1. **Layout Creation**: Builds container HTML structure
+2. **Component Initialization**: Instantiates manager components
+3. **Event Coordination**: Routes events between components
+4. **Canvas Management**: Handles core Fabric.js functionality
+5. **State Synchronization**: Maintains overall drawing state
+
+This optimization demonstrates effective large-file decomposition while maintaining full functionality and improving code organization.
+```

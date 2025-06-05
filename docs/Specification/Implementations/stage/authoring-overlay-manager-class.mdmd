@@ -1,0 +1,65 @@
+---
+id: "authoring-overlay-manager-class"
+title: "Authoring Overlay Manager Class"
+unit-type: "javascript-class-definition"
+source-ref: "../../../src/stage/AuthoringOverlayManager.js"
+status: "implemented"
+priority: "high"
+owner: "AI"
+see-also:
+  - "[[performance-stage-class]]"
+  - "[[unified-authoring-requirement]]"
+  - "[[stage-integration-requirement]]"
+---
+
+## Authoring Overlay Manager Class
+
+**Purpose**: Manages the unified authoring experience with context-aware UI overlays for different authoring modes (character, animation, music) on the Performance Stage.
+
+### Architectural Role
+
+The AuthoringOverlayManager is a critical component extracted from PerformanceStage to handle the complex overlay system that enables unified stage authoring. It provides:
+
+- **Mode Management**: Switches between performance, character, animation, and music authoring modes
+- **Overlay Coordination**: Manages overlay containers and visibility states
+- **Coordinate Integration**: Maintains stage coordinate system awareness for proper overlay positioning
+- **Event Orchestration**: Handles authoring mode events and state transitions
+
+### Core Responsibilities
+
+```javascript
+class AuthoringOverlayManager {
+    // Mode switching and overlay management
+    setAuthoringMode(mode)
+    enterEditMode()
+    exitEditMode()
+    
+    // Overlay registration and coordination
+    registerAuthoringOverlay(mode, overlayElement)
+    updateOverlayVisibility()
+    
+    // Coordinate system integration
+    updateCoordinateSystem(renderX, renderY, renderWidth, renderHeight)
+    getCoordinateSystem()
+    
+    // State and lifecycle management
+    getAuthoringState()
+    destroy()
+}
+```
+
+### Integration Pattern
+
+Extracted to reduce PerformanceStage complexity while maintaining tight integration:
+
+- **Dependency**: Requires canvas, eventBus, stateManager from parent stage
+- **Coordination**: Manages DOM overlay container within stage parent element
+- **Events**: Listens for authoring mode events and emits state change notifications
+- **Lifecycle**: Initialized by PerformanceStage and coordinates with other stage components
+
+### Optimization Impact
+
+- **Lines Reduced**: ~150 lines extracted from PerformanceStage
+- **Separation of Concerns**: Authoring logic isolated from rendering logic
+- **Maintainability**: Authoring features can be enhanced independently
+- **Testability**: Overlay management can be unit tested in isolation

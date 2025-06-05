@@ -1,0 +1,69 @@
+---
+id: "main-css-stylesheet"
+title: "Main CSS Stylesheet"
+unit-type: "css-stylesheet-definition"
+source-ref: "../../../src/styles/main.css"
+status: "draft"
+see-also:
+  - "[[sprunki-core-architecture]]"
+  - "[[client-side-architecture-requirement]]"
+  - "[[html-main-page]]"
+---
+
+# Main CSS Stylesheet
+
+Core stylesheet providing visual design, layout, and theming for the Open Sprunk Framework application. This stylesheet implements the visual design requirements established in the UI architecture and provides the foundation for the responsive, game-focused interface.
+
+## Purpose
+
+Provides comprehensive styling for:
+- Application layout and structure
+- Visual theming and color schemes
+- Responsive design patterns
+- Component-specific styling
+- Game interface visual elements
+
+## Dependencies
+
+This stylesheet is loaded by `[[html-main-page]]` and provides styling for all visual components within the Open Sprunk Framework application.
+
+## Architectural Context
+
+This unit implements the visual design requirements outlined in the UI/UX architecture, specifically supporting:
+- Client-side architecture requirements (`[[client-side-architecture-requirement]]`)
+- Core game interface design patterns from `[[sprunki-core-architecture]]`
+- Integration with the main HTML page structure (`[[html-main-page]]`)
+
+```css
+/* Core application styling contract */
+/* Layout foundation */
+body, html {
+  /* Application container styling */
+}
+
+/* Component styling */
+.character-editor {
+  /* Character editor visual styling */
+}
+
+.performance-stage {
+  /* Performance stage visual styling */
+}
+
+/* Responsive design patterns */
+@media (max-width: 768px) {
+  /* Mobile-responsive adjustments */
+}
+
+/* Visual theming variables */
+:root {
+  /* CSS custom properties for theming */
+}
+```
+
+## Implementation Notes
+
+- Must maintain consistency with the game's visual identity
+- Should support responsive design across device sizes
+- Provides styling foundation for all UI components
+- Implements visual feedback patterns for interactive elements

@@ -1,8 +1,18 @@
+// MDMD Source: docs/Specification/Implementations/core/state-manager-class.mdmd
+
 /**
  * StateManager - Global application state management
  * Manages project data, UI state, and provides reactive state updates
+ * 
+ * @class StateManager
+ * @description Central state management system for the Open Sprunk Framework.
+ *              Provides reactive state updates, persistence, and event-driven state changes.
  */
 export class StateManager {
+    /**
+     * Create a StateManager instance
+     * @param {EventBus} eventBus - The application event bus for reactive updates
+     */
     constructor(eventBus) {
         this.eventBus = eventBus;
         this.state = {
@@ -62,17 +72,23 @@ export class StateManager {
     }
 
     /**
-     * Get a copy of the current state
-     * @returns {Object} Current application state
+     * Get a deep copy of the entire application state
+     * @returns {Object} Complete application state object (deep copied for safety)
+     * @example
+     * const fullState = stateManager.getState(); // Gets entire state
+     * // Note: Use get(key) for specific properties instead
      */
     getState() {
         return JSON.parse(JSON.stringify(this.state)); // Deep copy
     }
 
     /**
-     * Get specific state property
-     * @param {string} key - State property key
-     * @returns {any} State property value
+     * Get a specific state property using dot notation
+     * @param {string} key - State property key (e.g., "projectData.characters", "ui.selectedCharacter")
+     * @returns {any} The state property value, or undefined if not found
+     * @example
+     * const characters = stateManager.get('projectData.characters');
+     * const activeView = stateManager.get('activeView');
      */
     get(key) {
         const keys = key.split('.');
@@ -86,9 +102,13 @@ export class StateManager {
     }
 
     /**
-     * Set state property and emit change event
+     * Set a state property and emit change event for reactive updates
      * @param {string} key - State property key (supports dot notation)
-     * @param {any} value - New value
+     * @param {any} value - New value to set
+     * @fires {string} state:changed - Emitted when state changes with {key, value, state} data
+     * @example
+     * stateManager.set('ui.selectedCharacter', 'char-123');
+     * stateManager.set('projectData.characters', [...characters, newCharacter]);
      */
     set(key, value) {
         const keys = key.split('.');

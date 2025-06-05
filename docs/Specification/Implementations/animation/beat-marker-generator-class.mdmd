@@ -1,0 +1,109 @@
+---
+id: "beat-marker-generator-class"
+title: "Beat Marker Generator Class"
+unit-type: "javascript-class-definition"
+source-ref: "../../../src/animation/BeatMarkerGenerator.js"
+status: "implemented"
+priority: "medium"
+owner: "timeline-optimization-team"
+see-also:
+  - "[[timeline-class]]"
+  - "[[time-converter-class]]"
+  - "[[req-beat-grid-system]]"
+  - "[[req-unified-timeline]]"
+---
+
+# Beat Marker Generator Class
+
+The BeatMarkerGenerator class manages visual beat markers and grid system for the unified timeline. This component was extracted from Timeline.js to provide specialized beat marker functionality with better performance and maintainability.
+
+## Architectural Role
+
+The BeatMarkerGenerator serves as the specialized beat grid manager:
+- Generates visual beat markers for timeline display
+- Calculates measure boundaries and beat subdivisions
+- Manages grid density based on zoom levels
+- Provides temporal reference points for user interaction
+
+## Core Interface
+
+```javascript
+class BeatMarkerGenerator {
+    constructor(eventBus) {
+        this.eventBus = eventBus;
+        this.tempo = 120;
+        this.timeSignature = { numerator: 4, denominator: 4 };
+        this.duration = 10;
+        this.beatMarkers = [];
+    }
+
+    // Beat marker generation
+    generateBeatMarkers() { ... }
+    updateMarkers() { ... }
+    getBeatMarkers() { ... }
+
+    // Grid calculations
+    calculateGridDensity(pixelsPerSecond) { ... }
+    getVisibleMarkers(startTime, endTime) { ... }
+
+    // Configuration
+    setTempo(tempo) { ... }
+    setTimeSignature(timeSignature) { ... }
+    setDuration(duration) { ... }
+}
+```
+
+## Beat Marker Structure
+
+Each beat marker contains:
+```javascript
+{
+    time: number,          // Time position in seconds
+    beat: number,          // Beat number (0.25 = 16th note)
+    isMeasureStart: boolean,  // First beat of measure
+    isBeatStart: boolean,     // Whole beat boundary
+    measure: number,          // Measure number
+    subdivision: number       // Beat subdivision (0, 0.25, 0.5, 0.75)
+}
+```
+
+## Integration Pattern
+
+This component is used by:
+- **Timeline**: Primary consumer for beat marker data
+- **TimelineUI**: For visual beat grid rendering
+- **TrackManager**: For snap-to-beat functionality
+- **PerformanceStage**: For visual rhythm guidance
+
+## Optimization Impact
+
+**Line Count Reduction:**
+- Extracted ~80-100 lines of beat marker logic from Timeline.js
+- Specialized component with focused responsibility
+- Improved performance through optimized marker generation
+
+**Benefits:**
+- **Performance**: Smart marker generation only when needed
+- **Scalability**: Efficient handling of long timelines
+- **Flexibility**: Configurable grid density based on zoom
+- **Visual Consistency**: Standardized beat marker appearance
+
+## Performance Features
+
+- **Lazy Generation**: Markers generated only when timeline changes
+- **Viewport Culling**: Only generates visible markers for large timelines
+- **Caching**: Avoids regeneration when tempo/signature unchanged
+- **Event-Driven**: Updates only when necessary via EventBus
+
+## Dependencies
+
+- **EventBus**: For emitting beat marker updates
+- **TimeConverter**: For beat-to-time calculations (indirect)
+- Configured by Timeline for tempo, time signature, and duration
+
+## Testing Considerations
+
+- Verify correct marker placement at various tempos
+- Test time signature changes (3/4, 6/8, etc.)
+- Performance testing with very long timelines (>10 minutes)
+- Visual accuracy testing with different zoom levels

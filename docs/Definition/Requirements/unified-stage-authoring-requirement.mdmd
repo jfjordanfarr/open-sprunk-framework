@@ -1,0 +1,155 @@
+::: {unit}
+id: "unified-stage-authoring-requirement"
+title: "Coordinated Stage + Drawing Window Authoring Requirement"
+unit-type: "functional-requirement"
+status: "revised"
+version: "0.2"
+priority: "high"
+brief: "Animation authoring and music sequencing occur on the performance stage with timeline overlays, while character drawing occurs in a dedicated window that coordinates with stage display."
+see-also:
+  - "[[stage-integrated-character-authoring-requirement]]" # Related stage integration requirement
+  - "[[../../Specification/Concepts/stage-module]]" # Implementation target
+  - "[[../../Specification/Implementations/stage/performance-stage-class]]" # Implementation target
+  - "[[../../Specification/Concepts/character-editor-module]]" # Drawing window implementation
+
+## Requirement Statement
+
+The Open Sprunk Framework must provide a coordinated authoring experience where animation and music authoring occur directly on the performance stage with timeline overlays, while character drawing occurs in a dedicated window that maintains real-time coordination with stage display. This approach ensures technical stability while preserving Sprunki's canonical fixed-position constraints and creative workflow continuity.
+
+## Core Functional Requirements
+
+### FR-CSA-001: Character Drawing in Dedicated Window
+**Requirement:** Users must be able to draw and edit character appearance in a dedicated, closable drawing window that provides real-time coordination with stage display.
+
+**Acceptance Criteria:**
+- Drawing window opens as dedicated space with full drawing tools
+- Character being edited appears simultaneously in both drawing window and stage
+- Changes in drawing window sync in real-time to stage character
+- Drawing window provides larger, detailed view for precise work
+- Window can be closed to focus on stage performance/animation
+- Drawing canvas scales properly with window resizing
+- No conflicts with stage rendering or timeline overlays
+
+### FR-CSA-002: Animation Authoring on Stage  
+**Requirement:** Users must be able to create and edit character animations directly on the stage with timeline and keyframe tools overlaying the stage interface.
+
+**Acceptance Criteria:**
+- Timeline and keyframe controls overlay the stage during animation mode
+- Character being animated is manipulable directly on stage (drag limbs, set poses)
+- Other characters continue performing their animations during animation editing
+- Animation previews play in real-time on the stage
+- Beat synchronization tools overlay stage for musical timing
+- Fixed position constraints maintained (characters stay in assigned boundaries)
+- No conflicts with drawing window when both are open
+
+### FR-CSA-003: Contextual Multi-Character Performance
+**Requirement:** During any authoring activity, other characters must remain visible and actively performing their assigned animations and music to provide complete performance context.
+
+**Acceptance Criteria:**
+- Background characters continue looping their animations during editing
+- Background characters continue playing their music loops during editing
+- Stage background and environmental elements remain active
+- Performance context never interrupted by authoring activities
+- User can switch between "focus on one character" and "full performance" views
+- Drawing window shows character in performance context
+
+### FR-CSA-004: Music Sequencing Stage Integration
+**Requirement:** Music sequencing interfaces integrate onto the stage experience through timeline overlays, with potential piano roll extensions.
+
+**Acceptance Criteria:**
+- Timeline with piano roll overlay stage when in music mode
+- Musical timing synchronized with character animations on stage
+- Beat markers and musical structure visible in stage context
+- Music authoring doesn't interrupt character animations
+- Seamless transition between music editing and performance modes
+- No conflicts with drawing window operations
+
+### FR-CSA-005: Cross-Window Coordination
+**Requirement:** The drawing window and performance stage must maintain real-time coordination to preserve creative workflow continuity.
+
+**Acceptance Criteria:**
+- Character changes in drawing window appear immediately on stage
+- Stage character selection triggers drawing window focus
+- Unified timeline coordinates animation across both spaces
+- Window state preserved during mode switching
+- Performance context visible in drawing window preview
+- Smooth workflow between drawing customization and animation authoring
+
+## Architectural Constraints
+
+### Drawing Window Separation
+- Character drawing occurs in dedicated window environment
+- Drawing canvas has full control over its coordinate system
+- No overlay conflicts with stage rendering pipeline
+- Independent scaling and viewport management
+
+### Stage Focus Areas
+- Performance display and coordination
+- Animation authoring with timeline overlays
+- Music sequencing with timeline integration
+- Multi-character ensemble coordination
+
+## Sprunki Canonical Constraints
+
+### Fixed Position System
+- Each character occupies a designated stage position with defined boundaries
+- Characters do not walk across stage or change positions during performance
+- Animation occurs within each character's fixed boundary area
+- Stage layout follows canonical Sprunki positioning patterns
+
+### Synchronized Performance Model
+- Multiple characters perform simultaneously in their positions
+- Music loops and animation loops coordinate timing
+- Beat-synchronized transitions between character phases
+- Ensemble performance with individual character focus capability
+
+## UX Design Principles
+
+### Context-Aware UI Overlays
+- **Character Drawing Mode**: Drawing tools appear, other UI minimized
+- **Animation Mode**: Timeline/keyframe tools appear, character manipulation enabled  
+- **Music Mode**: Music sequencing tools appear (design TBD)
+- **Performance Mode**: All authoring UI hidden, clean performance view
+
+### Immediate Visual Feedback
+- See character in final performance context while authoring
+- Accurate scale and positioning relative to other characters
+- Background and environmental context preserved
+- No separation between "editing" and "performance" views
+
+## Technical Constraints
+
+### Performance Requirements
+- Maintain 60fps during all authoring activities
+- Smooth transitions between authoring modes
+- No interruption of background character performances
+- Real-time synchronization of audio and visual elements
+
+### Compatibility Requirements  
+- Must work with existing phase system architecture
+- Must integrate with established event bus communication
+- Must support existing character, animation, and music data schemas
+- Must maintain backward compatibility with non-stage authoring workflows
+
+## Success Metrics
+
+- Users can complete character creation without leaving stage view
+- Users can complete animation authoring while seeing full performance context
+- Animation-to-music synchronization achieved through stage-integrated tools
+- User reports simplified workflow compared to multi-window alternatives
+- Performance maintains target 60fps during all authoring activities
+
+## Risk Mitigation
+
+### UI Complexity Management
+- Context-sensitive tool visibility reduces visual clutter
+- Mode-based UI overlays provide focused authoring experiences
+- Clear visual indicators for current authoring mode
+
+### Performance Optimization
+- Efficient rendering pipeline for stage + overlay UI
+- Level-of-detail scaling for background character animations
+- Optimized event handling for real-time authoring feedback
+
+This requirement represents a fundamental architectural shift toward unified stage-based authoring, requiring significant coordination across character, animation, music, and stage systems to achieve seamless integration while maintaining Sprunki's canonical performance model.
+:::

@@ -1,0 +1,401 @@
+<!-- filepath: docs/02_COMPOSITIONS/character-authoring-ux-composition.mdmd -->
+::: {composition}
+id: "character-authoring-ux-composition"
+title: "Sprunki Character Authoring UX Design"
+composition-type: "user-experience-specification"
+status: "draft"
+version: "1.0"
+brief: "Complete UX design for parts-based Sprunki character creation with visual-first accessibility, Scratch-style interface, and progressive disclosure principles."
+see-also:
+  - "[[character-data-schema]]" # Technical data structure
+  - "[[stage-integrated-character-authoring-requirement]]" # Original requirements
+  - "[[character-editor-module]]" # Technical architecture
+
+This composition defines the complete user experience for creating Sprunki characters through a parts-based authoring system. The design prioritizes pre-literate accessibility, visual-first interactions, and Scratch-style familiarity while embracing Sprunki's unique simplified anatomy.
+
+## UX Design Principles
+
+### 1. **Anatomical Accuracy First**
+Our design is built around **actual Sprunki anatomy** rather than assumed humanoid structures:
+
+**✅ SPRUNKI REALITY:**
+- **Floating Circle Hands** - No arms, hands position independently
+- **Trapezoid Body** - Simple geometric shape, thinner top/wider bottom  
+- **Expressive Head** - Primary animation focus with eyes, mouth, appendages
+- **Minimal Rigging** - Most animation is position-based, not joint-based
+
+**❌ HUMANOID ASSUMPTIONS REJECTED:**
+- Complex skeletal systems
+- Arm/leg attachment hierarchies
+- Traditional joint constraints
+- Multi-limb coordination
+
+### 2. **Visual-First Accessibility**
+Designed for **pre-literate users** and **multi-language accessibility**:
+
+**🎨 VISUAL INTERFACE PATTERNS:**
+- **Icon-Based Tools** - Universal symbols for drawing operations
+- **Color-Coded Workflows** - Different activities use distinct visual themes
+- **Direct Manipulation** - Click-and-drag interactions, minimal modal dialogs
+- **Immediate Preview** - Real-time feedback for all operations
+
+**📝 MINIMAL TEXT REQUIREMENTS:**
+- Tool names shown only on hover
+- Character names user-optional
+- Save/load through visual thumbnails
+- Error states communicated through visual indicators
+
+### 3. **Scratch-Style Familiarity**
+Leverages existing **mental models** from Scratch editor:
+
+**🏗️ FAMILIAR LAYOUT PATTERNS:**
+- **Left Panel Library** - Shows character parts like Sprite library
+- **Central Canvas** - Drawing/editing workspace with checkered background
+- **Right Panel Properties** - Color palette and part properties
+- **Bottom Timeline** - Animation keyframe interface
+
+**🎯 EXPECTED INTERACTIONS:**
+- Drag parts from library to workspace
+- Click to select, drag to position
+- Color picker for styling parts
+- Timeline scrubbing for animation preview
+
+### 4. **Progressive Disclosure**
+Balances **creative freedom** with **approachable complexity**:
+
+**🎲 SIMPLIFIED ENTRY POINTS:**
+- Start with pre-made Sprunki templates
+- Default parts provided (head, body, hands)
+- Basic expressions available immediately
+- Advanced features revealed through usage
+
+**🎭 OPTIONAL COMPLEXITY:**
+- Custom head appendages for advanced users
+- Expression state customization
+- Animation constraint fine-tuning
+- Advanced styling options
+
+## Interface Architecture
+
+### Window Layout: Drawing Focus Mode
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ 🎨 Sprunki Character Creator                               ⚙️ 💾 │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│ ┌──────────┐  ┌─────────────────────────────────┐  ┌──────────┐ │
+│ │   PART   │  │                                 │  │  STYLE   │ │
+│ │ LIBRARY  │  │         DRAWING CANVAS          │  │ PALETTE  │ │
+│ │          │  │                                 │  │          │ │
+│ │ 👤 Head  │  │  ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  │  │ 🎨 Fill  │ │
+│ │ 🫱 Body  │  │  ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  │  │ ✏️ Stroke│ │
+│ │ 👏 Hands │  │  ░░░░     SELECTED PART     ░░░  │  │ 📏 Width │ │
+│ │          │  │  ░░░░  ┌─────────────────┐  ░░░  │  │          │ │
+│ │ ━━━━━━━━ │  │  ░░░░  │                 │  ░░░  │  │ #4A90E2  │ │
+│ │ 👁️ Eyes  │  │  ░░░░  │   DRAWING HERE  │  ░░░  │  │ #FF6B6B  │ │
+│ │ 👄 Mouth │  │  ░░░░  │                 │  ░░░  │  │ #4ECDC4  │ │
+│ │ 🦄 Extras│  │  ░░░░  └─────────────────┘  ░░░  │  │ #45B7D1  │ │
+│ │          │  │  ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  │  │          │ │
+│ └──────────┘  │  ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  │  └──────────┘ │
+│               └─────────────────────────────────┘                │
+│                                                                 │
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │ 🎬 TIMELINE: Currently Editing "idle" Expression           │ │
+│ │ [●]━━━━━━[●]━━━━━━[●]  ▶️ 🔄 ⏹️                              │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Part Library: Visual Selection Interface
+
+**PRIMARY PARTS** (Always visible, required)
+```
+┌─────────────┐
+│ 👤 HEAD     │  [Currently selected: highlighted border]
+│ ┌─────────┐ │
+│ │  ●   ●  │ │  Visual representation of head with
+│ │    ⌒    │ │  eyes and mouth, shows current style
+│ └─────────┘ │
+└─────────────┘
+
+┌─────────────┐
+│ 🫱 BODY     │  
+│ ┌─────────┐ │
+│ │ ╔═════╗ │ │  Trapezoid shape preview
+│ │ ║     ║ │ │  Shows current fill/stroke
+│ │ ╚═══════╝ │ │
+│ └─────────┘ │
+└─────────────┘
+
+┌─────────────┐
+│ 👏 HANDS    │  
+│ ┌─────────┐ │
+│ │  ●   ●  │ │  Two circles showing current
+│ │         │ │  hand styling
+│ └─────────┘ │
+└─────────────┘
+```
+
+**HEAD SUB-PARTS** (Revealed after head selection)
+```
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│ 👁️ EYES     │    │ 👄 MOUTH    │    │ 🦄 EXTRAS   │
+│ ● ●         │    │     ⌒       │    │  🎪 horns   │
+│ wide/closed │    │ open/smile  │    │  📡 antennae│
+│ surprised   │    │ singing/o   │    │  🌟 sparkles│
+└─────────────┘    └─────────────┘    └─────────────┘
+```
+
+## Workflow Design: "Draw Your Sprunki"
+
+### Phase 1: Template Selection
+**Goal:** Immediate creative success, no blank canvas overwhelm
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ 🎨 Choose Your Starting Sprunki                            │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐      │
+│  │ CLASSIC │  │  HAPPY  │  │  COOL   │  │ CUSTOM  │      │
+│  │         │  │         │  │         │  │         │      │
+│  │  ● ●    │  │  ◕ ◕    │  │  ◔ ◔    │  │ [BLANK] │      │
+│  │   ⌒     │  │   ∩     │  │   ━     │  │         │      │
+│  │         │  │         │  │         │  │         │      │
+│  └─────────┘  └─────────┘  └─────────┘  └─────────┘      │
+│                                                             │
+│ Click any template to start, or "Custom" for blank canvas  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Phase 2: Part-by-Part Customization
+**Goal:** Focused editing, immediate visual feedback
+
+**2A: Part Selection**
+```
+USER CLICKS: [👤 HEAD] in part library
+RESULT: 
+- Head becomes selected in drawing canvas
+- Drawing tools appear in style palette
+- Head sub-parts revealed in library
+- Current head style shown in properties
+```
+
+**2B: Drawing Interface**
+```
+DRAWING TOOLS (Right Panel):
+🎨 Fill Color    [#4A90E2] ← color picker
+✏️ Stroke Color  [#2E5A8A] ← color picker  
+📏 Stroke Width  [2px]     ← slider
+👁️ Preview       [●]       ← toggle real-time preview
+
+CANVAS INTERACTION:
+- Direct path drawing on selected part
+- Bezier curve manipulation
+- Fill bucket for solid colors
+- Eraser for path editing
+```
+
+**2C: Real-Time Assembly**
+```
+STAGE PREVIEW (Background window):
+Shows complete character assembly in real-time
+- Modified head immediately updates
+- Character maintains proportions
+- Expression preview available
+- Position on stage visible
+```
+
+### Phase 3: Expression Design
+**Goal:** Facial animation without complexity
+
+**3A: Expression Mode Activation**
+```
+USER CLICKS: [👁️ EYES] or [👄 MOUTH] in library
+RESULT:
+- Interface switches to "Expression Mode"
+- Timeline shows expression states: idle | singing | surprised
+- Current expression highlighted
+- Sub-part editing tools appear
+```
+
+**3B: Expression State Editing**
+```
+EXPRESSION TIMELINE:
+[idle]━━━━━━[singing]━━━━━━[surprised]━━━━━━[+custom]
+
+USER CLICKS: [singing]
+RESULT:
+- Eyes/mouth switch to "singing" state
+- Drawing canvas shows mouth in "open" configuration
+- User can modify this specific state
+- Other expressions remain unchanged
+```
+
+**3C: Expression Preview**
+```
+PREVIEW CONTROLS:
+▶️ Play through expressions
+🔄 Loop expression sequence  
+⏹️ Stop and return to idle
+🎵 Sync with music (if available)
+
+VISUAL FEEDBACK:
+- Character face changes in real-time
+- Smooth transitions between states
+- Audio feedback for state changes
+```
+
+### Phase 4: Animation Integration
+**Goal:** Seamless transition to full character animation
+
+**4A: Return to Stage Context**
+```
+USER CLICKS: [🎬 Stage View] or finishes part editing
+RESULT:
+- Drawing window minimizes or closes
+- Stage view becomes primary focus
+- Character appears fully assembled
+- Timeline shows keyframe animation interface
+```
+
+**4B: Keyframe Animation**
+```
+CHARACTER MANIPULATION:
+- Click and drag body to reposition
+- Click and drag hands to new positions  
+- Click head to trigger expression changes
+- All changes automatically create keyframes
+
+TIMELINE INTEGRATION:
+- Keyframes appear on musical beats
+- Character movement syncs with audio
+- Expression changes triggered by musical events
+```
+
+## Accessibility Features
+
+### Visual Accessibility
+```
+HIGH CONTRAST MODE:
+- Strong borders on all interactive elements
+- Color combinations tested for WCAG compliance
+- Alternative visual indicators for color-blind users
+- Large touch targets (minimum 44px)
+
+VISUAL FEEDBACK:
+- Hover states show tool functionality
+- Selected parts highlighted with animated border
+- Progress indicators for save/load operations
+- Error states shown through color + icon combinations
+```
+
+### Motor Accessibility  
+```
+INTERACTION DESIGN:
+- Large click targets for part selection
+- Drag tolerance for imprecise movements
+- Snap-to-grid options for precise positioning
+- Undo/redo for all operations
+
+INPUT FLEXIBILITY:
+- Mouse, touch, and keyboard navigation
+- Customizable gesture sensitivity
+- Alternative interaction modes for different abilities
+```
+
+### Cognitive Accessibility
+```
+SIMPLIFIED WORKFLOWS:
+- One tool active at a time
+- Clear visual hierarchy
+- Immediate feedback for all actions
+- Non-destructive editing (always undoable)
+
+GUIDANCE SYSTEMS:
+- Visual hints for next suggested actions
+- Tutorial mode with overlay instructions
+- Template-based entry points
+- Progressive feature revelation
+```
+
+## Technical Integration Points
+
+### Cross-Window Coordination
+```javascript
+// Real-time sync between drawing window and stage
+characterEditor.on('partModified', (partId, newGeometry) => {
+  stageView.updateCharacterPart(characterId, partId, newGeometry);
+  timeline.markAsModified();
+});
+
+// Expression state synchronization
+expressionEditor.on('expressionChanged', (expressionName) => {
+  stageView.setCharacterExpression(characterId, expressionName);
+  timeline.addExpressionKeyframe(expressionName);
+});
+```
+
+### Performance Considerations
+```javascript
+// Efficient part rendering
+class PartRenderer {
+  // Cache rendered parts for performance
+  // Incremental updates only for modified elements
+  // GPU acceleration for real-time preview
+}
+
+// Memory management for complex characters
+class CharacterCache {
+  // Smart caching of part geometries
+  // Lazy loading of expression states
+  // Efficient serialization for save/load
+}
+```
+
+## Implementation Priority
+
+### Phase 1: Core Functionality ⚡
+1. **Template selection interface** - Immediate creative success
+2. **Basic part library** - Head, body, hands selection
+3. **Simple drawing tools** - Fill, stroke, basic shapes
+4. **Real-time preview** - Stage synchronization
+
+### Phase 2: Expression System 🎭
+1. **Expression state management** - Idle, singing, surprised
+2. **Face sub-part editing** - Eyes and mouth customization
+3. **Expression preview** - Transition animations
+4. **Timeline integration** - Keyframe placement
+
+### Phase 3: Advanced Features 🚀
+1. **Custom head appendages** - User-created extras
+2. **Advanced drawing tools** - Bezier paths, gradients
+3. **Animation constraints** - Realistic movement limits
+4. **Accessibility enhancements** - Full WCAG compliance
+
+### Phase 4: Polish & Performance ✨
+1. **Performance optimization** - 60fps real-time preview
+2. **Advanced templates** - More starting options
+3. **Export capabilities** - Character sharing
+4. **Integration testing** - Full workflow validation
+
+## Success Metrics
+
+### User Experience Goals
+- **⏱️ Time to First Success:** User creates recognizable character within 2 minutes
+- **🎯 Task Completion:** 90% of users successfully complete basic character creation
+- **😊 User Satisfaction:** Post-session survey shows positive creative experience
+- **🔄 Engagement:** Users return to modify characters multiple times
+
+### Technical Performance Goals  
+- **⚡ Real-time Sync:** <16ms latency between windows
+- **💾 Save Performance:** Character data saved in <500ms
+- **🖥️ Cross-Platform:** Consistent experience on desktop/tablet
+- **📱 Responsive Design:** Usable on screens 1024px and larger
+
+## Conclusion
+
+This UX design embraces Sprunki's unique anatomy to create a more accessible, focused, and creatively satisfying character authoring experience. By rejecting complex humanoid assumptions and building around actual Sprunki structure, we achieve both technical elegance and user-centered design that serves both pre-literate creators and advanced users seeking expressive character animation capabilities.
+
+:::

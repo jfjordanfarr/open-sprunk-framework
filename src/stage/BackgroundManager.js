@@ -44,7 +44,7 @@ export class BackgroundManager {
 
     render(ctx, currentTime) {
         // Get current background from stage state
-        const stageData = this.stateManager.getState('project.stages.main') || {};
+        const stageData = this.stateManager.get('project.stages.main') || {};
         const backgroundId = stageData.backgroundId || 'default';
         
         if (backgroundId === 'default') {
@@ -188,7 +188,7 @@ export class BackgroundManager {
         
         try {
             // Get background data from project
-            const projectData = this.stateManager.getState('project');
+            const projectData = this.stateManager.get('project');
             const background = projectData?.backgrounds?.find(b => b.id === backgroundId);
             
             if (!background) {
@@ -273,9 +273,9 @@ export class BackgroundManager {
         console.log('🌅 BackgroundManager: Stage background changed to:', data.backgroundId);
         
         // Update stage background in state
-        const currentStage = this.stateManager.getState('project.stages.main') || {};
+        const currentStage = this.stateManager.get('project.stages.main') || {};
         currentStage.backgroundId = data.backgroundId;
-        this.stateManager.setState('project.stages.main', currentStage);
+        this.stateManager.set('project.stages.main', currentStage);
         
         // Preload new background
         if (data.backgroundId !== 'default') {

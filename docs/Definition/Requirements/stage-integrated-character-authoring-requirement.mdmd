@@ -1,0 +1,117 @@
+<!-- filepath: docs/Definition/Requirements/stage-integrated-character-authoring-requirement.mdmd -->
+::: {unit}
+id: "stage-integrated-character-authoring-requirement"
+title: "Stage-Integrated Character Authoring Requirement"
+unit-type: "functional-requirement"
+status: "active"
+version: "1.0"
+priority: "high"
+brief: "Character authoring must happen within or identical to the performance stage context for accurate scale and positioning."
+owner: "ux-design"
+acceptance-criteria:
+  - "Character drawing tools available as overlay on performance stage"
+  - "Real-time visual feedback during character creation"
+  - "Accurate scale and positioning relative to stage dimensions"
+  - "Background context visible during character authoring"
+  - "Seamless switching between edit and preview modes"
+  - "Drawing tools maintain stage coordinate system"
+see-also:
+  - "[[CoreSystemRequirements.mdmd]]"
+  - "[[client-side-architecture-requirement.mdmd]]"
+  - "[[../../Specification/Concepts/character-editor-module.mdmd]]"
+  - "[[../../Specification/Concepts/stage-module.mdmd]]"
+  - "[[../../Specification/Implementations/character/character-editor-class.mdmd]]"
+  - "[[../../Specification/Implementations/stage/performance-stage-class.mdmd]]"
+
+## Problem Statement
+
+Users need to author characters with immediate visual feedback in the context where they will be performed. Creating characters in a separate editor lacks the spatial awareness necessary for accurate scale, positioning, and visual composition with backgrounds and other elements.
+
+## Background
+
+Traditional character editors operate in isolation from the performance context, leading to:
+
+- **Scale Mismatches**: Characters appear different sizes when moved from editor to stage
+- **Positioning Issues**: Lack of stage context makes it difficult to plan character placement
+- **Background Disconnect**: Cannot see how character relates to stage backgrounds during creation
+- **Iterative Inefficiency**: Constant switching between editor and stage for visual validation
+
+This requirement addresses the fundamental UX insight that character authoring should happen **in the stage** or a stage-identical view for optimal creative workflow.
+
+## Functional Requirements
+
+### Core Integration Requirements
+
+1. **Stage-Contextual Drawing**
+   - Character drawing tools must operate directly on or overlay the performance stage
+   - All drawing operations must respect stage coordinate system and dimensions
+   - Background elements must remain visible during character creation
+
+2. **Mode-Based Interaction**
+   - Performance Stage must support distinct "edit" and "preview" modes
+   - Edit mode enables character creation and modification tools
+   - Preview mode provides standard performance playback capabilities
+   - Mode switching must be seamless with preserved state
+
+3. **Real-Time Visual Feedback**
+   - Character changes must be immediately visible in final performance context
+   - Scale and positioning must be accurate to final rendering
+   - Background and environmental elements must provide visual context
+
+4. **Drawing Tool Integration**
+   - Vector drawing tools (Fabric.js) must integrate with stage canvas
+   - Drawing coordinates must map accurately to stage coordinates
+   - Character artwork must maintain fidelity across edit/preview modes
+
+### User Experience Requirements
+
+1. **Immediate Context Awareness**
+   - Users must see characters in final scale and position during creation
+   - Background phases must be visible during character authoring
+   - Stage dimensions must constrain and guide character design
+
+2. **Workflow Efficiency**
+   - No context switching required between character creation and stage preview
+   - Character edits must have immediate visual impact on performance
+   - Multi-character coordination must be possible during authoring
+
+3. **Creative Control**
+   - Full vector graphics capabilities within stage context
+   - Precise positioning and scaling tools
+   - Layer management for complex character designs
+
+## Implementation Constraints
+
+- Must maintain existing Performance Stage functionality
+- Character editor tools must not interfere with stage performance
+- Drawing operations must not impact stage rendering performance
+- Must support both touch and mouse input for drawing
+
+## Success Criteria
+
+The implementation will be considered successful when:
+
+1. Users can draw characters directly on the performance stage
+2. Character scale and positioning are immediately accurate to final performance
+3. Background context is maintained throughout character creation process
+4. Seamless mode switching between editing and performance
+5. No loss of existing stage functionality
+6. Performance maintains 60fps during character editing operations
+
+## Related Requirements
+
+This requirement builds upon and integrates with:
+
+- `[[CoreSystemRequirements.mdmd]]` - Core creative functionality
+- `[[client-side-architecture-requirement.mdmd]]` - Client-side implementation constraints
+- `[[undo-redo-requirement.mdmd]]` - Edit operation history in stage context
+- `[[project-saving-requirement.mdmd]]` - Persistence of stage-authored characters
+
+## Technical Dependencies
+
+- Performance Stage canvas system
+- Fabric.js vector graphics engine
+- Event system for mode management
+- State management for edit/preview coordination
+
+:::

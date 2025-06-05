@@ -1,0 +1,777 @@
+<!-- filepath: docs/03_UNITS/character/expression-system.mdmd -->
+::: {unit}
+id: "expression-system"
+title: "Sprunki Expression Animation System"
+unit-type: "javascript-class-definition"
+status: "draft"
+version: "1.0"
+brief: "Hybrid animation system for Sprunki facial expressions combining transform-based movement with sprite-swap states for eyes and mouth elements."
+source-ref: "../../../src/character/ExpressionSystem.js"
+see-also:
+  - "[[character-data-schema]]" # Data structure for expressions
+  - "[[drawing-window-interface]]" # Drawing interface integration
+  - "[[character-authoring-ux-composition]]" # Overall UX design
+
+This unit implements the expression animation system that allows Sprunki characters to display different facial states through a combination of transform animations and sprite-swapping for maximum expressiveness with minimal complexity.
+
+```javascript
+/**
+ * Expression system for Sprunki characters
+ * Handles hybrid animation: transforms + sprite swaps
+ */
+class ExpressionSystem {
+  constructor(characterData, options = {}) {
+    this.characterData = characterData;
+    this.options = {
+      defaultTransitionDuration: 0.3,
+      easing: 'easeInOut',
+      preloadExpressions: true,
+      smoothTransitions: true,
+      ...options
+    };
+    
+    // Current state
+    this.currentExpression = 'idle';
+    this.isTransitioning = false;
+    this.expressionCache = new Map();
+    
+    // Animation system
+    this.animationQueue = [];
+    this.activeAnimations = new Map();
+    
+    // Event system for coordination
+    this.eventBus = null;
+    this.listeners = new Map();
+    
+    this.init();
+  }
+  
+  /**
+   * Initialize expression system
+   */
+  init() {
+    this.validateExpressionData();
+    this.preloadExpressionStates();
+    this.setupDefaultExpressions();
+    this.bindEventListeners();
+  }
+  
+  /**
+   * Validate character expression data structure
+   */
+  validateExpressionData() {
+    const { expressions } = this.characterData;
+    
+    if (!expressions) {
+      throw new Error('Character data missing expressions object');
+    }
+    
+    // Ensure required expressions exist
+    const requiredExpressions = ['idle', 'singing', 'surprised'];
+    requiredExpressions.forEach(expr => {
+      if (!expressions[expr]) {
+        console.warn(`Missing required expression: ${expr}. Creating default.`);
+        expressions[expr] = this.createDefaultExpression(expr);
+      }
+    });
+    
+    // Validate expression structure
+    Object.entries(expressions).forEach(([name, config]) => {
+      this.validateExpressionConfig(name, config);
+    });
+  }
+  
+  /**
+   * Validate individual expression configuration
+   */
+  validateExpressionConfig(name, config) {
+    if (!config.eyes || !config.mouth) {
+      throw new Error(`Expression '${name}' missing eyes or mouth configuration`);
+    }
+    
+    if (!config.eyes.left || !config.eyes.right) {
+      throw new Error(`Expression '${name}' missing left or right eye configuration`);
+    }
+    
+    // Validate that referenced states exist in character parts
+    const { head } = this.characterData.parts;
+    
+    // Check eye states
+    if (head.eyes.left.expressionStates && !head.eyes.left.expressionStates[config.eyes.left]) {
+      console.warn(`Left eye state '${config.eyes.left}' not found for expression '${name}'`);
+    }
+    
+    if (head.eyes.right.expressionStates && !head.eyes.right.expressionStates[config.eyes.right]) {
+      console.warn(`Right eye state '${config.eyes.right}' not found for expression '${name}'`);
+    }
+    
+    // Check mouth state
+    if (head.mouth.expressionStates && !head.mouth.expressionStates[config.mouth]) {
+      console.warn(`Mouth state '${config.mouth}' not found for expression '${name}'`);
+    }
+  }
+  
+  /**
+   * Create default expression configurations
+   */
+  createDefaultExpression(expressionName) {
+    const defaultConfigs = {
+      'idle': {
+        eyes: { left: 'default', right: 'default' },
+        mouth: 'default',
+        duration: 0.3
+      },
+      'singing': {
+        eyes: { left: 'default', right: 'default' },
+        mouth: 'open',
+        duration: 0.2
+      },
+      'surprised': {
+        eyes: { left: 'wide', right: 'wide' },
+        mouth: 'open',
+        duration: 0.1
+      }
+    };
+    
+    return defaultConfigs[expressionName] || defaultConfigs.idle;
+  }
+  
+  /**
+   * Preload expression states for performance
+   */
+  preloadExpressionStates() {
+    if (!this.options.preloadExpressions) return;
+    
+    const { expressions } = this.characterData;
+    
+    Object.entries(expressions).forEach(([name, config]) => {
+      this.expressionCache.set(name, this.compileExpressionState(config));
+    });
+  }
+  
+  /**
+   * Compile expression state into optimized animation data
+   */
+  compileExpressionState(expressionConfig) {
+    const { head } = this.characterData.parts;
+    
+    const compiledState = {
+      leftEye: this.compileElementState(head.eyes.left, expressionConfig.eyes.left),
+      rightEye: this.compileElementState(head.eyes.right, expressionConfig.eyes.right),
+      mouth: this.compileElementState(head.mouth, expressionConfig.mouth),
+      duration: expressionConfig.duration || this.options.defaultTransitionDuration
+    };
+    
+    return compiledState;
+  }
+  
+  /**
+   * Compile individual element state (eye or mouth)
+   */
+  compileElementState(element, stateName) {
+    const expressionState = element.expressionStates?.[stateName];
+    
+    if (!expressionState) {
+      // Return default element state
+      return {
+        type: 'default',
+        geometry: element.geometry,
+        transform: element.transform || { position: element.position, rotation: 0, scale: { x: 1, y: 1 } }
+      };
+    }
+    
+    // Determine animation type based on what changed
+    const hasGeometryChange = expressionState.geometry !== element.geometry;
+    const hasTransformChange = expressionState.transform !== undefined;
+    
+    return {
+      type: hasGeometryChange ? 'sprite-swap' : 'transform',
+      geometry: expressionState.geometry || element.geometry,
+      transform: expressionState.transform || { position: element.position, rotation: 0, scale: { x: 1, y: 1 } },
+      originalGeometry: element.geometry,
+      originalTransform: element.transform || { position: element.position, rotation: 0, scale: { x: 1, y: 1 } }
+    };
+  }
+  
+  /**
+   * Set character expression with smooth transition
+   */
+  async setExpression(expressionName, options = {}) {
+    if (this.currentExpression === expressionName && !options.force) {
+      return; // Already in this expression
+    }
+    
+    if (this.isTransitioning && !options.interrupt) {
+      // Queue the expression change
+      this.animationQueue.push({ expressionName, options });
+      return;
+    }
+    
+    const transitionOptions = {
+      duration: options.duration,
+      easing: options.easing || this.options.easing,
+      immediate: options.immediate || false,
+      ...options
+    };
+    
+    try {
+      this.isTransitioning = true;
+      
+      await this.executeExpressionTransition(expressionName, transitionOptions);
+      
+      this.currentExpression = expressionName;
+      this.emitEvent('expressionChanged', { 
+        expressionName, 
+        previousExpression: this.currentExpression,
+        timestamp: Date.now() 
+      });
+      
+    } catch (error) {
+      console.error('Expression transition failed:', error);
+      this.emitEvent('expressionError', { expressionName, error });
+    } finally {
+      this.isTransitioning = false;
+      this.processAnimationQueue();
+    }
+  }
+  
+  /**
+   * Execute expression transition animation
+   */
+  async executeExpressionTransition(expressionName, options) {
+    const targetState = this.expressionCache.get(expressionName);
+    if (!targetState) {
+      throw new Error(`Expression '${expressionName}' not found in cache`);
+    }
+    
+    if (options.immediate) {
+      // Immediate transition without animation
+      this.applyExpressionStateImmediate(targetState);
+      return;
+    }
+    
+    // Animated transition
+    const animations = this.createTransitionAnimations(targetState, options);
+    await this.executeAnimations(animations);
+  }
+  
+  /**
+   * Create animation sequences for expression transition
+   */
+  createTransitionAnimations(targetState, options) {
+    const animations = [];
+    
+    // Left eye animation
+    animations.push(this.createElementAnimation(
+      'leftEye', 
+      targetState.leftEye, 
+      options
+    ));
+    
+    // Right eye animation
+    animations.push(this.createElementAnimation(
+      'rightEye', 
+      targetState.rightEye, 
+      options
+    ));
+    
+    // Mouth animation
+    animations.push(this.createElementAnimation(
+      'mouth', 
+      targetState.mouth, 
+      options
+    ));
+    
+    return animations;
+  }
+  
+  /**
+   * Create animation for individual element (eye or mouth)
+   */
+  createElementAnimation(elementName, targetState, options) {
+    const duration = options.duration || targetState.duration;
+    const easing = options.easing;
+    
+    if (targetState.type === 'sprite-swap') {
+      // Geometry swap animation
+      return {
+        elementName,
+        type: 'sprite-swap',
+        targetGeometry: targetState.geometry,
+        duration: Math.min(duration, 0.1), // Sprite swaps should be quick
+        easing: 'linear' // No easing for sprite swaps
+      };
+    } else {
+      // Transform animation
+      return {
+        elementName,
+        type: 'transform',
+        targetTransform: targetState.transform,
+        duration: duration,
+        easing: easing
+      };
+    }
+  }
+  
+  /**
+   * Execute multiple animations concurrently
+   */
+  async executeAnimations(animations) {
+    const animationPromises = animations.map(animation => 
+      this.executeElementAnimation(animation)
+    );
+    
+    await Promise.all(animationPromises);
+  }
+  
+  /**
+   * Execute animation for single element
+   */
+  async executeElementAnimation(animation) {
+    return new Promise((resolve, reject) => {
+      const animationId = `${animation.elementName}_${Date.now()}`;
+      
+      if (animation.type === 'sprite-swap') {
+        // Immediate geometry swap
+        this.applySpriteSwap(animation.elementName, animation.targetGeometry);
+        resolve();
+      } else {
+        // Animated transform
+        this.animateTransform(
+          animation.elementName,
+          animation.targetTransform,
+          animation.duration,
+          animation.easing
+        ).then(resolve).catch(reject);
+      }
+      
+      this.activeAnimations.set(animationId, animation);
+    });
+  }
+  
+  /**
+   * Apply sprite swap to element
+   */
+  applySpriteSwap(elementName, newGeometry) {
+    // Emit event for rendering system to update geometry
+    this.emitEvent('elementGeometryChanged', {
+      elementName,
+      newGeometry,
+      timestamp: Date.now()
+    });
+  }
+  
+  /**
+   * Animate transform properties
+   */
+  async animateTransform(elementName, targetTransform, duration, easing) {
+    return new Promise((resolve) => {
+      const startTime = performance.now();
+      const startTransform = this.getCurrentElementTransform(elementName);
+      
+      const animate = (currentTime) => {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / (duration * 1000), 1);
+        
+        // Apply easing
+        const easedProgress = this.applyEasing(progress, easing);
+        
+        // Interpolate transform
+        const currentTransform = this.interpolateTransform(
+          startTransform,
+          targetTransform,
+          easedProgress
+        );
+        
+        // Emit transform update
+        this.emitEvent('elementTransformChanged', {
+          elementName,
+          transform: currentTransform,
+          progress: easedProgress,
+          timestamp: Date.now()
+        });
+        
+        if (progress < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          resolve();
+        }
+      };
+      
+      requestAnimationFrame(animate);
+    });
+  }
+  
+  /**
+   * Apply easing function to progress value
+   */
+  applyEasing(progress, easingType) {
+    switch (easingType) {
+      case 'linear':
+        return progress;
+      case 'easeIn':
+        return progress * progress;
+      case 'easeOut':
+        return 1 - (1 - progress) * (1 - progress);
+      case 'easeInOut':
+      default:
+        return progress < 0.5 
+          ? 2 * progress * progress 
+          : 1 - 2 * (1 - progress) * (1 - progress);
+    }
+  }
+  
+  /**
+   * Interpolate between two transform states
+   */
+  interpolateTransform(start, end, progress) {
+    return {
+      position: {
+        x: start.position.x + (end.position.x - start.position.x) * progress,
+        y: start.position.y + (end.position.y - start.position.y) * progress
+      },
+      rotation: start.rotation + (end.rotation - start.rotation) * progress,
+      scale: {
+        x: start.scale.x + (end.scale.x - start.scale.x) * progress,
+        y: start.scale.y + (end.scale.y - start.scale.y) * progress
+      }
+    };
+  }
+  
+  /**
+   * Process queued animations
+   */
+  processAnimationQueue() {
+    if (this.animationQueue.length === 0) return;
+    
+    const nextAnimation = this.animationQueue.shift();
+    this.setExpression(nextAnimation.expressionName, nextAnimation.options);
+  }
+  
+  /**
+   * Add custom expression to character
+   */
+  addCustomExpression(name, config) {
+    // Validate configuration
+    this.validateExpressionConfig(name, config);
+    
+    // Add to character data
+    this.characterData.expressions[name] = config;
+    
+    // Compile and cache
+    this.expressionCache.set(name, this.compileExpressionState(config));
+    
+    // Emit event
+    this.emitEvent('customExpressionAdded', { name, config });
+  }
+  
+  /**
+   * Remove custom expression
+   */
+  removeCustomExpression(name) {
+    // Prevent removal of required expressions
+    const requiredExpressions = ['idle', 'singing', 'surprised'];
+    if (requiredExpressions.includes(name)) {
+      throw new Error(`Cannot remove required expression: ${name}`);
+    }
+    
+    // Remove from character data and cache
+    delete this.characterData.expressions[name];
+    this.expressionCache.delete(name);
+    
+    // If currently active, switch to idle
+    if (this.currentExpression === name) {
+      this.setExpression('idle');
+    }
+    
+    // Emit event
+    this.emitEvent('customExpressionRemoved', { name });
+  }
+  
+  /**
+   * Get list of available expressions
+   */
+  getAvailableExpressions() {
+    return Object.keys(this.characterData.expressions);
+  }
+  
+  /**
+   * Get current expression state
+   */
+  getCurrentExpression() {
+    return {
+      name: this.currentExpression,
+      isTransitioning: this.isTransitioning,
+      queueLength: this.animationQueue.length
+    };
+  }
+  
+  /**
+   * Connect to event bus for cross-system communication
+   */
+  connectEventBus(eventBus) {
+    this.eventBus = eventBus;
+    
+    // Listen for timeline expression changes
+    this.eventBus.on('timelineExpressionChange', (data) => {
+      this.setExpression(data.expressionName, { 
+        duration: data.duration,
+        immediate: data.immediate 
+      });
+    });
+    
+    // Listen for drawing window expression edits
+    this.eventBus.on('expressionStateModified', (data) => {
+      this.updateExpressionState(data.expressionName, data.elementName, data.newState);
+    });
+  }
+  
+  /**
+   * Update specific expression state from drawing modifications
+   */
+  updateExpressionState(expressionName, elementName, newState) {
+    const expression = this.characterData.expressions[expressionName];
+    if (!expression) return;
+    
+    // Update appropriate element state
+    if (elementName === 'leftEye') {
+      expression.eyes.left = newState;
+    } else if (elementName === 'rightEye') {
+      expression.eyes.right = newState;
+    } else if (elementName === 'mouth') {
+      expression.mouth = newState;
+    }
+    
+    // Recompile and cache
+    this.expressionCache.set(expressionName, this.compileExpressionState(expression));
+    
+    // If this is the current expression, apply changes immediately
+    if (this.currentExpression === expressionName) {
+      this.setExpression(expressionName, { immediate: true, force: true });
+    }
+  }
+  
+  /**
+   * Emit events through event bus
+   */
+  emitEvent(eventName, data) {
+    if (this.eventBus) {
+      this.eventBus.emit(eventName, data);
+    }
+    
+    // Also trigger local listeners
+    const localListeners = this.listeners.get(eventName);
+    if (localListeners) {
+      localListeners.forEach(callback => callback(data));
+    }
+  }
+  
+  /**
+   * Add local event listener
+   */
+  on(eventName, callback) {
+    if (!this.listeners.has(eventName)) {
+      this.listeners.set(eventName, []);
+    }
+    this.listeners.get(eventName).push(callback);
+  }
+  
+  /**
+   * Remove local event listener
+   */
+  off(eventName, callback) {
+    const listeners = this.listeners.get(eventName);
+    if (listeners) {
+      const index = listeners.indexOf(callback);
+      if (index > -1) {
+        listeners.splice(index, 1);
+      }
+    }
+  }
+  
+  /**
+   * Get current element transform (stub - to be implemented by rendering system)
+   */
+  getCurrentElementTransform(elementName) {
+    // This would be implemented by the rendering system
+    // Returns current transform state for interpolation
+    return {
+      position: { x: 0, y: 0 },
+      rotation: 0,
+      scale: { x: 1, y: 1 }
+    };
+  }
+  
+  /**
+   * Apply expression state immediately without animation
+   */
+  applyExpressionStateImmediate(targetState) {
+    // Apply all element states immediately
+    this.applySpriteSwap('leftEye', targetState.leftEye.geometry);
+    this.applySpriteSwap('rightEye', targetState.rightEye.geometry);
+    this.applySpriteSwap('mouth', targetState.mouth.geometry);
+    
+    // Apply transforms
+    this.emitEvent('elementTransformChanged', {
+      elementName: 'leftEye',
+      transform: targetState.leftEye.transform,
+      progress: 1,
+      timestamp: Date.now()
+    });
+    
+    this.emitEvent('elementTransformChanged', {
+      elementName: 'rightEye',
+      transform: targetState.rightEye.transform,
+      progress: 1,
+      timestamp: Date.now()
+    });
+    
+    this.emitEvent('elementTransformChanged', {
+      elementName: 'mouth',
+      transform: targetState.mouth.transform,
+      progress: 1,
+      timestamp: Date.now()
+    });
+  }
+  
+  /**
+   * Set up default expressions if they don't exist
+   */
+  setupDefaultExpressions() {
+    const { expressions } = this.characterData;
+    
+    // Ensure default states exist for all required expressions
+    ['idle', 'singing', 'surprised'].forEach(expressionName => {
+      if (!expressions[expressionName]) {
+        expressions[expressionName] = this.createDefaultExpression(expressionName);
+      }
+    });
+  }
+  
+  /**
+   * Bind event listeners for system integration
+   */
+  bindEventListeners() {
+    // Set up listeners for character data changes
+    // Implementation depends on overall data binding strategy
+  }
+  
+  /**
+   * Clean up resources
+   */
+  dispose() {
+    // Cancel active animations
+    this.activeAnimations.clear();
+    this.animationQueue.length = 0;
+    
+    // Clear caches
+    this.expressionCache.clear();
+    
+    // Remove event listeners
+    this.listeners.clear();
+    
+    this.isTransitioning = false;
+  }
+}
+
+// Factory function for easy instantiation
+export function createExpressionSystem(characterData, options = {}) {
+  return new ExpressionSystem(characterData, options);
+}
+
+// Export main class
+export { ExpressionSystem };
+
+/**
+ * Utility functions for expression management
+ */
+export const ExpressionUtils = {
+  /**
+   * Create expression from current character state
+   */
+  captureCurrentExpression(characterData, name) {
+    const { head } = characterData.parts;
+    
+    return {
+      eyes: {
+        left: 'current',
+        right: 'current'
+      },
+      mouth: 'current',
+      duration: 0.3
+    };
+  },
+  
+  /**
+   * Validate expression configuration
+   */
+  isValidExpressionConfig(config) {
+    return config && 
+           config.eyes && 
+           config.eyes.left && 
+           config.eyes.right && 
+           config.mouth;
+  },
+  
+  /**
+   * Clone expression configuration
+   */
+  cloneExpression(expression) {
+    return JSON.parse(JSON.stringify(expression));
+  },
+  
+  /**
+   * Merge expressions for combination effects
+   */
+  mergeExpressions(baseExpression, overrideExpression) {
+    return {
+      ...baseExpression,
+      ...overrideExpression,
+      eyes: {
+        ...baseExpression.eyes,
+        ...overrideExpression.eyes
+      }
+    };
+  }
+};
+```
+
+## Integration Example
+
+```javascript
+// Example usage with character data and event bus
+import { ExpressionSystem } from './ExpressionSystem.js';
+import { EventBus } from '../core/EventBus.js';
+
+// Initialize with character data
+const characterData = {
+  // ... character data structure from schema
+};
+
+const eventBus = new EventBus();
+const expressionSystem = new ExpressionSystem(characterData, {
+  defaultTransitionDuration: 0.3,
+  preloadExpressions: true
+});
+
+// Connect to event system
+expressionSystem.connectEventBus(eventBus);
+
+// Use expression system
+expressionSystem.setExpression('singing'); // Smooth transition to singing
+expressionSystem.setExpression('surprised', { immediate: true }); // Instant change
+
+// Add custom expression
+expressionSystem.addCustomExpression('winking', {
+  eyes: { left: 'closed', right: 'default' },
+  mouth: 'smile',
+  duration: 0.2
+});
+
+// Listen for expression changes
+expressionSystem.on('expressionChanged', (data) => {
+  console.log(`Expression changed to: ${data.expressionName}`);
+});
+```
+
+:::

@@ -1,0 +1,69 @@
+---
+id: "playback-controller-class"
+title: "Playback Controller Class"
+unit-type: "javascript-class-definition"
+source-ref: "../../../src/stage/PlaybackController.js"
+status: "implemented"
+priority: "high"
+owner: "AI"
+see-also:
+  - "[[performance-stage-class]]"
+  - "[[timeline-synchronization-requirement]]"
+  - "[[audio-visual-coordination-requirement]]"
+---
+
+## Playback Controller Class
+
+**Purpose**: Manages playback state, timing, and synchronization for the Performance Stage with frame-accurate timing control.
+
+### Architectural Role
+
+The PlaybackController is a specialized component extracted from PerformanceStage to handle all temporal coordination. It provides:
+
+- **Playback Control**: Start, pause, stop, and seek operations
+- **Frame Coordination**: Animation frame loop management
+- **Synchronization**: Maintains sync tolerance for audio-visual alignment
+- **Timing Accuracy**: High-precision timing for frame-accurate playback
+
+### Core Responsibilities
+
+```javascript
+class PlaybackController {
+    // Playback state management
+    startPlayback()
+    pausePlayback()
+    stopPlayback()
+    setCurrentTime(time)
+    
+    // Synchronization and timing
+    renderLoop()
+    synchronizeTo(targetTime)
+    isSynchronized(targetTime)
+    
+    // State access
+    getPlaybackState()
+}
+```
+
+### Synchronization Requirements
+
+- **Sync Tolerance**: 10ms precision as per unified timeline requirement
+- **Frame Accuracy**: requestAnimationFrame coordination for smooth playback
+- **Event Coordination**: Emits timing events for external audio-visual synchronization
+- **Callback Integration**: Delegates rendering to PerformanceStage render method
+
+### Integration Pattern
+
+Extracted to isolate temporal concerns while maintaining tight coordination:
+
+- **Callback Dependency**: Receives render callback from PerformanceStage
+- **Event Publishing**: Publishes playback events for timeline synchronization
+- **State Management**: Manages currentTime and isPlaying state independently
+- **Lifecycle**: Handles animation frame cleanup and event coordination
+
+### Optimization Impact
+
+- **Lines Reduced**: ~100 lines extracted from PerformanceStage
+- **Temporal Isolation**: Timing logic separated from rendering logic
+- **Precision Focus**: Dedicated component for frame-accurate timing
+- **Reusability**: Playback control logic can be reused by other components

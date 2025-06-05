@@ -11,19 +11,21 @@ Welcome to the Open Sprunk Framework documentation. This framework provides a co
 
 ## 📖 Documentation Structure
 
-This documentation follows a layered MDMD (Membrane Design MarkDown) approach:
+This documentation follows a strata-based MDMD (Membrane Design MarkDown) approach with recursive bilayers. MDMD organizes specifications into semantic strata that represent different levels of abstraction, where each stratum contains its own bilayer of compositions (overviews) and units (specific details):
 
-### [🔭 00_IDEATION/](./00_IDEATION/)
+### [🌟 Definition/Vision/](./Definition/Vision/)
 High-level vision, goals, and originating concepts for the framework.
 
-### [📋 01_REQUIREMENTS/](./01_REQUIREMENTS/) 
-Specific functional and technical requirements derived from the ideation phase.
+### [📋 Definition/Requirements/](./Definition/Requirements/) 
+Specific functional and technical requirements derived from the vision phase.
 
-### [🏗️ 02_COMPOSITIONS/](./02_COMPOSITIONS/)
+### [🏗️ Specification/Concepts/](./Specification/Concepts/)
 Architectural designs, module breakdowns, and system compositions that fulfill requirements.
 
-### [⚙️ 03_UNITS/](./03_UNITS/)
-Detailed specifications for individual classes, schemas, and implementable components.
+### [⚙️ Specification/Implementations/](./Specification/Implementations/)
+Detailed specifications for individual classes, schemas, and implementable components with `source-ref` links to actual code.
+
+**Navigation Tip**: MDMD documents use `[[id]]` cross-references to link related concepts. Look for these links throughout the documentation to trace relationships between vision, requirements, designs, and implementations.
 
 ## 🚀 Key Innovations
 
@@ -46,9 +48,9 @@ Detailed specifications for individual classes, schemas, and implementable compo
 
 ```mermaid
 graph TD
-    A[Ideas] --> B[Requirements]
-    B --> C[Compositions]
-    C --> D[Units]
+    A[Vision] --> B[Requirements]
+    B --> C[Concepts]
+    C --> D[Implementations]
     D --> E[Source Code]
     
     F[Phase System] --> G[Character Management]
@@ -94,10 +96,10 @@ The Open Sprunk Framework enables creators to build rich, interactive musical ex
 
 ## 🏃‍♂️ Getting Started
 
-1. **Explore the Architecture**: Start with [02_COMPOSITIONS/](./02_COMPOSITIONS/) for system overview
-2. **Understand the Vision**: Read [00_IDEATION/](./00_IDEATION/) for project goals
-3. **Review Requirements**: Check [01_REQUIREMENTS/](./01_REQUIREMENTS/) for functional needs
-4. **Dive into Implementation**: Browse [03_UNITS/](./03_UNITS/) for detailed specifications
+1. **Explore the Architecture**: Start with [Specification/Concepts/](./Specification/Concepts/) for system overview
+2. **Understand the Vision**: Read [Definition/Vision/](./Definition/Vision/) for project goals
+3. **Review Requirements**: Check [Definition/Requirements/](./Definition/Requirements/) for functional needs
+4. **Dive into Implementation**: Browse [Specification/Implementations/](./Specification/Implementations/) for detailed specifications
 
 ---
 

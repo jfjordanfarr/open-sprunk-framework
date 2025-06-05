@@ -1,25 +1,25 @@
 <!-- filepath: docs/Units/character/character-data-schema.mdmd -->
 ::: {unit}
 id: "character-data-schema"
-title: "Character Data Schema"
+title: "Sprunki Character Data Schema"
 unit-type: "json-schema-definition"
 language: "json"
-status: "draft"
-version: "0.2"
-brief: "Defines the JSON structure for storing character data."
+status: "revised"
+version: "0.5"
+brief: "Defines the JSON structure for Sprunki characters with anatomically-accurate simplified structure: trapezoid body, floating circle hands, and expressive head with sub-elements. Optimized for pre-literate accessibility and Scratch-style authoring workflow."
 source-ref: "../../src/character/CharacterData.js"
 see-also:
-  - "[[../Concepts/character-editor-module.mdmd]]" # Parent composition
+  - "[[character-editor-module]]" # Parent composition
   - "[[project-file-schema]]" # Architectural association (used by project schema)
+  - "[[animation-keyframe-schema]]" # Animation data structure
 
-This unit describes the data structure for a character. It will likely be a JSON object that can be serialized/deserialized.
-Note: The `source-ref` points to `CharacterData.js`, which might be a module exporting this schema or a class that works with this data structure.
+This unit describes the data structure for Sprunki characters based on **actual Sprunki anatomy analysis**: simple trapezoid bodies, floating circle hands (no arms/legs), and highly expressive heads. The schema supports hybrid animation combining transform-based movement with sprite-swap expressions, designed for minimal rigging complexity while maximizing creative expressiveness and accessibility.
 
 ```json
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "CharacterData",
-  "description": "Schema for Sprunki character data",
+  "title": "SprunkiCharacterData",
+  "description": "Schema for Sprunki character data with simplified anatomy and hybrid animation system",
   "type": "object",
   "properties": {
     "id": {
@@ -41,80 +41,633 @@ Note: The `source-ref` points to `CharacterData.js`, which might be a module exp
       "format": "date-time",
       "description": "Timestamp of last character update"
     },
-    "fabricCanvas": {
-      "type": "object",
-      "description": "Serialized Fabric.js canvas state representing the character visuals. See http://fabricjs.com/docs/fabric.Canvas.html#toObject"
-      // Specific properties of fabric.js serialization are numerous and complex,
-      // so we keep this generic. It typically includes 'version', 'objects', 'background'.
-    },
     "parts": {
-      "type": "array",
-      "description": "Optional structured hierarchy of character parts, if not solely relying on Fabric groups.",
-      "items": {
-        "type": "object",
-        "properties": {
-          "partId": { "type": "string" },
-          "name": { "type": "string" },
-          "fabricObjectIds": { 
-            "type": "array", 
-            "items": { "type": "string" },
-            "description": "IDs of Fabric.js objects belonging to this part"
+      "type": "object",
+      "description": "Sprunki character parts based on actual anatomy",
+      "properties": {
+        "body": {
+          "$ref": "#/definitions/trapezoidBody",
+          "description": "Tall trapezoid body shape (thinner top, wider bottom)"
+        },
+        "head": {
+          "$ref": "#/definitions/expressiveHead",
+          "description": "Complex head with sub-elements for animation"
+        },
+        "hands": {
+          "type": "object",
+          "description": "Floating circle hands (no arm connections)",
+          "properties": {
+            "left": { "$ref": "#/definitions/floatingHand" },
+            "right": { "$ref": "#/definitions/floatingHand" }
           },
-          "transform": { "type": "object", "description": "Relative transform if hierarchical" }
-          // Add other part-specific metadata
+          "required": ["left", "right"]
+        }
+      },
+      "required": ["body", "head", "hands"]
+    },
+    "expressions": {
+      "type": "object",
+      "description": "Named expression states for face animation",
+      "properties": {
+        "idle": { "$ref": "#/definitions/expressionState" },
+        "singing": { "$ref": "#/definitions/expressionState" },
+        "surprised": { "$ref": "#/definitions/expressionState" }
+      },
+      "additionalProperties": { 
+        "$ref": "#/definitions/expressionState",
+        "description": "User-defined custom expressions"
+      }
+    },
+    "defaultPose": {
+      "$ref": "#/definitions/characterPose",
+      "description": "Default positioning and scale for all parts"
+    },
+    "animations": {
+      "type": "object",
+      "description": "Named animation sequences for this character",
+      "patternProperties": {
+        "^[a-zA-Z0-9_-]+$": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "duration": { "type": "number", "minimum": 0 },
+            "loop": { "type": "boolean", "default": true },
+            "keyframes": {
+              "type": "array",
+              "items": { "$ref": "#/definitions/animationKeyframe" }
+            }
+          },
+          "required": ["name", "duration", "keyframes"]
         }
       }
     },
+    "stagePosition": {
+      "$ref": "#/definitions/point2D",
+      "description": "Character's position on performance stage"
+    },
     "metadata": {
-        "type": "object",
-        "description": "Any other custom metadata for the character"
+      "type": "object",
+      "description": "Additional character metadata",
+      "properties": {
+        "templateBased": {
+          "type": "boolean",
+          "description": "Whether character was created from template"
+        },
+        "complexity": {
+          "type": "string",
+          "enum": ["simple", "detailed", "advanced"],
+          "description": "Character complexity level for UI progressive disclosure"
+        },
+        "accessibilityFeatures": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["high-contrast", "large-targets", "auditory-feedback"]
+          },
+          "description": "Enabled accessibility features"
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "User-defined tags for organization"
+        }
+      }
     }
   },
-  "required": [
-    "id",
-    "name",
-    "fabricCanvas"
-  ]
+  "required": ["id", "name", "parts", "expressions", "defaultPose"],
+  "definitions": {
+    "trapezoidBody": {
+      "type": "object",
+      "description": "Simple trapezoid body geometry based on Sprunki anatomy",
+      "properties": {
+        "geometry": {
+          "type": "object",
+          "properties": {
+            "topWidth": { 
+              "type": "number", 
+              "minimum": 10,
+              "description": "Width at shoulder area (thinner)"
+            },
+            "bottomWidth": { 
+              "type": "number", 
+              "minimum": 15,
+              "description": "Width at base (wider)"
+            },
+            "height": { 
+              "type": "number", 
+              "minimum": 20,
+              "description": "Total body height"
+            },
+            "cornerRadius": { 
+              "type": "number", 
+              "minimum": 0,
+              "description": "Corner rounding for softer appearance"
+            }
+          },
+          "required": ["topWidth", "bottomWidth", "height"]
+        },
+        "style": {
+          "$ref": "#/definitions/partStyle"
+        },
+        "transform": {
+          "$ref": "#/definitions/transform2D"
+        }
+      },
+      "required": ["geometry", "style", "transform"]
+    },
+    "expressiveHead": {
+      "type": "object",
+      "description": "Complex head with optional sub-elements for maximum expressiveness",
+      "properties": {
+        "base": {
+          "type": "object",
+          "description": "Head base shape (can be circle, oval, or custom path)",
+          "properties": {
+            "geometry": { "$ref": "#/definitions/vectorPath" },
+            "style": { "$ref": "#/definitions/partStyle" }
+          },
+          "required": ["geometry", "style"]
+        },
+        "eyes": {
+          "type": "object",
+          "description": "Eye elements with expression support",
+          "properties": {
+            "left": { "$ref": "#/definitions/eyeElement" },
+            "right": { "$ref": "#/definitions/eyeElement" }
+          },
+          "required": ["left", "right"]
+        },
+        "mouth": {
+          "$ref": "#/definitions/mouthElement",
+          "description": "Mouth with expression state support"
+        },
+        "appendages": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/headAppendage" },
+          "description": "Custom head appendages (horns, antennae, hair, etc.)"
+        },
+        "transform": {
+          "$ref": "#/definitions/transform2D"
+        }
+      },
+      "required": ["base", "eyes", "mouth", "transform"]
+    },
+    "floatingHand": {
+      "type": "object",
+      "description": "Simple floating circle hand (no arm attachment)",
+      "properties": {
+        "geometry": {
+          "type": "object",
+          "properties": {
+            "radius": { 
+              "type": "number", 
+              "minimum": 5,
+              "description": "Circle radius for hand size"
+            }
+          },
+          "required": ["radius"]
+        },
+        "style": {
+          "$ref": "#/definitions/partStyle"
+        },
+        "position": {
+          "$ref": "#/definitions/point2D",
+          "description": "Absolute position (floats independently of body)"
+        },
+        "animationConstraints": {
+          "type": "object",
+          "description": "Movement limits for realistic hand positioning",
+          "properties": {
+            "maxDistanceFromBody": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Maximum distance hand can be from body center"
+            }
+          }
+        }
+      },
+      "required": ["geometry", "style", "position"]
+    },
+    "eyeElement": {
+      "type": "object",
+      "description": "Individual eye with expression states",
+      "properties": {
+        "geometry": { 
+          "$ref": "#/definitions/vectorPath",
+          "description": "Default eye shape"
+        },
+        "style": { "$ref": "#/definitions/partStyle" },
+        "position": { 
+          "$ref": "#/definitions/point2D",
+          "description": "Position relative to head center"
+        },
+        "expressionStates": {
+          "type": "object",
+          "description": "Different eye states for expressions (wide, closed, wink, etc.)",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "geometry": { "$ref": "#/definitions/vectorPath" },
+              "transform": { "$ref": "#/definitions/transform2D" }
+            },
+            "required": ["geometry"]
+          }
+        }
+      },
+      "required": ["geometry", "style", "position"]
+    },
+    "mouthElement": {
+      "type": "object",
+      "description": "Mouth with sprite-swap expression support",
+      "properties": {
+        "geometry": { 
+          "$ref": "#/definitions/vectorPath",
+          "description": "Default mouth shape"
+        },
+        "style": { "$ref": "#/definitions/partStyle" },
+        "position": { 
+          "$ref": "#/definitions/point2D",
+          "description": "Position relative to head center"
+        },
+        "expressionStates": {
+          "type": "object",
+          "description": "Different mouth shapes for expressions (open, smile, 'o', etc.)",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "geometry": { "$ref": "#/definitions/vectorPath" },
+              "transform": { "$ref": "#/definitions/transform2D" }
+            },
+            "required": ["geometry"]
+          }
+        }
+      },
+      "required": ["geometry", "style", "position"]
+    },
+    "headAppendage": {
+      "type": "object",
+      "description": "Custom head appendage (horns, antennae, hair, accessories)",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "geometry": { "$ref": "#/definitions/vectorPath" },
+        "style": { "$ref": "#/definitions/partStyle" },
+        "attachmentPoint": { 
+          "$ref": "#/definitions/point2D",
+          "description": "Where this appendage connects to head"
+        },
+        "transform": { "$ref": "#/definitions/transform2D" },
+        "animationConstraints": {
+          "type": "object",
+          "properties": {
+            "maxRotation": { 
+              "type": "number",
+              "description": "Maximum rotation in degrees"
+            },
+            "elasticity": { 
+              "type": "number", 
+              "minimum": 0, 
+              "maximum": 1,
+              "description": "How much appendage bounces with head movement"
+            }
+          }
+        }
+      },
+      "required": ["id", "geometry", "style", "attachmentPoint", "transform"]
+    },
+    "expressionState": {
+      "type": "object",
+      "description": "Complete facial expression configuration",
+      "properties": {
+        "eyes": {
+          "type": "object",
+          "properties": {
+            "left": { 
+              "type": "string", 
+              "description": "Left eye expression state name"
+            },
+            "right": { 
+              "type": "string", 
+              "description": "Right eye expression state name"
+            }
+          },
+          "required": ["left", "right"]
+        },
+        "mouth": {
+          "type": "string",
+          "description": "Mouth expression state name"
+        },
+        "duration": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0.3,
+          "description": "Duration for expression transition (seconds)"
+        }
+      },
+      "required": ["eyes", "mouth"]
+    },
+    "characterPose": {
+      "type": "object",
+      "description": "Complete character positioning and expression state",
+      "properties": {
+        "body": { "$ref": "#/definitions/transform2D" },
+        "head": { "$ref": "#/definitions/transform2D" },
+        "hands": {
+          "type": "object",
+          "properties": {
+            "left": { "$ref": "#/definitions/point2D" },
+            "right": { "$ref": "#/definitions/point2D" }
+          },
+          "required": ["left", "right"]
+        },
+        "expression": {
+          "type": "string",
+          "description": "Active expression state name"
+        }
+      },
+      "required": ["body", "head", "hands"]
+    },
+    "animationKeyframe": {
+      "type": "object",
+      "description": "Single keyframe in animation sequence",
+      "properties": {
+        "time": { 
+          "type": "number", 
+          "minimum": 0,
+          "description": "Time position in seconds" 
+        },
+        "pose": { 
+          "$ref": "#/definitions/characterPose",
+          "description": "Complete character state at this time"
+        },
+        "easing": { 
+          "type": "string", 
+          "enum": ["linear", "easeIn", "easeOut", "easeInOut"],
+          "default": "easeInOut",
+          "description": "Interpolation method to next keyframe"
+        }
+      },
+      "required": ["time", "pose"]
+    },
+    "vectorPath": {
+      "type": "object",
+      "description": "SVG-like path definition for custom shapes",
+      "properties": {
+        "pathData": {
+          "type": "string",
+          "description": "SVG path data string (M, L, C, Z commands)"
+        },
+        "viewBox": {
+          "type": "object",
+          "properties": {
+            "x": { "type": "number" },
+            "y": { "type": "number" },
+            "width": { "type": "number" },
+            "height": { "type": "number" }
+          },
+          "required": ["x", "y", "width", "height"]
+        }
+      },
+      "required": ["pathData"]
+    },
+    "partStyle": {
+      "type": "object",
+      "description": "Visual styling for character parts",
+      "properties": {
+        "fill": {
+          "type": "string",
+          "description": "Fill color (hex, rgb, or gradient identifier)"
+        },
+        "stroke": {
+          "type": "string",
+          "description": "Stroke color"
+        },
+        "strokeWidth": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Stroke thickness"
+        },
+        "opacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 1
+        }
+      },
+      "required": ["fill"]
+    },
+    "transform2D": {
+      "type": "object",
+      "description": "2D transformation properties",
+      "properties": {
+        "position": { "$ref": "#/definitions/point2D" },
+        "rotation": { 
+          "type": "number",
+          "description": "Rotation in degrees"
+        },
+        "scale": {
+          "type": "object",
+          "properties": {
+            "x": { "type": "number", "minimum": 0.1 },
+            "y": { "type": "number", "minimum": 0.1 }
+          },
+          "required": ["x", "y"]
+        }
+      },
+      "required": ["position"]
+    },
+    "point2D": {
+      "type": "object",
+      "description": "2D coordinate point",
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" }
+      },
+      "required": ["x", "y"]
+    }
+  }
 }
 ```
 
-A corresponding JavaScript file (`src/character/CharacterData.js`) might look like this:
+## Usage Examples
+
+### Basic Sprunki Character
+```json
+{
+  "id": "simple-sprunki-01",
+  "name": "My First Sprunki",
+  "createdAt": "2024-01-15T10:30:00Z",
+  "updatedAt": "2024-01-15T10:30:00Z",
+  "parts": {
+    "body": {
+      "geometry": {
+        "topWidth": 40,
+        "bottomWidth": 60,
+        "height": 80,
+        "cornerRadius": 5
+      },
+      "style": {
+        "fill": "#4A90E2",
+        "stroke": "#2E5A8A",
+        "strokeWidth": 2
+      },
+      "transform": {
+        "position": { "x": 0, "y": 0 },
+        "rotation": 0,
+        "scale": { "x": 1, "y": 1 }
+      }
+    },
+    "head": {
+      "base": {
+        "geometry": {
+          "pathData": "M 0,30 A 30,30 0 1,1 0,-30 A 30,30 0 1,1 0,30 Z",
+          "viewBox": { "x": -30, "y": -30, "width": 60, "height": 60 }
+        },
+        "style": {
+          "fill": "#4A90E2",
+          "stroke": "#2E5A8A",
+          "strokeWidth": 2
+        }
+      },
+      "eyes": {
+        "left": {
+          "geometry": {
+            "pathData": "M 0,6 A 6,6 0 1,1 0,-6 A 6,6 0 1,1 0,6 Z"
+          },
+          "style": { "fill": "#000000" },
+          "position": { "x": -10, "y": -5 }
+        },
+        "right": {
+          "geometry": {
+            "pathData": "M 0,6 A 6,6 0 1,1 0,-6 A 6,6 0 1,1 0,6 Z"
+          },
+          "style": { "fill": "#000000" },
+          "position": { "x": 10, "y": -5 }
+        }
+      },
+      "mouth": {
+        "geometry": {
+          "pathData": "M -8,0 Q 0,8 8,0"
+        },
+        "style": { "fill": "none", "stroke": "#000000", "strokeWidth": 2 },
+        "position": { "x": 0, "y": 10 }
+      },
+      "appendages": [],
+      "transform": {
+        "position": { "x": 0, "y": -60 },
+        "rotation": 0,
+        "scale": { "x": 1, "y": 1 }
+      }
+    },
+    "hands": {
+      "left": {
+        "geometry": { "radius": 12 },
+        "style": {
+          "fill": "#4A90E2",
+          "stroke": "#2E5A8A",
+          "strokeWidth": 2
+        },
+        "position": { "x": -45, "y": -20 }
+      },
+      "right": {
+        "geometry": { "radius": 12 },
+        "style": {
+          "fill": "#4A90E2",
+          "stroke": "#2E5A8A",
+          "strokeWidth": 2
+        },
+        "position": { "x": 45, "y": -20 }
+      }
+    }
+  },
+  "expressions": {
+    "idle": {
+      "eyes": { "left": "default", "right": "default" },
+      "mouth": "default"
+    },
+    "singing": {
+      "eyes": { "left": "default", "right": "default" },
+      "mouth": "open"
+    },
+    "surprised": {
+      "eyes": { "left": "wide", "right": "wide" },
+      "mouth": "open"
+    }
+  },
+  "defaultPose": {
+    "body": {
+      "position": { "x": 0, "y": 0 },
+      "rotation": 0,
+      "scale": { "x": 1, "y": 1 }
+    },
+    "head": {
+      "position": { "x": 0, "y": -60 },
+      "rotation": 0,
+      "scale": { "x": 1, "y": 1 }
+    },
+    "hands": {
+      "left": { "x": -45, "y": -20 },
+      "right": { "x": 45, "y": -20 }
+    },
+    "expression": "idle"
+  },
+  "stagePosition": { "x": 200, "y": 300 },
+  "metadata": {
+    "templateBased": true,
+    "complexity": "simple",
+    "tags": ["beginner", "blue", "friendly"]
+  }
+}
+```
+
+## JavaScript Implementation
+
+The corresponding `src/character/CharacterData.js` should provide:
 
 ```javascript
 // src/character/CharacterData.js
 
-/**
- * Generates a new character data object with default values.
- * @param {string} name - The name of the character.
- * @returns {object} A new character data object.
- */
-export function createNewCharacterData(name) {
-    return {
-        id: self.crypto.randomUUID(), // Browser environment
-        name: name || 'New Character',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        fabricCanvas: null, // To be populated by Fabric.js toJSON()
-        parts: [],
-        metadata: {}
+export class SprunkiCharacterData {
+  constructor(name = 'New Sprunki') {
+    this.id = crypto.randomUUID();
+    this.name = name;
+    this.createdAt = new Date().toISOString();
+    this.updatedAt = new Date().toISOString();
+    this.parts = this.createDefaultParts();
+    this.expressions = this.createDefaultExpressions();
+    this.defaultPose = this.createDefaultPose();
+    this.animations = {};
+    this.stagePosition = { x: 0, y: 0 };
+    this.metadata = {
+      templateBased: true,
+      complexity: 'simple',
+      tags: []
     };
+  }
+
+  // Factory methods for creating default structures
+  createDefaultParts() { /* ... */ }
+  createDefaultExpressions() { /* ... */ }
+  createDefaultPose() { /* ... */ }
+  
+  // Expression management
+  setExpression(expressionName) { /* ... */ }
+  addCustomExpression(name, config) { /* ... */ }
+  
+  // Animation helpers
+  addKeyframe(animationName, time, pose) { /* ... */ }
+  
+  // Validation
+  validate() { /* Schema validation */ }
+  
+  // Serialization
+  toJSON() { /* ... */ }
+  static fromJSON(data) { /* ... */ }
 }
 
-/**
- * Validates character data against the schema (basic validation example).
- * @param {object} characterData - The character data to validate.
- * @returns {boolean} True if valid, false otherwise.
- */
-export function isValidCharacterData(characterData) {
-    if (!characterData || typeof characterData !== 'object') return false;
-    if (typeof characterData.id !== 'string') return false;
-    if (typeof characterData.name !== 'string') return false;
-    if (typeof characterData.fabricCanvas !== 'object') return false; // Could be null initially
-    return true;
+export function createTemplateSprunki(templateName) {
+  // Factory function for pre-made Sprunki templates
 }
-
-// Potentially, a CharacterData class could also be defined here to wrap the object
-// and provide methods for manipulation, if preferred over plain utility functions.
 ```
 
 :::

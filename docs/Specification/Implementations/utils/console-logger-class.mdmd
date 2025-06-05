@@ -1,0 +1,83 @@
+<!-- filepath: docs/Specification/Implementations/utils/console-logger-class.mdmd -->
+::: {unit}
+id: "console-logger-class"
+title: "Console Logger Class"
+unit-type: "javascript-class-definition"
+language: "javascript"
+status: "active"
+version: "0.1"
+brief: "Debug utility that captures and displays console output for development and troubleshooting."
+source-ref: "../../../../src/console-logger.js"
+see-also:
+  - "[[app-core-module]]"
+  - "[[html-main-page]]"
+  - "[[client-side-architecture-requirement]]"
+
+The ConsoleLogger class provides a debugging interface that intercepts and captures console output, making it easy to copy/paste logs for issue reporting and troubleshooting. This utility is particularly valuable for GitHub Copilot debugging sessions.
+
+```javascript
+export class ConsoleLogger {
+    constructor() {
+        this.logs = [];
+        this.maxLogs = 100;
+        this.setupInterception();
+        this.createUI();
+    }
+
+    /**
+     * Sets up console method interception
+     */
+    setupInterception() {
+        // Store original console methods and replace with intercepting versions
+    }
+
+    /**
+     * Adds a log entry with timestamp and formatting
+     * @param {string} type - Log type ('LOG', 'ERROR', 'WARN', 'INFO')
+     * @param {Array} args - Arguments passed to console method
+     */
+    addLog(type, args) {
+        // Formats and stores log entry with metadata
+    }
+
+    /**
+     * Creates the logger UI overlay
+     */
+    createUI() {
+        // Creates floating UI panel for log display and interaction
+    }
+
+    /**
+     * Exports logs in a format suitable for copying
+     * @returns {string} Formatted log output
+     */
+    exportLogs() {
+        // Returns formatted log content for copy/paste
+    }
+
+    /**
+     * Clears all captured logs
+     */
+    clearLogs() {
+        // Empties the log buffer
+    }
+
+    /**
+     * Toggles logger UI visibility
+     */
+    toggle() {
+        // Shows/hides the logger interface
+    }
+}
+```
+
+**Key Features:**
+- **Console Interception**: Captures all console.log, console.error, console.warn, and console.info calls
+- **UI Interface**: Provides floating panel for log viewing and management
+- **Export Functionality**: Formats logs for easy copy/paste in bug reports
+- **Log Management**: Automatic log rotation and manual clearing capabilities
+- **Development Focus**: Designed specifically for debugging and development workflows
+
+**Usage Context:**
+This utility is primarily used during development and debugging sessions, particularly when working with GitHub Copilot to diagnose and fix issues in the application.
+:::

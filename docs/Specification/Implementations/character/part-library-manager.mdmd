@@ -1,0 +1,133 @@
+{unit}
+---
+id: "part-library-manager-class"
+title: "Part Library Manager Class"
+unit-type: "javascript-class-definition"
+source-ref: "../../../src/character/PartLibraryManager.js"
+status: "implemented"
+priority: "high"
+owner: "character-authoring-team"
+see-also:
+  - "[[drawing-window-interface]]"
+  - "[[event-bus-class]]"
+  - "[[sprunki-anatomy-structure]]"
+  - "[[character-authoring-ux-composition]]"
+---
+
+# Part Library Manager Class
+
+The **PartLibraryManager** class handles the visual part library interface within the DrawingWindow, implementing the Sprunki anatomy-aware part selection system. This extracted component manages the left panel of the character authoring interface, providing an intuitive part browsing and selection experience.
+
+## Core Responsibilities
+
+- **Sprunki Anatomy Management**: Organizes parts according to the head/body/hands anatomy structure
+- **Visual Part Library**: Creates interactive thumbnail grids for part selection
+- **Part Preview Generation**: Generates visual previews for anatomy-based parts
+- **Event Coordination**: Integrates with EventBus for real-time part selection updates
+- **Subpart Navigation**: Handles hierarchical part structures (e.g., head subparts like eyes, mouth)
+
+## Implementation Contract
+
+```javascript
+export class PartLibraryManager {
+  constructor(container, eventBus) {
+    // Initialize with DOM container and event bus
+    this.container = container;
+    this.eventBus = eventBus;
+    this.selectedPart = null;
+    this.selectedSubPart = null;
+  }
+
+  // Core lifecycle methods
+  init() {
+    this.createPartLibrary();
+    this.setupEventListeners();
+  }
+
+  // Part library creation and management
+  createPartLibrary() {
+    // Creates primary parts (head, body, hands)
+    // Creates head subparts (eyes, mouth, appendages)
+    // Renders interactive part grids
+  }
+
+  generatePartPreview(partType) {
+    // Generates visual thumbnails for parts
+    // Returns Canvas-based preview images
+  }
+
+  // Event handling and state management
+  selectPart(partId, subPartId) {
+    // Handles part selection logic
+    // Emits selection events via EventBus
+  }
+
+  updateSelectedPart(partData) {
+    // Updates selection state
+    // Triggers canvas updates
+  }
+
+  // Canvas integration methods
+  loadPartIntoCanvas(partData) {
+    // Loads selected part into drawing canvas
+    // Creates default geometry for new parts
+  }
+
+  createDefaultPartGeometry(partType) {
+    // Creates basic shapes for anatomy parts
+    // Returns Fabric.js geometry objects
+  }
+}
+```
+
+## Architecture Integration
+
+**EventBus Communication:**
+- Emits `part:selected` events when parts are chosen
+- Listens for `canvas:part-loaded` confirmations
+- Coordinates with StylePaletteManager for tool state
+
+**Sprunki Anatomy Structure:**
+- **Primary Parts**: Head (complex), Body (trapezoid), Hands (circles)
+- **Head Subparts**: Eyes, mouth, appendages with expression variants
+- **Hierarchical Selection**: Parent-child relationships for complex parts
+
+**Canvas Integration:**
+- Generates default Fabric.js geometry for selected parts
+- Provides part-specific drawing templates
+- Manages part placement and initial styling
+
+## Dependencies
+
+- **EventBus**: For real-time communication across components
+- **Fabric.js**: For canvas geometry generation and part previews
+- **DOM Container**: Parent element provided by DrawingWindow
+- **CSS Classes**: Styling coordination with drawing-window.css
+
+## File Organization
+
+This class was extracted from the original 1000+ line DrawingWindow.js to improve:
+- **LLM Efficacy**: Reduced file size to 354 lines (optimal range)
+- **MDMD Compliance**: Dedicated unit specification for part management
+- **Code Maintainability**: Clear separation of concerns
+- **Testing Isolation**: Independent testing of part library functionality
+
+## Usage Example
+
+```javascript
+// Integration within DrawingWindow
+const partLibraryManager = new PartLibraryManager(
+  this.container.querySelector('.part-library-panel'),
+  this.eventBus
+);
+
+partLibraryManager.init();
+
+// Event-driven part selection
+this.eventBus.on('part:selected', (partData) => {
+  partLibraryManager.loadPartIntoCanvas(partData);
+});
+```
+
+This component demonstrates the MDMD methodology's ability to create independently maintainable, focused modules that enhance both human comprehension and LLM processing efficiency.
+{/unit}

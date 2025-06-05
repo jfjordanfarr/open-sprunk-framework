@@ -1,0 +1,128 @@
+---
+id: "timeline-playback-manager-class"
+title: "Timeline Playback Manager Class"
+unit-type: "javascript-class-definition"
+source-ref: "../../../src/animation/TimelinePlaybackManager.js"
+status: "implemented"
+priority: "high"
+owner: "timeline-optimization-team"
+see-also:
+  - "[[timeline-class]]"
+  - "[[audio-engine-class]]"
+  - "[[req-synchronized-playback]]"
+  - "[[req-unified-timeline]]"
+---
+
+# Timeline Playback Manager Class
+
+The TimelinePlaybackManager class manages unified playback control for synchronized music and animation. This component was extracted from Timeline.js to provide specialized playback coordination with precise temporal synchronization.
+
+## Architectural Role
+
+The TimelinePlaybackManager serves as the playback coordination center:
+- Unified play/pause/stop controls for music and animation
+- Audio engine synchronization and fallback handling
+- Animation frame loop management
+- Precise timing coordination with 10ms tolerance
+
+## Core Interface
+
+```javascript
+class TimelinePlaybackManager {
+    constructor(eventBus, audioEngine) {
+        this.eventBus = eventBus;
+        this.audioEngine = audioEngine;
+        this.isPlaying = false;
+        this.isLooping = false;
+        this.currentTime = 0;
+        this.syncPrecision = 0.01; // 10ms tolerance
+    }
+
+    // Playback control
+    async play() { ... }
+    pause() { ... }
+    stop() { ... }
+    toggle() { ... }
+
+    // State management
+    isPlaying() { ... }
+    getCurrentTime() { ... }
+    setCurrentTime(time) { ... }
+    setDuration(duration) { ... }
+
+    // Synchronization
+    syncWithAudio() { ... }
+    updateLoop() { ... }
+}
+```
+
+## Synchronization Strategy
+
+**Audio-First Approach:**
+1. Start audio engine first for clock reference
+2. Begin animation loop synchronized to audio timeline
+3. Fallback to visual-only if audio fails
+4. Maintain 10ms synchronization tolerance
+
+**Error Handling:**
+- Graceful degradation when audio engine fails
+- Continues with visual timeline if music unavailable
+- Logs warnings but doesn't break animation playback
+
+## Integration Pattern
+
+This component is used by:
+- **Timeline**: Primary consumer for all playback operations
+- **PerformanceStage**: For performance playback coordination
+- **AudioEngine**: Direct integration for audio synchronization
+- **AnimationEngine**: Via EventBus for animation frame updates
+
+## Optimization Impact
+
+**Line Count Reduction:**
+- Extracted ~120-150 lines of playback logic from Timeline.js
+- Centralized all timing-critical playback code
+- Improved reliability through focused testing
+
+**Benefits:**
+- **Reliability**: Isolated playback logic easier to debug
+- **Performance**: Optimized update loops for smooth playback
+- **Synchronization**: Better audio-visual coordination
+- **Maintainability**: Single responsibility for playback concerns
+
+## Timing Precision
+
+**Frame Rate Management:**
+- Uses `requestAnimationFrame` for smooth 60fps updates
+- Delta time calculations for frame-rate independent timing
+- Handles performance drops gracefully
+
+**Audio Synchronization:**
+- Cross-references audio engine current time
+- Adjusts animation timing to match audio playback
+- Compensates for audio buffer delays
+
+## Dependencies
+
+- **EventBus**: For playback state notifications
+- **AudioEngine**: For audio playback coordination
+- **Performance API**: For high-precision timing measurements
+
+## Event Emissions
+
+```javascript
+// Playback state changes
+'timeline:playback_started' { currentTime }
+'timeline:playback_paused' { currentTime }
+'timeline:playback_stopped' { }
+
+// Time updates during playback
+'timeline:time_update' { currentTime, deltaTime }
+```
+
+## Testing Considerations
+
+- Audio-visual synchronization accuracy testing
+- Performance testing under various system loads
+- Error handling when audio engine unavailable
+- Frame drop recovery and timing compensation

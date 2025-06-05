@@ -1,0 +1,86 @@
+---
+id: "performance-metrics-class"
+title: "Performance Metrics Class"
+unit-type: "javascript-class-definition"
+source-ref: "../../../src/stage/PerformanceMetrics.js"
+status: "implemented"
+priority: "medium"
+owner: "AI"
+see-also:
+  - "[[performance-stage-class]]"
+  - "[[debug-monitoring-requirement]]"
+  - "[[performance-optimization-requirement]]"
+---
+
+## Performance Metrics Class
+
+**Purpose**: Tracks and provides performance monitoring for the Performance Stage including FPS tracking, frame counting, and debug information display.
+
+### Architectural Role
+
+The PerformanceMetrics component is extracted from PerformanceStage to handle all performance monitoring and debugging capabilities. It provides:
+
+- **FPS Tracking**: Real-time frame rate monitoring with history
+- **Render Timing**: Frame render time tracking and analysis
+- **Debug Display**: Visual debug information overlay
+- **Performance Analysis**: Warning detection and optimization insights
+
+### Core Responsibilities
+
+```javascript
+class PerformanceMetrics {
+    // Performance tracking
+    updateFPS(now)
+    trackRenderTime(startTime, endTime)
+    
+    // Debug visualization
+    renderDebugInfo(ctx, currentTime)
+    
+    // Performance analysis
+    getPerformanceMetrics()
+    getPerformanceWarnings()
+    
+    // Statistics calculation
+    getAverageFPS()
+    getMinFPS()
+    getMaxFPS()
+    getTotalFrameCount()
+}
+```
+
+### Performance Monitoring Features
+
+- **FPS Calculation**: Rolling FPS calculation with 1-second update intervals
+- **History Tracking**: 60-second FPS history for trend analysis
+- **Render Timing**: Per-frame render time measurement with rolling averages
+- **Performance Warnings**: Automatic detection of performance issues
+
+### Debug Information Display
+
+- **Real-time Metrics**: FPS, render time, frame count display
+- **Visual Overlay**: Semi-transparent debug panel with performance data
+- **Conditional Rendering**: Only renders when debug mode is enabled
+- **Performance Impact**: Minimal overhead when debug mode is disabled
+
+### Performance Thresholds
+
+- **Target FPS**: 60 FPS target with warnings below 30 FPS
+- **Render Budget**: 16ms render time budget (60 FPS frame budget)
+- **Drop Detection**: 20% FPS drop detection for performance alerts
+- **History Analysis**: Recent performance vs. overall average comparison
+
+### Integration Pattern
+
+Extracted to isolate performance concerns while maintaining integration:
+
+- **Event Integration**: Publishes FPS update events for external monitoring
+- **Render Integration**: Called during PerformanceStage render cycle
+- **State Integration**: Checks debug mode from stateManager
+- **Non-invasive**: Designed to have minimal impact on performance when disabled
+
+### Optimization Impact
+
+- **Lines Reduced**: ~80 lines extracted from PerformanceStage
+- **Performance Focus**: Dedicated component for monitoring and optimization
+- **Debug Isolation**: Debug rendering separated from core stage rendering
+- **Analysis Tools**: Comprehensive performance analysis capabilities

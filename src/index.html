@@ -5,49 +5,102 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sprunki Game - Creative Character & Music Studio</title>
     <link rel="stylesheet" href="styles/main.css">
+    
+    <!-- Fabric.js for character drawing capabilities -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
 </head>
 <body>
     <div id="app">
-        <header id="app-header">
-            <h1>Sprunki Creative Studio</h1>
-            <nav id="main-nav">
-                <button id="nav-character" class="nav-tab">Character</button>
-                <button id="nav-music" class="nav-tab">Music</button>
-                <button id="nav-animation" class="nav-tab">Animation</button>
-                <button id="nav-stage" class="nav-tab active">Stage</button>
+        <header id="app-header" class="modern-header">
+            <div class="header-brand">
+                <span class="brand-icon">🎭</span>
+                <h1 class="brand-title">Sprunki Creative Studio</h1>
+            </div>
+            <nav id="main-nav" class="main-navigation">
+                <button class="nav-btn" data-mode="character" aria-label="Character Creator">
+                    <span class="icon">🎨</span>
+                    <span class="label">Characters</span>
+                </button>
+                <button class="nav-btn" data-mode="animation" aria-label="Animation Editor">
+                    <span class="icon">🎬</span>
+                    <span class="label">Animation</span>
+                </button>
+                <button class="nav-btn" data-mode="music" aria-label="Music Editor">
+                    <span class="icon">🎵</span>
+                    <span class="label">Music</span>
+                </button>
+                <button class="nav-btn active" data-mode="stage" aria-label="Performance Stage">
+                    <span class="icon">🎪</span>
+                    <span class="label">Stage</span>
+                </button>
             </nav>
-            <div id="project-controls">
-                <button id="save-project">Save</button>
-                <button id="load-project">Load</button>
-                <button id="export-project">Export</button>
+            <div id="project-controls" class="project-controls">
+                <button id="save-project" class="control-btn" aria-label="Save Project">
+                    <span class="icon">💾</span>
+                </button>
+                <button id="load-project" class="control-btn" aria-label="Load Project">
+                    <span class="icon">📁</span>
+                </button>
+                <button id="export-project" class="control-btn" aria-label="Export Project">
+                    <span class="icon">📦</span>
+                </button>
+                <button id="settings" class="control-btn" aria-label="Settings">
+                    <span class="icon">⚙️</span>
+                </button>
             </div>
         </header>
         
-        <main id="app-main">
+        <main id="app-main" class="app-main">
+            <!-- Character Editor - Now opens in popup/overlay -->
             <div id="character-editor" class="editor-panel hidden">
-                <div id="character-canvas-container"></div>
-                <div id="character-controls"></div>
+                <div class="editor-launch">
+                    <button id="launch-character-editor" class="launch-btn">
+                        <span class="icon">🎨</span>
+                        <span class="title">Open Character Creator</span>
+                        <span class="subtitle">Create and edit Sprunki characters</span>
+                    </button>
+                </div>
             </div>
             
+            <!-- Music Editor Panel -->
             <div id="music-editor" class="editor-panel hidden">
-                <div id="piano-roll-container"></div>
-                <div id="instrument-controls"></div>
-                <div id="music-controls"></div>
+                <div class="coming-soon">
+                    <span class="icon">🎵</span>
+                    <h3>Music Editor</h3>
+                    <p>Beat-synchronized music composition coming soon</p>
+                </div>
             </div>
             
+            <!-- Animation Editor Panel -->
             <div id="animation-editor" class="editor-panel hidden">
-                <div id="timeline-container"></div>
-                <div id="property-editor-container"></div>
-                <div id="animation-preview"></div>
+                <div class="coming-soon">
+                    <span class="icon">🎬</span>
+                    <h3>Animation Editor</h3>
+                    <p>Timeline-based animation authoring coming soon</p>
+                </div>
             </div>
             
-            <div id="performance-stage" class="editor-panel">
-                <div id="stage-canvas-container"></div>
-                <div id="stage-controls"></div>
+            <!-- Performance Stage - Main View -->
+            <div id="performance-stage" class="editor-panel active">
+                <div id="stage-canvas-container" class="stage-container">
+                    <!-- Stage content will be rendered here -->
+                </div>
+                <div id="stage-controls" class="stage-controls">
+                    <button class="stage-btn" id="play-pause" aria-label="Play/Pause">
+                        <span class="icon">▶️</span>
+                    </button>
+                    <button class="stage-btn" id="stop" aria-label="Stop">
+                        <span class="icon">⏹️</span>
+                    </button>
+                    <div class="stage-timeline">
+                        <input type="range" id="timeline-scrubber" min="0" max="100" value="0" aria-label="Timeline">
+                    </div>
+                </div>
             </div>
         </main>
     </div>
     
+    <script src="console-logger.js"></script>
     <script type="module" src="main.js"></script>
 </body>
 </html>

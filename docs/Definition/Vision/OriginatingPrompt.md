@@ -8,6 +8,6 @@ The app should be 100% client-side for now. I don't want any of the headache of 
 
 My goal is to create a very simple, web-based, client-side game/interactive experience creation tool, akin to a highly simplified Adobe Animate (Flash) or a visual Scratch, but with a focus on vector graphics and direct HTML5 export. The primary user will be someone who wants to make simple animated cartoons or interactive stories without needing to code extensively, though the output should be inspectable and potentially modifiable by a developer.
 
-This concept is further elaborated in `[[Idea.md]]` and its requirements are captured in documents like `[[../01_REQUIREMENTS/CoreSystemRequirements.mdmd]]`, specifically `[[../01_REQUIREMENTS/client-side-architecture-requirement.mdmd]]` and `[[../01_REQUIREMENTS/html5-export-requirement.mdmd]]`.
+This concept is further elaborated in `[[Idea.md]]` and its requirements are captured in documents like `[[../Requirements/CoreSystemRequirements]]`, specifically `[[../Requirements/client-side-architecture-requirement]]` and `[[../Requirements/html5-export-requirement]]`.
 
 ## Core Features (Initial Thoughts):

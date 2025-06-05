@@ -1,0 +1,115 @@
+{unit}
+---
+id: "animation-engine-class"
+title: "Animation Engine Class"
+unit-type: "javascript-class-definition"
+source-ref: "../../../src/character/AnimationEngine.js"
+status: "implemented"
+priority: "high"
+owner: "character-authoring-team"
+see-also:
+  - "[[expression-system]]"
+  - "[[expression-controller-class]]"
+  - "[[character-authoring-ux-composition]]"
+  - "[[humanoid-character-animation-requirement]]"
+---
+
+# Animation Engine Class
+
+The **AnimationEngine** class provides the core animation capabilities for the Sprunki Expression System. This extracted component handles animation queuing, easing, interpolation, and smooth transitions between character expression states, ensuring fluid and responsive character animations.
+
+## Core Responsibilities
+
+- **Animation Queuing**: Manages sequential and parallel animation execution
+- **Smooth Interpolation**: Provides easing functions and transition curves
+- **Performance Optimization**: Handles animation batching and efficient rendering
+- **State Transitions**: Coordinates smooth transitions between expression states
+- **Timeline Management**: Synchronizes animations with performance timeline
+
+## Implementation Contract
+
+```javascript
+export class AnimationEngine {
+  constructor(options = {}) {
+    // Initialize animation engine with configurable options
+    this.options = {
+      defaultTransitionDuration: 0.3,
+      easing: 'easeInOut',
+      smoothTransitions: true,
+      ...options
+    };
+    
+    // Animation state management
+    this.animationQueue = [];
+    this.activeAnimations = new Map();
+    this.isProcessing = false;
+  }
+
+  // Core animation methods
+  createTransitionAnimations(targetState, options) {
+    // Creates smooth transition animations between states
+    // Supports duration, easing, and stagger configurations
+  }
+
+  processAnimationQueue() {
+    // Processes queued animations with proper timing
+    // Handles parallel and sequential animation execution
+  }
+
+  applyEasing(t, easingType) {
+    // Applies easing functions to animation progress
+    // Supports various easing curves (linear, ease-in, ease-out, etc.)
+  }
+
+  interpolateValue(from, to, progress) {
+    // Interpolates between values using current progress
+    // Handles numbers, colors, transforms, and complex objects
+  }
+
+  startAnimation(animation) {
+    // Starts individual animations with proper lifecycle management
+    // Manages animation state and completion callbacks
+  }
+
+  stopAnimation(animationId) {
+    // Stops specific animations by ID
+    // Cleans up animation state and resources
+  }
+
+  clearAllAnimations() {
+    // Stops all active animations
+    // Resets animation engine to clean state
+  }
+}
+```
+
+## Key Features
+
+### Animation Queuing System
+- **Sequential Animations**: Queues animations to play one after another
+- **Parallel Animations**: Supports multiple simultaneous animations
+- **Priority Management**: Handles animation priority and interruption
+
+### Easing and Interpolation
+- **Built-in Easing Functions**: Provides common easing curves (linear, quadratic, cubic)
+- **Custom Easing Support**: Allows custom bezier curve definitions
+- **Multi-type Interpolation**: Handles numbers, colors, transforms, and object properties
+
+### Performance Optimization
+- **Animation Batching**: Groups related animations for efficient execution
+- **Request Animation Frame**: Uses browser-optimized rendering loops
+- **Memory Management**: Proper cleanup of completed animations
+
+## Integration Points
+
+- **Expression System**: Primary consumer for character expression transitions
+- **Performance Stage**: Coordinates with stage rendering and timeline
+- **Event Bus**: Publishes animation events for system coordination
+
+## Dependencies
+
+- Modern browser with RequestAnimationFrame support
+- Integration with Expression Controller for state management
+- EventBus for animation event coordination
+
+This animation engine provides the foundational animation capabilities needed for smooth, responsive Sprunki character expressions while maintaining optimal performance.

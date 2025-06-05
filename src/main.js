@@ -1,9 +1,17 @@
+// MDMD Source: docs/Specification/Implementations/app-main-bootstrap.mdmd
+
 /**
  * Sprunki App - Main application bootstrap
  * Initializes all modules and sets up the UI
+ * 
+ * @class SpunkiApp
+ * @description Main application controller that bootstraps the entire system,
+ *              manages module initialization, and coordinates the user interface.
  */
 import { AppCore } from './core/AppCore.js';
 import { PerformanceStage } from './stage/PerformanceStage.js';
+import { CharacterEditor } from './character/CharacterEditor.js';
+import { AnimationTimelineEditor } from './animation/AnimationTimelineEditor.js';
 
 class SpunkiApp {
     constructor() {
@@ -20,22 +28,16 @@ class SpunkiApp {
             this.appCore = new AppCore();
             await this.appCore.init();
 
-            // Initialize editors - Stage gets real implementation!
-            this.editors = {
-                character: new PlaceholderEditor('character', this.appCore.getEventBus()),
-                music: new PlaceholderEditor('music', this.appCore.getEventBus()),
-                animation: new PlaceholderEditor('animation', this.appCore.getEventBus()),
-                stage: await this.createPerformanceStage()
-            };
+            // Initialize Performance Stage first (foundation for unified authoring)
+            this.editors.stage = await this.createPerformanceStage();
 
-            // Initialize other editors (non-async)
-            await Promise.all([
-                this.editors.character.init(),
-                this.editors.music.init(),
-                this.editors.animation.init()
-            ]);
-            
-            // Stage is already initialized in createPerformanceStage
+            // Initialize unified editors with stage integration
+            this.editors.character = await this.createCharacterEditor();
+            this.editors.music = new PlaceholderEditor('music', this.appCore.getEventBus());
+            this.editors.animation = await this.createAnimationTimelineEditor();
+
+            // Initialize placeholder editors (non-async) 
+            await this.editors.music.init();
 
             // Register editors with the core
             Object.entries(this.editors).forEach(([name, editor]) => {
@@ -45,13 +47,14 @@ class SpunkiApp {
             // Set up UI interactions
             this.setupNavigation();
             this.setupProjectControls();
+            this.setupUnifiedAuthoringControls();
 
             // Set up global event listeners
             this.setupGlobalEventListeners();
 
             // Show initial message in console
             console.log('🎉 Sprunki Creative Studio initialized successfully!');
-            console.log('🎭 Performance Stage is ready for creativity!');
+            console.log('🎭 Performance Stage is ready for unified authoring!');
             
             // Add some test data to demonstrate the stage
             this.addTestData();
@@ -108,6 +111,158 @@ class SpunkiApp {
         return stage;
     }
 
+    async createCharacterEditor() {
+        console.log('🎨 Creating Character Editor with stage integration...');
+        
+        // Create Character Editor instance with Performance Stage integration
+        const characterEditor = new CharacterEditor(
+            this.editors.stage,
+            this.appCore.getEventBus(),
+            this.appCore.getStateManager()
+        );
+        
+        // Initialize Character Editor
+        await characterEditor.initialize();
+        
+        console.log('🎨 Character Editor created and initialized with stage integration');
+        return characterEditor;
+    }
+
+    async createAnimationTimelineEditor() {
+        console.log('🎬 Creating Animation Timeline Editor with stage integration...');
+        
+        // Create Animation Timeline Editor instance with Performance Stage integration
+        const animationEditor = new AnimationTimelineEditor(
+            this.editors.stage,
+            this.appCore.getEventBus(),
+            this.appCore.getStateManager()
+        );
+        
+        // Initialize Animation Timeline Editor
+        await animationEditor.initialize();
+        
+        console.log('🎬 Animation Timeline Editor created and initialized with stage integration');
+        return animationEditor;
+    }
+
+    setupUnifiedAuthoringControls() {
+        console.log('🎭 Setting up unified authoring controls...');
+        // Move authoring controls into the stage area
+        const stagePanel = document.getElementById('performance-stage');
+        if (stagePanel) {
+            const authoringControls = document.createElement('div');
+            authoringControls.id = 'authoring-controls';
+            authoringControls.style.cssText = `
+                padding: 15px;
+                background: rgba(255, 255, 255, 0.95);
+                border-bottom: 1px solid #ddd;
+                display: flex;
+                gap: 10px;
+                align-items: center;
+                justify-content: center;
+            `;
+            authoringControls.innerHTML = `
+                <h4 style="margin: 0; color: #333;">🎨 Unified Stage Authoring</h4>
+                <button id="start-character-drawing" style="padding: 10px 20px; background: #007acc; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">
+                    Start Drawing on Stage
+                </button>
+                <button id="stop-character-drawing" style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 6px; cursor: pointer;" disabled>
+                    Exit Drawing Mode
+                </button>
+                <button id="start-animation-timeline" style="padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">
+                    🎬 Animation Timeline
+                </button>
+                <button id="stop-animation-timeline" style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 6px; cursor: pointer;" disabled>
+                    Exit Timeline
+                </button>
+            `;
+            stagePanel.insertBefore(authoringControls, stagePanel.firstChild);
+            document.getElementById('start-character-drawing').addEventListener('click', () => {
+                this.startCharacterDrawing();
+            });
+            document.getElementById('stop-character-drawing').addEventListener('click', () => {
+                this.stopCharacterDrawing();
+            });
+            document.getElementById('start-animation-timeline').addEventListener('click', () => {
+                this.startAnimationTimeline();
+            });
+            document.getElementById('stop-animation-timeline').addEventListener('click', () => {
+                this.stopAnimationTimeline();
+            });
+        }
+        console.log('🎭 Unified authoring controls set up');
+    }
+
+    startCharacterDrawing() {
+        console.log('🎨 Starting character drawing on stage...');
+        
+        // Switch to stage view if not already there
+        if (this.currentView !== 'stage') {
+            this.switchView('stage');
+        }
+        
+        // Start character editing mode
+        if (this.editors.character && this.editors.character.startCharacterEditing) {
+            this.editors.character.startCharacterEditing();
+        }
+        
+        // Update button states
+        document.getElementById('start-character-drawing').disabled = true;
+        document.getElementById('stop-character-drawing').disabled = false;
+        
+        this.showNotification('🎨 Character drawing mode activated on stage!', 'success');
+    }
+
+    stopCharacterDrawing() {
+        console.log('🎨 Stopping character drawing...');
+        
+        // Stop character editing mode
+        if (this.editors.character && this.editors.character.stopCharacterEditing) {
+            this.editors.character.stopCharacterEditing();
+        }
+        
+        // Update button states
+        document.getElementById('start-character-drawing').disabled = false;
+        document.getElementById('stop-character-drawing').disabled = true;
+        
+        this.showNotification('🎨 Character drawing mode deactivated', 'info');
+    }
+
+    startAnimationTimeline() {
+        console.log('🎬 Starting animation timeline on stage...');
+        
+        // Switch to stage view if not already there
+        if (this.currentView !== 'stage') {
+            this.switchView('stage');
+        }
+        
+        // Start animation timeline mode
+        if (this.editors.animation && this.editors.animation.startTimelineEditing) {
+            this.editors.animation.startTimelineEditing();
+        }
+        
+        // Update button states
+        document.getElementById('start-animation-timeline').disabled = true;
+        document.getElementById('stop-animation-timeline').disabled = false;
+        
+        this.showNotification('🎬 Animation timeline activated on stage!', 'success');
+    }
+
+    stopAnimationTimeline() {
+        console.log('🎬 Stopping animation timeline...');
+        
+        // Stop animation timeline mode
+        if (this.editors.animation && this.editors.animation.stopTimelineEditing) {
+            this.editors.animation.stopTimelineEditing();
+        }
+        
+        // Update button states
+        document.getElementById('start-animation-timeline').disabled = false;
+        document.getElementById('stop-animation-timeline').disabled = true;
+        
+        this.showNotification('🎬 Animation timeline deactivated', 'info');
+    }
+
     addTestData() {
         console.log('🧪 Adding test data for Performance Stage demonstration...');
         
@@ -140,7 +295,7 @@ class SpunkiApp {
         ];
         
         // Set test project data
-        stateManager.setState('project.characters', testCharacters);
+        stateManager.set('projectData.characters', testCharacters);
         
         // Place characters on stage
         const stageLayout = {
@@ -169,7 +324,7 @@ class SpunkiApp {
             ]
         };
         
-        stateManager.setState('project.stages.main', stageLayout);
+        stateManager.set('projectData.stages.main', stageLayout);
         
         // Add stage controls
         this.addStageControls();
@@ -227,7 +382,7 @@ class SpunkiApp {
         });
         
         document.getElementById('debug-mode').addEventListener('change', (e) => {
-            this.appCore.getStateManager().setState('ui.debugMode', e.target.checked);
+            this.appCore.getStateManager().set('ui.debugMode', e.target.checked);
         });
         
         document.getElementById('add-character').addEventListener('click', () => {
@@ -255,9 +410,9 @@ class SpunkiApp {
         };
         
         // Add to project
-        const currentCharacters = this.appCore.getStateManager().getState('project.characters') || [];
+        const currentCharacters = this.appCore.getStateManager().get('projectData.characters') || [];
         currentCharacters.push(newCharacter);
-        this.appCore.getStateManager().setState('project.characters', currentCharacters);
+        this.appCore.getStateManager().set('projectData.characters', currentCharacters);
         
         // Place on stage at random position
         this.appCore.getEventBus().emit('stage:character_placed', {
@@ -277,23 +432,40 @@ class SpunkiApp {
             if (this.editors.stage && this.editors.stage.getPerformanceMetrics) {
                 const metrics = this.editors.stage.getPerformanceMetrics();
                 
-                document.getElementById('stage-time').textContent = `${metrics.currentTime.toFixed(2)}s`;
-                document.getElementById('stage-fps').textContent = `${metrics.fps.toFixed(1)}`;
+                // Safely update metrics with fallback values
+                const currentTime = metrics.currentTime || 0;
+                const fps = metrics.fps || 0;
+                
+                document.getElementById('stage-time').textContent = `${currentTime.toFixed(2)}s`;
+                document.getElementById('stage-fps').textContent = `${fps.toFixed(1)}`;
             }
         }, 100);
     }
 
     setupNavigation() {
-        const navButtons = document.querySelectorAll('.nav-tab');
+        // Setup main navigation buttons
+        const navButtons = document.querySelectorAll('.nav-btn[data-mode]');
         navButtons.forEach(button => {
             button.addEventListener('click', (e) => {
-                const viewName = e.target.id.replace('nav-', '');
+                const viewName = e.currentTarget.getAttribute('data-mode');
                 this.switchView(viewName);
+                
+                // Update active state
+                navButtons.forEach(btn => btn.classList.remove('active'));
+                e.currentTarget.classList.add('active');
                 
                 // Emit navigation event
                 this.appCore.getEventBus().emit('nav:tab-clicked', viewName);
             });
         });
+
+        // Setup character editor launch button
+        const launchCharacterEditor = document.getElementById('launch-character-editor');
+        if (launchCharacterEditor) {
+            launchCharacterEditor.addEventListener('click', () => {
+                this.launchCharacterCreator();
+            });
+        }
     }
 
     switchView(viewName) {
@@ -302,26 +474,22 @@ class SpunkiApp {
         // Hide all panels
         document.querySelectorAll('.editor-panel').forEach(panel => {
             panel.classList.add('hidden');
+            panel.classList.remove('active');
         });
 
-        // Show selected panel
-        const targetPanel = document.getElementById(`${viewName}-editor`) || 
-                          document.getElementById('performance-stage');
+        // Show selected panel - handle both new and old naming
+        let targetPanel;
+        if (viewName === 'stage') {
+            targetPanel = document.getElementById('performance-stage');
+        } else {
+            targetPanel = document.getElementById(`${viewName}-editor`);
+        }
         
         if (targetPanel) {
             targetPanel.classList.remove('hidden');
+            targetPanel.classList.add('active');
         } else {
             console.warn(`[SpunkiApp] Could not find panel for view: ${viewName}`);
-        }
-
-        // Update navigation
-        document.querySelectorAll('.nav-tab').forEach(tab => {
-            tab.classList.remove('active');
-        });
-        
-        const navButton = document.getElementById(`nav-${viewName}`);
-        if (navButton) {
-            navButton.classList.add('active');
         }
 
         this.currentView = viewName;
@@ -333,6 +501,29 @@ class SpunkiApp {
 
         // Update state
         this.appCore.getStateManager().setActiveView(viewName);
+    }
+
+    launchCharacterCreator() {
+        console.log('🎨 Launching standalone character creator...');
+        
+        // Open character creator in new window/tab
+        const characterCreatorUrl = './character/drawing-window-demo.html';
+        const newWindow = window.open(
+            characterCreatorUrl, 
+            'character-creator',
+            'width=1200,height=800,scrollbars=yes,resizable=yes'
+        );
+        
+        if (newWindow) {
+            newWindow.focus();
+            this.showNotification('🎨 Character creator opened in new window', 'success');
+        } else {
+            // Fallback: try to open in same tab
+            window.location.href = characterCreatorUrl;
+        }
+        
+        // Track character creator usage
+        this.appCore.getEventBus().emit('character:creator-launched');
     }
 
     setupProjectControls() {

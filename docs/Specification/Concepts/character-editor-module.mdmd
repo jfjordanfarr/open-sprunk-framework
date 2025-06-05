@@ -3,12 +3,14 @@
 id: "character-editor-module"
 title: "Character Editor Module"
 composition-type: "software-module-definition"
-status: "draft"
-version: "0.2"
-brief: "Module for character creation and customization using vector graphics."
+status: "active"
+version: "0.3"
+brief: "Stage-integrated character creation and customization using vector graphics with immediate performance context."
 see-also:
   - "[[sprunki-core-architecture]]"
   - "[[vector-graphics-system]]"
+  - "[[stage-module]]"
+  - "[[../../Definition/Requirements/stage-integrated-character-authoring-requirement.mdmd]]"
   - "[[../../Definition/Requirements/client-side-architecture-requirement.mdmd]]"
   - "[[core-system-requirements]]"
   - "[[../../Definition/Requirements/undo-redo-requirement.mdmd]]"
@@ -19,13 +21,33 @@ see-also:
   - "[[../Implementations/character/drawing-canvas-class.mdmd]]"
   - "[[../Implementations/character/texture-manager-class.mdmd]]"
   - "[[../Implementations/character/character-data-schema.mdmd]]"
+  - "[[../Implementations/stage/performance-stage-class.mdmd]]"
 
-The Character Editor module is a primary creative hub, allowing users to design and customize characters. This directly supports a core aspect of `[[../../Definition/Requirements/CoreSystemRequirements.mdmd]]`. It must function entirely client-side as per `[[../../Definition/Requirements/client-side-architecture-requirement.mdmd]]`. All significant user actions within this editor should be covered by `[[../../Definition/Requirements/undo-redo-requirement.mdmd]]`. The character data created is integral to project persistence (`[[../../Definition/Requirements/project-saving-requirement.mdmd]]`, `[[../../Definition/Requirements/project-autosave-requirement.mdmd]]`) and the final `[[../../Definition/Requirements/html5-export-requirement.mdmd]]`.
+The Character Editor module provides dedicated window-based character creation with real-time stage coordination, allowing users to design and customize characters in a controlled drawing environment while maintaining performance context. This revised architecture addresses technical constraints of stage-integrated drawing while preserving the visual feedback and scale awareness required by `[[../../Definition/Requirements/stage-integrated-character-authoring-requirement.mdmd]]`. The module coordinates closely with `[[stage-module]]` to provide seamless workflow between character customization and animation authoring.
 
-The Character Editor module allows users to:
+This directly supports `[[../../Definition/Requirements/CoreSystemRequirements.mdmd]]` while operating entirely client-side per `[[../../Definition/Requirements/client-side-architecture-requirement.mdmd]]`. All editing actions are covered by `[[../../Definition/Requirements/undo-redo-requirement.mdmd]]`, and character data integrates with project persistence systems.
 
-- **Draw & Edit Shapes**: Using a Fabric.js based canvas `[[../Implementations/character/drawing-canvas-class.mdmd]]`
-- **Manage Textures**: Apply and manage textures/images `[[../Implementations/character/texture-manager-class.mdmd]]`
-- **Define Body Parts**: Structure character as a hierarchy of editable parts
-- **Save/Load Characters**: Persist character designs `[[../Implementations/character/character-data-schema.mdmd]]`
+## Dedicated Window + Stage Coordination Architecture
+
+The Character Editor operates as a dedicated window that coordinates with the Performance Stage rather than overlaying it:
+
+- **Drawing Window**: Dedicated environment for vector graphics creation `[[../Implementations/character/drawing-canvas-class.mdmd]]`
+- **Stage Coordination**: Real-time synchronization with Performance Stage character display `[[../Implementations/stage/performance-stage-class.mdmd]]`
+- **Context Preview**: Drawing window shows character in performance context
+- **Workflow Integration**: Seamless transitions between character customization and animation authoring
+
+## Core Capabilities
+
+The Character Editor module enables users to:
+
+- **Dedicated Window Drawing**: Create characters in focused drawing environment with full tool access
+- **Real-time Stage Sync**: See character changes immediately on performance stage
+- **Context-Aware Preview**: Drawing window displays character in performance context
+- **Scale-Accurate Authoring**: Design characters at correct scale relative to stage dimensions
+- **Workflow Coordination**: Seamless transitions between character customization and animation authoring
+- **Independent Scaling**: Drawing window and stage can scale independently for optimal user experience
+- **Texture Management**: Apply and manage textures/images within dedicated drawing environment `[[../Implementations/character/texture-manager-class.mdmd]]`
+- **Hierarchical Structure**: Define character as hierarchy of body parts for animation support
+- **Cross-Window Communication**: Event-based coordination between drawing window and stage
+- **Data Persistence**: Save/load character designs with stage positioning `[[../Implementations/character/character-data-schema.mdmd]]`
 :::

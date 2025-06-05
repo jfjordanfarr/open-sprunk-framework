@@ -1,0 +1,76 @@
+---
+id: "mouse-interaction-handler-class"
+title: "Mouse Interaction Handler Class"
+unit-type: "javascript-class-definition"
+source-ref: "../../../src/stage/MouseInteractionHandler.js"
+status: "implemented"
+priority: "high"
+owner: "AI"
+see-also:
+  - "[[performance-stage-class]]"
+  - "[[character-renderer-class]]"
+  - "[[stage-interaction-requirement]]"
+---
+
+## Mouse Interaction Handler Class
+
+**Purpose**: Manages mouse interactions for the Performance Stage including character selection, dragging, and coordinate transformations between canvas and stage space.
+
+### Architectural Role
+
+The MouseInteractionHandler is a specialized component extracted from PerformanceStage to handle all mouse-based interactions. It provides:
+
+- **Character Interaction**: Selection and dragging of stage characters
+- **Coordinate Conversion**: Canvas-to-stage coordinate transformations
+- **Event Management**: Mouse event handling and propagation
+- **State Tracking**: Drag state and interaction history
+
+### Core Responsibilities
+
+```javascript
+class MouseInteractionHandler {
+    // Mouse event handling
+    onMouseDown(e)
+    onMouseMove(e) 
+    onMouseUp(e)
+    
+    // Coordinate transformation
+    getCanvasPosition(clientX, clientY)
+    getCanvasFromStagePosition(stageX, stageY)
+    isPointInStage(clientX, clientY)
+    
+    // Interaction state
+    getInteractionState()
+    updateCoordinateSystem(renderX, renderY, renderWidth, renderHeight)
+}
+```
+
+### Coordinate System Integration
+
+- **Letterbox Awareness**: Handles letterboxed stage rendering with proper coordinate mapping
+- **Viewport Independence**: Maintains coordinate transformations across canvas resize
+- **Stage Boundaries**: Validates interactions within stage render area
+- **Character Integration**: Delegates character hit testing to CharacterRenderer
+
+### Interaction Features
+
+- **Character Selection**: Click-to-select with state management integration
+- **Character Dragging**: Smooth drag operations with offset calculation
+- **Cursor Management**: Context-sensitive cursor changes
+- **Event Propagation**: Publishes interaction events for other systems
+
+### Integration Pattern
+
+Extracted to isolate interaction logic while maintaining tight integration:
+
+- **Component Dependencies**: Requires canvas, eventBus, stateManager, characterRenderer
+- **Coordinate Synchronization**: Updates coordinate system when stage resizes
+- **Event Publishing**: Emits character selection, movement, and interaction events
+- **State Coordination**: Updates stateManager with selected character information
+
+### Optimization Impact
+
+- **Lines Reduced**: ~120 lines extracted from PerformanceStage
+- **Interaction Isolation**: Mouse logic separated from rendering concerns
+- **Coordinate Specialization**: Dedicated coordinate transformation handling
+- **Event Clarity**: Clear separation of interaction events from stage events

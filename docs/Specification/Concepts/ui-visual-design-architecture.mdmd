@@ -1,0 +1,120 @@
+```{composition}
+id: "ui-visual-design-architecture"
+title: "UI Visual Design Architecture"
+composition-type: "software-architecture-overview"
+status: "draft"
+version: "0.1"
+brief: "Visual design and theming architecture providing consistent UI styling principles across the application."
+see-also:
+  - "[[visual-theming-requirement]]"
+  - "[[sprunki-core-architecture]]"
+  - "[[../../Definition/Requirements/client-side-architecture-requirement]]"
+  - "[[../Implementations/styles/main-stylesheet]]"
+  - "[[../Implementations/html-main-page]]"
+```
+
+# UI Visual Design Architecture
+
+The UI Visual Design Architecture provides the foundational theming, styling, and visual consistency framework for the Open Sprunk Framework interface. This architecture bridges the visual design requirements with concrete implementation through a centralized design token system and component styling patterns.
+
+## Architecture Overview
+
+The visual design architecture is organized around three core layers:
+
+```mermaid
+graph TD
+    A[Design Tokens] --> B[Component Themes]
+    B --> C[Application Styling]
+    
+    A1[Colors] --> B
+    A2[Typography] --> B  
+    A3[Spacing] --> B
+    A4[Animations] --> B
+    
+    B --> C1[UI Components]
+    B --> C2[Creative Tools]
+    B --> C3[Stage Interface]
+```
+
+### Design Token Foundation
+
+**Color System:**
+- Primary palette for brand identity and key interface elements
+- Secondary palette for supporting UI elements and states
+- Semantic color assignments (success, warning, error, info)
+- Dark/light theme variants with automatic contrast adjustments
+
+**Typography Scale:**
+- Hierarchical font size system for consistent information architecture
+- Font weight variations for emphasis and visual hierarchy
+- Line height and letter spacing optimized for creative tool interfaces
+- Monospace fonts for code/data display within the creative environment
+
+**Spacing System:**
+- Consistent spacing units based on 8px grid system
+- Component padding and margin standards
+- Layout gap specifications for responsive grid systems
+- Touch target sizing for mobile/tablet creative workflows
+
+### Component Theming Layer
+
+**Interactive Elements:**
+- Button styling variants (primary, secondary, tool-specific)
+- Form input styling with focus states and validation feedback
+- Navigation and menu styling consistent across editor contexts
+- Selection and highlight styling for creative content manipulation
+
+**Creative Interface Elements:**
+- Canvas and stage background styling options
+- Drawing tool UI theming (brushes, color pickers, property panels)
+- Timeline and sequence editor visual styling
+- Character and animation preview styling
+
+**Panel and Layout Styling:**
+- Editor panel theming with consistent borders and backgrounds
+- Responsive layout styling for different viewport configurations
+- Modal and overlay styling for configuration dialogs
+- Status and notification styling for user feedback
+
+## Implementation Strategy
+
+### CSS Architecture
+
+The visual design architecture is implemented through a layered CSS approach:
+
+1. **CSS Custom Properties (Variables)**: Define all design tokens at the root level
+2. **Base Styling**: Apply tokens to fundamental HTML elements and layout structures  
+3. **Component Classes**: Provide reusable styling classes for UI components
+4. **Utility Classes**: Offer atomic styling utilities for rapid interface development
+
+### Theme Switching Mechanism
+
+- JavaScript-based theme selection and persistence
+- CSS class-based theme application without page reloads
+- Local storage integration for user theme preferences
+- Automatic system theme detection (light/dark mode preferences)
+
+### Performance Considerations
+
+- Minimal CSS payload through efficient token usage
+- CSS custom property optimization for browser compatibility
+- Critical styling prioritization for fast initial paint
+- Progressive enhancement for advanced theming features
+
+## Integration with Creative Tools
+
+The visual design architecture specially considers the needs of creative software:
+
+**High Contrast Creative Areas:**
+- Drawing canvases use neutral backgrounds to not interfere with artwork
+- UI elements around creative areas use subdued styling to emphasize content
+- Color picker and palette tools integrate seamlessly with the overall theme
+
+**Visual Feedback for Creative Actions:**
+- Selection highlighting that works across different creative contexts
+- Animation and transition styling that enhances workflow without distraction
+- Loading and progress indicators styled for creative tool contexts
+
+This architecture ensures that Open Sprunk Framework maintains a professional, consistent visual identity while providing an optimal creative environment that supports rather than distracts from the creative process.
+
+````

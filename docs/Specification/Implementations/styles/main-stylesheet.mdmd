@@ -1,0 +1,85 @@
+<!-- filepath: docs/Specification/Implementations/styles/main-stylesheet.mdmd -->
+```{unit}
+id: "main-stylesheet"
+title: "Main Application Stylesheet"
+unit-type: "css-stylesheet-definition"
+status: "implemented"
+priority: "high"
+source-ref: "../../../../src/styles/main.css"
+see-also:
+  - "[[../../Concepts/ui-visual-design-architecture]]"
+  - "[[../../Concepts/responsive-ui-architecture]]"
+  - "[[../../Concepts/accessibility-architecture]]"
+  - "[[../../Concepts/performance-optimization-architecture]]"
+  - "[[../../../Definition/Requirements/visual-theming-requirement]]"
+  - "[[../../../Definition/Requirements/responsive-layout-requirement]]"
+  - "[[../../../Definition/Requirements/accessibility-requirement]]"
+  - "[[../../../Definition/Requirements/performance-requirement]]"
+  - "[[html-main-page]]"
+  - "[[sprunki-core-architecture]]"
+```
+
+The main application stylesheet provides the foundational CSS styling for the Open Sprunk Framework interface. This stylesheet establishes the visual design system, layout structure, and responsive behavior for all UI components.
+
+## Core Styling Areas
+
+The main stylesheet covers:
+
+- **Layout Foundation**: Grid systems, flexbox layouts, and responsive containers
+- **UI Component Styles**: Panels, buttons, controls, and interactive elements  
+- **Editor Interface**: Styling for character editor, drawing canvas, and stage interfaces
+- **Typography System**: Font families, sizes, and text styling conventions
+- **Color Palette**: Consistent color scheme across all interface elements
+- **Z-Index Management**: Layering hierarchy for overlays, panels, and UI elements
+
+## Implementation Contract
+
+```css
+/* Global reset and foundation */
+* { box-sizing: border-box; }
+body { 
+    margin: 0; 
+    font-family: 'Inter', sans-serif;
+    background: var(--bg-primary);
+}
+
+/* Layout structure */
+.app-container { 
+    display: grid;
+    grid-template: "sidebar main" 1fr / 250px 1fr;
+    height: 100vh;
+}
+
+/* Panel systems */
+.panel {
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+}
+
+/* Editor interfaces */
+.editor-panel { /* Stage and editor styling */ }
+.drawing-overlay { /* Canvas overlay positioning */ }
+.character-grid { /* Character layout system */ }
+
+/* Interactive elements */
+.btn { /* Button styling system */ }
+.tool-button { /* Tool-specific button styles */ }
+.input-field { /* Form input styling */ }
+
+/* Responsive design */
+@media (max-width: 768px) { /* Mobile adaptations */ }
+```
+
+## Integration Points
+
+This stylesheet integrates with the application through:
+
+- **Requirements Fulfillment**: Implements `[[visual-theming-requirement]]`, `[[responsive-layout-requirement]]`, and `[[accessibility-requirement]]`
+- **HTML Integration**: Linked in `[[html-main-page]]` as the primary stylesheet
+- **Component Styling**: Provides classes used by all JavaScript UI components
+- **Architecture Alignment**: Supports the client-side architecture defined in `[[sprunki-core-architecture]]`
+
+The main stylesheet serves as the foundation for all visual presentation in the Open Sprunk Framework, ensuring consistent styling across the integrated authoring environment.
+
+````

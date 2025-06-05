@@ -18,21 +18,21 @@
 This layer focuses on what the user will do and experience.
 
 *   **Core User Journey:**
-    *   Create a new project or load an existing one (see `[[../01_REQUIREMENTS/project-saving-requirement.mdmd]]`).
-    *   Design characters using vector graphics tools (see `[[../01_REQUIREMENTS/client-side-architecture-requirement.mdmd]]` for implications on tooling).
+    *   Create a new project or load an existing one (see `[[../Requirements/project-saving-requirement]]`).
+    *   Design characters using vector graphics tools (see `[[../Requirements/client-side-architecture-requirement]]` for implications on tooling).
     *   Define character animations and behaviors.
     *   Compose music and sound effects.
     *   Arrange elements on a stage or timeline.
     *   Preview the interactive experience.
-    *   Export the project as a standalone HTML5 package (see `[[../01_REQUIREMENTS/html5-export-requirement.mdmd]]`).
+    *   Export the project as a standalone HTML5 package (see `[[../Requirements/html5-export-requirement]]`).
 *   **Key Features (Functional Requirements):**
     *   Vector graphics editor for character design.
     *   Timeline-based animation system.
     *   Simple music composition tools (e.g., a basic piano roll).
     *   Drag-and-drop interface for scene creation.
-    *   Project saving/loading (see `[[../01_REQUIREMENTS/project-saving-requirement.mdmd]]`) and potentially autosave (see `[[../01_REQUIREMENTS/project-autosave-requirement.mdmd]]`).
-    *   HTML5 export (see `[[../01_REQUIREMENTS/html5-export-requirement.mdmd]]`).
-    *   Undo/redo functionality (see `[[../01_REQUIREMENTS/undo-redo-requirement.mdmd]]`).
+    *   Project saving/loading (see `[[../Requirements/project-saving-requirement]]`) and potentially autosave (see `[[../Requirements/project-autosave-requirement]]`).
+    *   HTML5 export (see `[[../Requirements/html5-export-requirement]]`).
+    *   Undo/redo functionality (see `[[../Requirements/undo-redo-requirement]]`).
 *   **User Interface (UI) / User Experience (UX) Principles:**
     *   Intuitive and accessible design, minimizing the learning curve.
     *   Consistent visual language and controls across different editing modules.
@@ -43,7 +43,7 @@ This layer focuses on what the user will do and experience.
 
 This layer outlines the technical approach.
 
-*   **Client-Side Focus:** The entire application should run in the browser (see `[[../01_REQUIREMENTS/client-side-architecture-requirement.mdmd]]`).
+*   **Client-Side Focus:** The entire application should run in the browser (see `[[../Requirements/client-side-architecture-requirement]]`).
     *   *Rationale:* Accessibility, no server-side dependencies for core functionality, ease of distribution.
 *   **Technology Stack (Initial Thoughts):**
   * **Core Language & Environment:**  
@@ -76,11 +76,11 @@ This layer outlines the technical approach.
     * **Storage:** Browser localStorage or IndexedDB for saving projects.  
     * **Import/Export:** JavaScript File API for saving/loading project JSON files.  
     * *Solved Problem Composed:* Data serialization (JSON) and client-side storage mechanisms.
-*   **Modularity:** Design the system as a collection of loosely coupled modules (e.g., Character Editor, Animation Engine, Music Composer, Stage Manager, Export Module). This is further detailed in `[[../01_REQUIREMENTS/client-side-architecture-requirement.mdmd]]`.
+*   **Modularity:** Design the system as a collection of loosely coupled modules (e.g., Character Editor, Animation Engine, Music Composer, Stage Manager, Export Module). This is further detailed in `[[../Requirements/client-side-architecture-requirement]]`.
     *   *Rationale:* Maintainability, testability, potential for parallel development.
 *   **Data Management:**
     *   Define clear data structures for characters, animations, music, scenes, etc.
-    *   Consider how project data will be serialized for saving/loading (see `[[../01_REQUIREMENTS/project-saving-requirement.mdmd]]`) and export.
+    *   Consider how project data will be serialized for saving/loading (see `[[../Requirements/project-saving-requirement]]`) and export.
 
 ## **Layer 3: Component Breakdown & Interfaces (The "How" \- Detailed)**
 

@@ -4,108 +4,393 @@ id: "character-editor-class"
 title: "Character Editor Class"
 unit-type: "javascript-class-definition"
 language: "javascript"
-status: "draft"
-version: "0.2"
-brief: "Main class for the Character Editor module, handling UI and logic."
-source-ref: "../../src/character/CharacterEditor.js"
+status: "active"
+version: "0.3"
+brief: "Stage-integrated character editor providing drawing tools as overlay on Performance Stage."
+source-ref: "../../../src/character/CharacterEditor.js"
 see-also:
-  - "[[drawing-canvas-class]]" # Implementation dependency (uses DrawingCanvas)
-  - "[[texture-manager-class]]" # Implementation dependency (uses TextureManager)
+  - "[[drawing-canvas-class]]" # Implementation dependency (uses DrawingCanvas for vector graphics)
+  - "[[texture-manager-class]]" # Implementation dependency (uses TextureManager for assets)
   - "[[character-data-schema]]" # Implementation dependency (works with character data structure)
   - "[[../core/event-bus-class.mdmd]]" # Implementation dependency (uses EventBus for communication)
+  - "[[../stage/performance-stage-class.mdmd]]" # Implementation dependency (integrates with Performance Stage)
+  - "[[../../Definition/Requirements/stage-integrated-character-authoring-requirement.mdmd]]" # Traceability (implements stage integration)
   - "[[../Concepts/character-editor-module.mdmd]]" # Parent composition
 
-The CharacterEditor class manages the character creation interface, including the drawing canvas and control panels.
+The CharacterEditor class provides stage-integrated character creation by overlaying drawing tools on the Performance Stage. This implements the core requirement for `[[../../Definition/Requirements/stage-integrated-character-authoring-requirement.mdmd]]` ensuring immediate visual feedback and accurate scale/positioning during character authoring.
 
 ```javascript
 import { DrawingCanvas } from './DrawingCanvas.js';
 import { TextureManager } from './TextureManager.js';
-// import { CharacterData } from './CharacterData.js'; // Schema/model, not a class to instantiate directly here
 
 export class CharacterEditor {
-    constructor(containerElement, eventBus) {
-        this.container = containerElement;
+    constructor(performanceStage, eventBus) {
+        this.performanceStage = performanceStage; // Reference to Performance Stage instance
         this.eventBus = eventBus;
         this.drawingCanvas = null;
         this.textureManager = null;
-        this.characterData = {}; // Holds the current character being edited
-
-        this._setupUI();
+        this.characterData = {}; // Current character being edited
+        
+        // Stage integration state
+        this.isEditMode = false;
+        this.editOverlay = null;
+        this.stageCanvas = performanceStage.canvas;
+        this.stageContext = this.stageCanvas.getContext('2d');
+        
+        // Drawing tools UI state
+        this.toolsPanel = null;
+        this.activeCharacterId = null;
+        
+        this._setupStageIntegration();
     }
 
     async init() {
         this.textureManager = new TextureManager(this.eventBus);
         await this.textureManager.init();
 
-        const canvasContainer = this.container.querySelector('#character-canvas-container');
-        this.drawingCanvas = new DrawingCanvas(canvasContainer, this.eventBus);
+        // Initialize drawing canvas that overlays the stage
+        this.drawingCanvas = new DrawingCanvas(
+            this.stageCanvas, 
+            this.eventBus,
+            { 
+                stageIntegrated: true,
+                coordinateSystem: this.performanceStage.getCoordinateSystem()
+            }
+        );
         await this.drawingCanvas.init();
 
         this._setupEventHandlers();
-        console.log('CharacterEditor initialized');
+        this._createDrawingToolsUI();
+        console.log('CharacterEditor initialized with stage integration');
     }
 
-    _setupUI() {
-        // Create or find UI elements for controls, layers, etc.
-        // Example: this.container.innerHTML = `... HTML structure ...`;
-        // For now, assumes HTML structure is in html-main-page
+    _setupStageIntegration() {
+        // Create edit mode overlay container
+        this.editOverlay = document.createElement('div');
+        this.editOverlay.id = 'character-edit-overlay';
+        this.editOverlay.style.cssText = `
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+            display: none;
+        `;
+        
+        // Insert overlay into stage container
+        const stageContainer = this.stageCanvas.parentElement;
+        stageContainer.style.position = 'relative';
+        stageContainer.appendChild(this.editOverlay);
+    }
+
+    _createDrawingToolsUI() {
+        // Create floating tools panel for stage-integrated editing
+        this.toolsPanel = document.createElement('div');
+        this.toolsPanel.id = 'drawing-tools-panel';
+        this.toolsPanel.style.cssText = `
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            display: none;
+            pointer-events: auto;
+            z-index: 20;
+        `;
+        
+        this.toolsPanel.innerHTML = `
+            <h4 style="margin: 0 0 10px 0; color: #333;">Drawing Tools</h4>
+            <div class="tool-buttons">
+                <button id="tool-pen" data-tool="pen">Pen</button>
+                <button id="tool-rectangle" data-tool="rectangle">Rectangle</button>
+                <button id="tool-circle" data-tool="circle">Circle</button>
+                <button id="tool-select" data-tool="select">Select</button>
+            </div>
+            <div class="color-controls" style="margin-top: 10px;">
+                <label>Color: <input type="color" id="tool-color" value="#ff6b6b"></label>
+            </div>
+            <div class="editing-controls" style="margin-top: 10px;">
+                <button id="finish-character">Finish Character</button>
+                <button id="cancel-edit">Cancel</button>
+            </div>
+        `;
+        
+        this.editOverlay.appendChild(this.toolsPanel);
     }
 
     _setupEventHandlers() {
-        // Listen to events from DrawingCanvas (e.g., shape created, modified)
+        // Stage mode events
+        this.eventBus.on('stage:enter_edit_mode', (data) => this.enterEditMode(data.characterId));
+        this.eventBus.on('stage:exit_edit_mode', () => this.exitEditMode());
+        
+        // Drawing canvas events
         this.eventBus.on('canvas:object:modified', (fabricObject) => {
             this.updateCharacterDataFromCanvas();
+            this.performanceStage.render(this.performanceStage.currentTime); // Refresh stage
         });
 
-        // Listen to events from UI controls (e.g., new layer, color change)
-        // document.getElementById('add-shape-button').addEventListener('click', () => { ... });
+        // Character management events
+        this.eventBus.on('character:create_new', () => this.startNewCharacter());
+        this.eventBus.on('character:edit_existing', (data) => this.editExistingCharacter(data.characterId));
 
-        // Listen for project load events to populate editor
+        // Project persistence events
         this.eventBus.on('state:project:loaded', (project) => {
             if (project && project.characterData) {
                 this.loadCharacter(project.characterData);
             }
         });
+
+        // Tool panel events
+        this._setupToolPanelEvents();
     }
+
+    _setupToolPanelEvents() {
+        // Tool selection
+        const toolButtons = this.toolsPanel.querySelectorAll('[data-tool]');
+        toolButtons.forEach(button => {
+            button.addEventListener('click', (e) => {
+                const tool = e.target.dataset.tool;
+                this.drawingCanvas.setActiveTool(tool);
+                this.updateToolButtonStates(tool);
+            });
+        });
+
+        // Color selection
+        this.toolsPanel.querySelector('#tool-color').addEventListener('change', (e) => {
+            this.drawingCanvas.setDrawingColor(e.target.value);
+        });
+
+        // Edit completion
+        this.toolsPanel.querySelector('#finish-character').addEventListener('click', () => {
+            this.finishCharacterEdit();
+        });
+
+        this.toolsPanel.querySelector('#cancel-edit').addEventListener('click', () => {
+            this.cancelCharacterEdit();
+        });
+    }
+
+    // STAGE INTEGRATION METHODS
+
+    enterEditMode(characterId = null) {
+        console.log('CharacterEditor: Entering edit mode', characterId);
+        this.isEditMode = true;
+        this.activeCharacterId = characterId;
+        
+        // Show edit overlay and tools
+        this.editOverlay.style.display = 'block';
+        this.toolsPanel.style.display = 'block';
+        
+        // Configure drawing canvas for stage coordinates
+        this.drawingCanvas.enterStageMode(this.performanceStage.getStageCoordinates());
+        
+        // If editing existing character, load its data
+        if (characterId) {
+            this.editExistingCharacter(characterId);
+        } else {
+            this.startNewCharacter();
+        }
+        
+        // Disable stage interaction during edit
+        this.performanceStage.setInteractionMode('edit');
+        
+        this.eventBus.emit('character_editor:edit_mode_entered', { characterId });
+    }
+
+    exitEditMode() {
+        console.log('CharacterEditor: Exiting edit mode');
+        this.isEditMode = false;
+        
+        // Hide edit overlay and tools
+        this.editOverlay.style.display = 'none';
+        this.toolsPanel.style.display = 'none';
+        
+        // Exit stage mode on drawing canvas
+        this.drawingCanvas.exitStageMode();
+        
+        // Re-enable normal stage interaction
+        this.performanceStage.setInteractionMode('performance');
+        
+        // Clear active character
+        this.activeCharacterId = null;
+        
+        this.eventBus.emit('character_editor:edit_mode_exited');
+    }
+
+    startNewCharacter() {
+        console.log('CharacterEditor: Starting new character creation');
+        
+        // Clear drawing canvas
+        this.drawingCanvas.clear();
+        
+        // Initialize new character data
+        this.characterData = {
+            id: 'char-' + Date.now(),
+            name: 'New Character',
+            fabricCanvas: {},
+            stagePosition: this.performanceStage.getDefaultCharacterPosition(),
+            created: new Date().toISOString()
+        };
+        
+        // Set default drawing tool
+        this.drawingCanvas.setActiveTool('pen');
+        this.updateToolButtonStates('pen');
+        
+        this.eventBus.emit('character:creation_started', this.characterData);
+    }
+
+    editExistingCharacter(characterId) {
+        console.log('CharacterEditor: Editing existing character', characterId);
+        
+        // Load character data from state
+        const projectData = this.performanceStage.stateManager.get('project');
+        const character = projectData?.characters?.find(c => c.id === characterId);
+        
+        if (character) {
+            this.loadCharacter(character);
+            this.eventBus.emit('character:edit_started', { characterId });
+        } else {
+            console.warn('Character not found for editing:', characterId);
+            this.startNewCharacter();
+        }
+    }
+
+    finishCharacterEdit() {
+        console.log('CharacterEditor: Finishing character edit');
+        
+        // Finalize character data from canvas
+        this.updateCharacterDataFromCanvas();
+        
+        // Save character to project state
+        this.saveCharacterToProject();
+        
+        // Exit edit mode
+        this.exitEditMode();
+        
+        this.eventBus.emit('character:edit_completed', { 
+            characterId: this.characterData.id,
+            characterData: this.characterData 
+        });
+    }
+
+    cancelCharacterEdit() {
+        console.log('CharacterEditor: Cancelling character edit');
+        
+        // Simply exit edit mode without saving changes
+        this.exitEditMode();
+        
+        this.eventBus.emit('character:edit_cancelled', { 
+            characterId: this.activeCharacterId 
+        });
+    }
+
+    // CHARACTER DATA MANAGEMENT
 
     loadCharacter(characterData) {
         this.characterData = JSON.parse(JSON.stringify(characterData)); // Deep copy
-        this.drawingCanvas.loadFromJSON(this.characterData.fabricCanvas, () => {
-            this.drawingCanvas.render();
-        });
-        // Update UI controls based on loaded character data
+        
+        if (this.characterData.fabricCanvas) {
+            this.drawingCanvas.loadFromJSON(this.characterData.fabricCanvas, () => {
+                this.drawingCanvas.render();
+            });
+        }
+        
         this.eventBus.emit('character:loaded', this.characterData);
     }
 
     updateCharacterDataFromCanvas() {
         const canvasJSON = this.drawingCanvas.toJSON();
-        this.characterData.fabricCanvas = canvasJSON; // Or a more structured representation
-        // Potentially extract more structured data from canvas objects if needed
-        this.eventBus.emit('data:character:changed', { fabricCanvas: canvasJSON /*, other parts */ });
+        this.characterData.fabricCanvas = canvasJSON;
+        this.characterData.lastModified = new Date().toISOString();
+        
+        // Update stage position if available
+        if (this.isEditMode) {
+            this.characterData.stagePosition = this.performanceStage.getCharacterPosition(this.characterData.id);
+        }
+        
+        this.eventBus.emit('data:character:changed', { 
+            characterId: this.characterData.id,
+            characterData: this.characterData 
+        });
+    }
+
+    saveCharacterToProject() {
+        const projectData = this.performanceStage.stateManager.get('project') || { characters: [] };
+        
+        // Find existing character or add new one
+        const existingIndex = projectData.characters.findIndex(c => c.id === this.characterData.id);
+        
+        if (existingIndex >= 0) {
+            projectData.characters[existingIndex] = this.characterData;
+        } else {
+            projectData.characters.push(this.characterData);
+        }
+        
+        // Update project state
+        this.performanceStage.stateManager.set('project', projectData);
+        
+        // Also ensure character is placed on stage if new
+        if (existingIndex < 0) {
+            this.performanceStage.placeCharacter(this.characterData.id, this.characterData.stagePosition);
+        }
     }
 
     getCurrentCharacterData() {
-        // Ensure it's up-to-date with canvas
-        this.updateCharacterDataFromCanvas(); 
+        if (this.isEditMode) {
+            this.updateCharacterDataFromCanvas();
+        }
         return this.characterData;
     }
 
+    updateToolButtonStates(activeTool) {
+        const toolButtons = this.toolsPanel.querySelectorAll('[data-tool]');
+        toolButtons.forEach(button => {
+            button.classList.toggle('active', button.dataset.tool === activeTool);
+        });
+    }
+
+    // LIFECYCLE METHODS
+
     onActivate() {
-        // Called when this editor becomes the active view
         console.log('CharacterEditor activated');
-        if (this.drawingCanvas) {
-            this.drawingCanvas.resize(); // Ensure canvas is correctly sized
-            this.drawingCanvas.render();
+        
+        // Check if should enter edit mode immediately
+        const shouldEdit = this.performanceStage.stateManager.get('ui.requestCharacterEdit');
+        if (shouldEdit) {
+            this.enterEditMode(shouldEdit.characterId);
+            this.performanceStage.stateManager.set('ui.requestCharacterEdit', null);
         }
     }
 
     dispose() {
-        // Clean up event listeners, resources
+        console.log('CharacterEditor disposed');
+        
+        // Clean up edit overlay
+        if (this.editOverlay && this.editOverlay.parentElement) {
+            this.editOverlay.parentElement.removeChild(this.editOverlay);
+        }
+        
+        // Clean up drawing canvas
         if (this.drawingCanvas) {
             this.drawingCanvas.dispose();
         }
-        // this.eventBus.off(...);
-        console.log('CharacterEditor disposed');
+        
+        // Clean up texture manager
+        if (this.textureManager) {
+            this.textureManager.dispose();
+        }
+        
+        // Remove event listeners
+        this.eventBus.off('stage:enter_edit_mode');
+        this.eventBus.off('stage:exit_edit_mode');
+        this.eventBus.off('canvas:object:modified');
+        this.eventBus.off('character:create_new');
+        this.eventBus.off('character:edit_existing');
+        this.eventBus.off('state:project:loaded');
     }
 }
 ```

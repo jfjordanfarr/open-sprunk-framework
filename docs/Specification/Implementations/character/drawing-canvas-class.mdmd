@@ -7,7 +7,7 @@ language: "javascript"
 status: "draft"
 version: "0.2"
 brief: "Fabric.js canvas wrapper for character drawing and editing."
-source-ref: "../../src/character/DrawingCanvas.js"
+source-ref: "../../../src/character/DrawingCanvas.js"
 see-also:
   - "[[../core/event-bus-class.mdmd]]" # Implementation dependency (uses EventBus for drawing events)
   - "[[../utils/vector2d-utils.mdmd]]" # Implementation dependency (uses for coordinate calculations)

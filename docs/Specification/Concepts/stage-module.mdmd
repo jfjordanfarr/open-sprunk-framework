@@ -3,24 +3,74 @@
 id: "stage-module"
 title: "Stage Module"
 composition-type: "software-module-definition"
-status: "draft"
-version: "0.2"
-brief: "Module for displaying animated characters and playing composed music."
+status: "active"
+version: "0.4"
+brief: "Unified stage environment for performance rendering AND integrated multi-modal authoring (character editing, animation authoring, music sequencing) with context-aware UI overlays."
 see-also:
   - "[[sprunki-core-architecture]]"
+  - "[[character-editor-module]]"
+  - "[[animation-editor-module]]"
+  - "[[music-editor-module]]"
   - "[[core-system-requirements]]"
+  - "[[../../Definition/Requirements/unified-stage-authoring-requirement.mdmd]]"
   - "[[../../Definition/Requirements/client-side-architecture-requirement.mdmd]]"
   - "[[../../Definition/Requirements/html5-export-requirement.mdmd]]"
   - "[[../Implementations/stage/performance-stage-class.mdmd]]"
   - "[[../Implementations/stage/character-renderer-class.mdmd]]"
   - "[[../Implementations/stage/background-manager-class.mdmd]]"
+  - "[[../Implementations/character/drawing-canvas-class.mdmd]]"
 
-The Stage module is where users can view the final performance, combining all their creative assets. This fulfills a key aspect of `[[../../Definition/Requirements/CoreSystemRequirements.mdmd]]` by providing the performance/viewing experience. It operates client-side per `[[../../Definition/Requirements/client-side-architecture-requirement.mdmd]]` and produces content for `[[../../Definition/Requirements/html5-export-requirement.mdmd]]`.
+The Stage module serves as the unified creative environment where ALL authoring activities occur directly on the performance stage. This revolutionary design fulfills `[[../../Definition/Requirements/unified-stage-authoring-requirement.mdmd]]` by providing character editing, animation authoring, and music sequencing through context-aware UI overlays while maintaining continuous multi-character performance context. The module maintains Sprunki's canonical fixed-position constraints while enabling seamless creative workflows.
 
-Users can:
+This fulfills key aspects of `[[../../Definition/Requirements/CoreSystemRequirements.mdmd]]` by providing both the performance experience and the primary character creation environment. It operates client-side per `[[../../Definition/Requirements/client-side-architecture-requirement.mdmd]]` and produces content for `[[../../Definition/Requirements/html5-export-requirement.mdmd]]`.
 
-- **View Performances**: See characters animate and hear music play `[[../Implementations/stage/performance-stage-class.mdmd]]`
-- **Render Characters**: Uses PixiJS for efficient rendering `[[../Implementations/stage/character-renderer-class.mdmd]]`
-- **Customize Backgrounds**: Change stage appearance `[[../Implementations/stage/background-manager-class.mdmd]]`
-- **Combine Creations**: Bring together characters, music, and animations
+## Unified Stage Authoring Architecture
+
+The Stage module operates as the primary creative environment supporting multiple authoring modes through context-aware UI overlays while maintaining continuous performance context:
+
+### Performance Mode (Pure Performance)
+- **Live Rendering**: Real-time character animation and music playback `[[../Implementations/stage/performance-stage-class.mdmd]]`
+- **Multi-Character Coordination**: All characters performing simultaneously in fixed positions
+- **Clean Interface**: Minimal UI for pure performance experience
+- **Interactive Playback**: Timeline, playback, and performance controls
+
+### Character Drawing Mode
+- **DEPRECATED**: Character drawing moved to dedicated window due to technical constraints
+- **Coordination**: Stage displays characters customized in separate drawing window
+- **Real-time Sync**: Drawing window changes appear immediately on stage
+- **Performance Context**: Stage maintains character display during drawing window usage
+
+### Animation Authoring Mode
+- **Timeline Overlay**: Animation timeline and keyframe controls overlay stage
+- **Direct Manipulation**: Drag character limbs/poses directly on stage
+- **Multi-Character Context**: Other characters continue performing while editing one character
+- **Beat Synchronization**: Musical timing tools integrated with stage view
+- **Fixed Boundary Constraints**: Animation editing respects character's assigned stage position
+
+### Music Sequencing Mode
+- **Piano Roll Integration**: Piano roll overlay on stage for musical note editing
+- **Beat Visualization**: Musical structure overlayed on stage performance
+- **Animation Synchronization**: Music editing synchronized with character animations
+- **Performance Context**: Music sequencing occurs with full visual performance context
+- **Timeline Integration**: Unified timeline coordinates music and animation authoring
+
+## Core Capabilities
+
+### Contextual UI Overlays
+- **Mode-Specific Tools**: UI elements appear/disappear based on current authoring mode
+- **Smooth Transitions**: Seamless switching between authoring modes without losing context
+- **Performance Preservation**: Background characters never stop performing during editing
+
+### Sprunki Canonical Constraints
+- **Fixed Positions**: Each character occupies designated stage position with defined boundaries
+- **Ensemble Performance**: Multiple characters perform simultaneously in their assigned positions
+- **Position-Aware Authoring**: All editing tools respect character position constraints
+- **Canonical Stage Layout**: Stage follows established Sprunki positioning patterns
+
+### Immediate Visual Feedback
+- **Context-Accurate Authoring**: Create content with immediate feedback in final performance context
+- **Scale-Aware Design**: Author characters and animations at correct scale relative to stage
+- **Background Integration**: All authoring occurs with full environmental context
+- **Multi-Character Awareness**: See impact of edits on overall ensemble performance
+- **Export Performances**: Generate final HTML5 performance packages
 :::

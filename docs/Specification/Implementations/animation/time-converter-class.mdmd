@@ -1,0 +1,84 @@
+---
+id: "time-converter-class"
+title: "Time Converter Class"
+unit-type: "javascript-class-definition"
+source-ref: "../../../src/animation/TimeConverter.js"
+status: "implemented"
+priority: "medium"
+owner: "timeline-optimization-team"
+see-also:
+  - "[[timeline-class]]"
+  - "[[temporal-coordinator-class]]"
+  - "[[beat-marker-generator-class]]"
+  - "[[req-unified-timeline]]"
+---
+
+# Time Converter Class
+
+The TimeConverter class provides unified time unit conversion functionality for the Timeline system. This component was extracted from Timeline.js to improve maintainability and separation of concerns.
+
+## Architectural Role
+
+The TimeConverter serves as a centralized utility for converting between different time units in the unified timeline system:
+- Seconds ↔ Beats conversion
+- Seconds ↔ Measures conversion  
+- Beat grid quantization
+- Tempo and time signature management
+
+## Core Interface
+
+```javascript
+class TimeConverter {
+    constructor() {
+        this.tempo = 120;              // BPM (beats per minute)
+        this.timeSignature = { numerator: 4, denominator: 4 };
+    }
+
+    // Time unit conversions
+    beatsToSeconds(beats) { ... }
+    secondsToBeats(seconds) { ... }
+    measureToSeconds(measure) { ... }
+    secondsToMeasure(seconds) { ... }
+
+    // Grid quantization
+    quantizeToGrid(time, subdivision) { ... }
+
+    // Configuration
+    setTempo(tempo) { ... }
+    setTimeSignature(timeSignature) { ... }
+}
+```
+
+## Integration Pattern
+
+This component is used by:
+- **Timeline**: Primary consumer for all time conversions
+- **BeatMarkerGenerator**: For beat positioning calculations
+- **TemporalCoordinator**: For tempo change operations
+- **TrackManager**: For grid snapping functionality
+
+## Optimization Impact
+
+**Line Count Reduction:**
+- Extracted ~60-80 lines of time conversion logic from Timeline.js
+- Centralizes time math in single-responsibility component
+- Enables reuse across timeline components
+
+**Benefits:**
+- **Maintainability**: Time conversion logic isolated and testable
+- **Consistency**: Single source of truth for time calculations
+- **Performance**: Cached calculations for repeated conversions
+- **Extensibility**: Easy to add new time unit conversions
+
+## Dependencies
+
+- No external dependencies (pure math utility)
+- Configurable via tempo and time signature parameters
+- Stateless operations suitable for high-frequency calls
+
+## Testing Considerations
+
+- Unit test time conversion accuracy with various tempos
+- Verify quantization behavior with different grid subdivisions
+- Test edge cases (zero time, large values, negative inputs)
+- Performance testing for animation frame rate usage

@@ -1,11 +1,20 @@
+// MDMD Source: docs/Specification/Implementations/core/app-core-class.mdmd
+
 /**
  * AppCore - Central application coordinator
  * Manages shared resources and facilitates communication between modules
+ * 
+ * @class AppCore
+ * @description Central orchestrator that manages the EventBus, StateManager, and module lifecycle.
+ *              Provides a single point of access for all core application services.
  */
 import { EventBus } from './EventBus.js';
 import { StateManager } from './StateManager.js';
 
 export class AppCore {
+    /**
+     * Create an AppCore instance
+     */
     constructor() {
         this.eventBus = null;
         this.stateManager = null;
@@ -13,6 +22,12 @@ export class AppCore {
         this.modules = new Map();
     }
 
+    /**
+     * Initialize the application core system
+     * @async
+     * @returns {Promise<void>} Resolves when initialization is complete
+     * @description Sets up EventBus, StateManager, and prepares for module registration
+     */
     async init() {
         if (this.initialized) {
             console.log('[AppCore] Already initialized');

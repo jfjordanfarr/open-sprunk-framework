@@ -1,0 +1,138 @@
+{unit}
+---
+id: "expression-controller-class"
+title: "Expression Controller Class"
+unit-type: "javascript-class-definition"
+source-ref: "../../../src/character/ExpressionController.js"
+status: "implemented"
+priority: "high"
+owner: "character-authoring-team"
+see-also:
+  - "[[expression-system]]"
+  - "[[animation-engine-class]]"
+  - "[[character-authoring-ux-composition]]"
+  - "[[humanoid-character-animation-requirement]]"
+---
+
+# Expression Controller Class
+
+The **ExpressionController** class manages character expression state and validation for the Sprunki Expression System. This extracted component handles expression data management, state transitions, validation, and caching, ensuring consistent and reliable character expression behavior.
+
+## Core Responsibilities
+
+- **Expression State Management**: Maintains current expression state and history
+- **Data Validation**: Validates expression configurations and constraints
+- **Expression Caching**: Optimizes performance through intelligent caching
+- **State Transitions**: Manages valid transitions between expression states
+- **Default Expression Setup**: Provides fallback expressions for all character parts
+
+## Implementation Contract
+
+```javascript
+export class ExpressionController {
+  constructor(characterData, options = {}) {
+    // Initialize with character data and configuration options
+    this.characterData = characterData;
+    this.options = {
+      preloadExpressions: true,
+      ...options
+    };
+    
+    // Expression state management
+    this.currentExpression = 'idle';
+    this.expressionCache = new Map();
+    this.expressionHistory = [];
+  }
+
+  // Core lifecycle methods
+  init() {
+    // Initialize expression controller
+    this.validateExpressionData();
+    this.setupDefaultExpressions();
+    if (this.options.preloadExpressions) {
+      this.preloadExpressionStates();
+    }
+  }
+
+  // Expression management
+  setExpression(expressionId, options = {}) {
+    // Sets character to specified expression
+    // Validates expression exists and is compatible
+    // Triggers appropriate transition animations
+  }
+
+  getExpression(expressionId) {
+    // Retrieves expression data by ID
+    // Returns cached data if available
+  }
+
+  validateExpression(expressionData) {
+    // Validates expression data structure
+    // Ensures all required properties are present
+    // Checks compatibility with character anatomy
+  }
+
+  // State management
+  getCurrentState() {
+    // Returns current expression state
+    // Includes all part states and properties
+  }
+
+  canTransitionTo(targetExpression) {
+    // Checks if transition to target expression is valid
+    // Considers current state and transition rules
+  }
+
+  getExpressionHistory() {
+    // Returns history of expression changes
+    // Useful for undo/redo functionality
+  }
+
+  // Cache management
+  preloadExpressionStates() {
+    // Preloads and caches common expressions
+    // Optimizes performance for frequent expressions
+  }
+
+  clearCache() {
+    // Clears expression cache
+    // Useful for memory management or data updates
+  }
+}
+```
+
+## Key Features
+
+### Expression Validation System
+- **Data Structure Validation**: Ensures expression data integrity
+- **Anatomy Compatibility**: Validates expressions against character anatomy
+- **Constraint Checking**: Enforces expression rules and limitations
+
+### State Management
+- **Current State Tracking**: Maintains precise expression state
+- **History Management**: Tracks expression changes for undo/redo
+- **Transition Validation**: Ensures valid state transitions
+
+### Performance Optimization
+- **Expression Caching**: Intelligent caching of frequently used expressions
+- **Preloading Strategy**: Preloads common expressions for instant access
+- **Memory Management**: Efficient cleanup and cache management
+
+### Default Expression System
+- **Fallback Expressions**: Provides default expressions for all anatomy parts
+- **Safe State Handling**: Ensures characters always have valid expressions
+- **Error Recovery**: Graceful handling of invalid expression requests
+
+## Integration Points
+
+- **Expression System**: Core component of the broader expression system
+- **Animation Engine**: Coordinates with animation engine for smooth transitions
+- **Character Data**: Manages character-specific expression configurations
+
+## Dependencies
+
+- Valid character data structure with anatomy definitions
+- Integration with Animation Engine for state transitions
+- EventBus for expression change notifications
+
+This expression controller provides robust, validated expression management that ensures consistent character behavior while optimizing performance through intelligent caching and preloading strategies.

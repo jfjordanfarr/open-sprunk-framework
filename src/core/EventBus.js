@@ -1,8 +1,17 @@
+// MDMD Source: docs/Specification/Implementations/core/event-bus-class.mdmd
+
 /**
  * EventBus - Decoupled communication system for application modules
  * Supports both specific events and wildcard pattern matching
+ * 
+ * @class EventBus
+ * @description Core communication system enabling decoupled module interactions.
+ *              Supports event emission, listening, and wildcard pattern matching.
  */
 export class EventBus {
+    /**
+     * Create an EventBus instance
+     */
     constructor() {
         this.events = new Map();
         this.wildcardListeners = new Map();

@@ -1,0 +1,1055 @@
+<!-- filepath: docs/03_UNITS/character/drawing-window-interface.mdmd -->
+::: {unit}
+id: "drawing-window-class"
+title: "Scratch-Style Drawing Window Class"
+unit-type: "javascript-class-definition"
+status: "draft"
+version: "1.0"
+brief: "HTML5 Canvas-based drawing interface for individual Sprunki character parts with Scratch-style layout, visual-first accessibility, and real-time stage synchronization."
+source-ref: "../../../src/character/DrawingWindow.js"
+see-also:
+  - "[[character-authoring-ux-composition]]" # Parent UX design
+  - "[[character-data-schema]]" # Data structure
+  - "[[character-editor-module]]" # Overall architecture
+
+This unit implements the core drawing interface for creating and editing individual Sprunki character parts. The interface follows Scratch editor patterns with a left part library, central drawing canvas, right style palette, and bottom timeline integration.
+
+```javascript
+/**
+ * Scratch-style drawing window for Sprunki character parts
+ * Features: Visual part library, checkered canvas, real-time preview
+ */
+class DrawingWindow {
+  constructor(containerId, options = {}) {
+    this.container = document.getElementById(containerId);
+    this.options = {
+      canvasWidth: 800,
+      canvasHeight: 600,
+      checkeredBackground: true,
+      realTimeSync: true,
+      accessibility: {
+        highContrast: false,
+        largeTouchTargets: true,
+        auditoryFeedback: false
+      },
+      ...options
+    };
+    
+    this.characterData = null;
+    this.selectedPart = null;
+    this.selectedSubPart = null;
+    this.currentTool = 'select';
+    this.drawingMode = false;
+    
+    // Event system for cross-window coordination
+    this.eventBus = null;
+    
+    // Drawing state
+    this.fabricCanvas = null;
+    this.partGeometry = new Map(); // Part ID -> Fabric objects
+    this.undoStack = [];
+    this.redoStack = [];
+    
+    this.init();
+  }
+  
+  /**
+   * Initialize the complete drawing interface
+   */
+  init() {
+    this.createLayout();
+    this.setupCanvas();
+    this.createPartLibrary();
+    this.createStylePalette();
+    this.createTimeline();
+    this.setupEventListeners();
+    this.setupAccessibilityFeatures();
+  }
+  
+  /**
+   * Create the main layout structure following Scratch patterns
+   */
+  createLayout() {
+    this.container.innerHTML = `
+      <div class="drawing-window" data-mode="drawing">
+        <!-- Header with mode indicator and controls -->
+        <header class="drawing-header">
+          <div class="mode-indicator">
+            <span class="icon">🎨</span>
+            <span class="title">Sprunki Character Creator</span>
+          </div>
+          <div class="header-controls">
+            <button class="control-btn" data-action="settings" aria-label="Settings">
+              <span class="icon">⚙️</span>
+            </button>
+            <button class="control-btn" data-action="save" aria-label="Save Character">
+              <span class="icon">💾</span>
+            </button>
+          </div>
+        </header>
+        
+        <!-- Main content area with 3-panel layout -->
+        <main class="drawing-main">
+          <!-- Left: Part Library Panel -->
+          <aside class="part-library-panel">
+            <div class="panel-header">
+              <h2 class="panel-title">Parts</h2>
+            </div>
+            <div class="part-library-content">
+              <!-- Primary parts section -->
+              <section class="primary-parts" aria-label="Main character parts">
+                <div class="part-category-title">Main Parts</div>
+                <div class="part-grid" data-category="primary"></div>
+              </section>
+              
+              <!-- Head sub-parts section (initially hidden) -->
+              <section class="head-subparts" aria-label="Head details" style="display: none;">
+                <div class="part-category-title">Head Details</div>
+                <div class="part-grid" data-category="head-subparts"></div>
+              </section>
+            </div>
+          </aside>
+          
+          <!-- Center: Drawing Canvas -->
+          <section class="drawing-canvas-section">
+            <div class="canvas-header">
+              <div class="selected-part-indicator">
+                <span class="current-part">Select a part to edit</span>
+              </div>
+              <div class="canvas-controls">
+                <button class="canvas-btn" data-action="zoom-in" aria-label="Zoom In">
+                  <span class="icon">🔍+</span>
+                </button>
+                <button class="canvas-btn" data-action="zoom-out" aria-label="Zoom Out">
+                  <span class="icon">🔍-</span>
+                </button>
+                <button class="canvas-btn" data-action="center" aria-label="Center View">
+                  <span class="icon">🎯</span>
+                </button>
+              </div>
+            </div>
+            <div class="canvas-container">
+              <canvas id="drawing-canvas" class="drawing-canvas"></canvas>
+              <div class="canvas-overlay">
+                <!-- Selection handles, guides, etc. -->
+              </div>
+            </div>
+          </section>
+          
+          <!-- Right: Style Palette Panel -->
+          <aside class="style-palette-panel">
+            <div class="panel-header">
+              <h2 class="panel-title">Style</h2>
+            </div>
+            <div class="style-palette-content">
+              <!-- Drawing tools -->
+              <section class="drawing-tools" aria-label="Drawing tools">
+                <div class="tool-category-title">Tools</div>
+                <div class="tool-grid" data-category="drawing"></div>
+              </section>
+              
+              <!-- Color palette -->
+              <section class="color-palette" aria-label="Colors">
+                <div class="tool-category-title">Colors</div>
+                <div class="color-grid" data-category="colors"></div>
+              </section>
+              
+              <!-- Style properties -->
+              <section class="style-properties" aria-label="Style properties">
+                <div class="tool-category-title">Properties</div>
+                <div class="property-controls" data-category="properties"></div>
+              </section>
+            </div>
+          </aside>
+        </main>
+        
+        <!-- Bottom: Timeline Integration -->
+        <footer class="timeline-footer">
+          <div class="timeline-container">
+            <div class="timeline-header">
+              <span class="timeline-title">🎬 Timeline: Currently Editing Expression</span>
+              <div class="timeline-controls">
+                <button class="timeline-btn" data-action="play" aria-label="Play">▶️</button>
+                <button class="timeline-btn" data-action="loop" aria-label="Loop">🔄</button>
+                <button class="timeline-btn" data-action="stop" aria-label="Stop">⏹️</button>
+              </div>
+            </div>
+            <div class="timeline-track">
+              <!-- Timeline keyframes will be rendered here -->
+            </div>
+          </div>
+        </footer>
+      </div>
+    `;
+  }
+  
+  /**
+   * Set up the main drawing canvas with Fabric.js
+   */
+  setupCanvas() {
+    const canvasElement = this.container.querySelector('#drawing-canvas');
+    
+    this.fabricCanvas = new fabric.Canvas(canvasElement, {
+      width: this.options.canvasWidth,
+      height: this.options.canvasHeight,
+      backgroundColor: 'transparent',
+      selection: true,
+      preserveObjectStacking: true
+    });
+    
+    // Add checkered background pattern if enabled
+    if (this.options.checkeredBackground) {
+      this.addCheckeredBackground();
+    }
+    
+    // Configure canvas for part editing
+    this.fabricCanvas.on({
+      'object:modified': this.onObjectModified.bind(this),
+      'path:created': this.onPathCreated.bind(this),
+      'selection:created': this.onSelectionCreated.bind(this),
+      'selection:cleared': this.onSelectionCleared.bind(this)
+    });
+  }
+  
+  /**
+   * Create visual part library with Sprunki anatomy structure
+   */
+  createPartLibrary() {
+    const primaryPartsGrid = this.container.querySelector('[data-category="primary"]');
+    const headSubpartsGrid = this.container.querySelector('[data-category="head-subparts"]');
+    
+    // Primary parts based on Sprunki anatomy
+    const primaryParts = [
+      {
+        id: 'head',
+        name: 'Head',
+        icon: '👤',
+        description: 'Main head shape',
+        preview: this.generatePartPreview('head')
+      },
+      {
+        id: 'body',
+        name: 'Body',
+        icon: '🫱',
+        description: 'Trapezoid body',
+        preview: this.generatePartPreview('body')
+      },
+      {
+        id: 'hands',
+        name: 'Hands',
+        icon: '👏',
+        description: 'Floating circle hands',
+        preview: this.generatePartPreview('hands')
+      }
+    ];
+    
+    // Head sub-parts for detailed editing
+    const headSubparts = [
+      {
+        id: 'eyes',
+        name: 'Eyes',
+        icon: '👁️',
+        description: 'Eye elements with expressions',
+        preview: this.generatePartPreview('eyes')
+      },
+      {
+        id: 'mouth',
+        name: 'Mouth',
+        icon: '👄',
+        description: 'Mouth with expression states',
+        preview: this.generatePartPreview('mouth')
+      },
+      {
+        id: 'appendages',
+        name: 'Extras',
+        icon: '🦄',
+        description: 'Custom head appendages',
+        preview: this.generatePartPreview('appendages')
+      }
+    ];
+    
+    // Render primary parts
+    primaryParts.forEach(part => {
+      const partElement = this.createPartLibraryItem(part);
+      primaryPartsGrid.appendChild(partElement);
+    });
+    
+    // Render head sub-parts
+    headSubparts.forEach(part => {
+      const partElement = this.createPartLibraryItem(part);
+      headSubpartsGrid.appendChild(partElement);
+    });
+  }
+  
+  /**
+   * Create individual part library item with visual preview
+   */
+  createPartLibraryItem(partConfig) {
+    const item = document.createElement('div');
+    item.className = 'part-library-item';
+    item.dataset.partId = partConfig.id;
+    item.setAttribute('aria-label', `${partConfig.name}: ${partConfig.description}`);
+    item.setAttribute('role', 'button');
+    item.setAttribute('tabindex', '0');
+    
+    item.innerHTML = `
+      <div class="part-preview">
+        <canvas class="part-preview-canvas" width="80" height="80"></canvas>
+        <div class="part-icon" aria-hidden="true">${partConfig.icon}</div>
+      </div>
+      <div class="part-label">
+        <span class="part-name">${partConfig.name}</span>
+      </div>
+    `;
+    
+    // Render preview of current part state
+    this.renderPartPreview(item.querySelector('.part-preview-canvas'), partConfig);
+    
+    return item;
+  }
+  
+  /**
+   * Create style palette with drawing tools and color options
+   */
+  createStylePalette() {
+    const drawingToolsGrid = this.container.querySelector('[data-category="drawing"]');
+    const colorsGrid = this.container.querySelector('[data-category="colors"]');
+    const propertiesContainer = this.container.querySelector('[data-category="properties"]');
+    
+    // Drawing tools optimized for part creation
+    const drawingTools = [
+      { id: 'select', name: 'Select', icon: '👆', description: 'Select and move objects' },
+      { id: 'pen', name: 'Pen', icon: '✏️', description: 'Draw freehand paths' },
+      { id: 'brush', name: 'Brush', icon: '🖌️', description: 'Paint with brush' },
+      { id: 'circle', name: 'Circle', icon: '⭕', description: 'Draw circles' },
+      { id: 'rectangle', name: 'Rectangle', icon: '⬜', description: 'Draw rectangles' },
+      { id: 'fill', name: 'Fill', icon: '🪣', description: 'Fill shapes with color' },
+      { id: 'eraser', name: 'Eraser', icon: '🧽', description: 'Erase parts of drawing' }
+    ];
+    
+    // Sprunki-inspired color palette
+    const colorPalette = [
+      '#4A90E2', // Classic blue
+      '#FF6B6B', // Energetic red  
+      '#4ECDC4', // Calm teal
+      '#45B7D1', // Bright blue
+      '#96CEB4', // Soft green
+      '#FFEAA7', // Warm yellow
+      '#DDA0DD', // Gentle purple
+      '#FFB347', // Orange
+      '#87CEEB', // Sky blue
+      '#F0E68C', // Khaki
+      '#000000', // Black
+      '#FFFFFF'  // White
+    ];
+    
+    // Render drawing tools
+    drawingTools.forEach(tool => {
+      const toolElement = this.createToolItem(tool);
+      drawingToolsGrid.appendChild(toolElement);
+    });
+    
+    // Render color palette
+    colorPalette.forEach(color => {
+      const colorElement = this.createColorItem(color);
+      colorsGrid.appendChild(colorElement);
+    });
+    
+    // Render property controls
+    this.createPropertyControls(propertiesContainer);
+  }
+  
+  /**
+   * Create property control interface for selected objects
+   */
+  createPropertyControls(container) {
+    container.innerHTML = `
+      <div class="property-group">
+        <label class="property-label">Fill Color</label>
+        <input type="color" class="property-input" data-property="fill" value="#4A90E2">
+      </div>
+      
+      <div class="property-group">
+        <label class="property-label">Stroke Color</label>
+        <input type="color" class="property-input" data-property="stroke" value="#2E5A8A">
+      </div>
+      
+      <div class="property-group">
+        <label class="property-label">Stroke Width</label>
+        <input type="range" class="property-slider" data-property="strokeWidth" 
+               min="0" max="10" step="0.5" value="2">
+        <span class="property-value">2px</span>
+      </div>
+      
+      <div class="property-group">
+        <label class="property-label">Opacity</label>
+        <input type="range" class="property-slider" data-property="opacity"
+               min="0" max="1" step="0.1" value="1">
+        <span class="property-value">100%</span>
+      </div>
+    `;
+  }
+  
+  /**
+   * Set up comprehensive event listeners
+   */
+  setupEventListeners() {
+    // Part library interactions
+    this.container.addEventListener('click', (e) => {
+      const partItem = e.target.closest('.part-library-item');
+      if (partItem) {
+        this.selectPart(partItem.dataset.partId);
+      }
+      
+      const toolItem = e.target.closest('.tool-item');
+      if (toolItem) {
+        this.selectTool(toolItem.dataset.toolId);
+      }
+      
+      const colorItem = e.target.closest('.color-item');
+      if (colorItem) {
+        this.selectColor(colorItem.dataset.color);
+      }
+    });
+    
+    // Property control changes
+    this.container.addEventListener('input', (e) => {
+      if (e.target.classList.contains('property-input') || 
+          e.target.classList.contains('property-slider')) {
+        this.updateSelectedObjectProperty(
+          e.target.dataset.property,
+          e.target.value
+        );
+      }
+    });
+    
+    // Keyboard shortcuts
+    this.container.addEventListener('keydown', (e) => {
+      this.handleKeyboardShortcuts(e);
+    });
+    
+    // Canvas control buttons
+    this.container.addEventListener('click', (e) => {
+      const action = e.target.closest('[data-action]')?.dataset.action;
+      if (action) {
+        this.handleCanvasAction(action);
+      }
+    });
+  }
+  
+  /**
+   * Set up accessibility features based on options
+   */
+  setupAccessibilityFeatures() {
+    if (this.options.accessibility.highContrast) {
+      this.container.classList.add('high-contrast-mode');
+    }
+    
+    if (this.options.accessibility.largeTouchTargets) {
+      this.container.classList.add('large-touch-targets');
+    }
+    
+    // Screen reader announcements
+    this.createAriaLiveRegion();
+    
+    // Focus management
+    this.setupFocusManagement();
+    
+    // Keyboard navigation
+    this.setupKeyboardNavigation();
+  }
+  
+  /**
+   * Select and focus on specific character part
+   */
+  selectPart(partId) {
+    // Update UI to show selected part
+    this.container.querySelectorAll('.part-library-item').forEach(item => {
+      item.classList.remove('selected');
+    });
+    
+    const selectedItem = this.container.querySelector(`[data-part-id="${partId}"]`);
+    if (selectedItem) {
+      selectedItem.classList.add('selected');
+    }
+    
+    // Update selected part indicator
+    const partNames = {
+      'head': 'Head',
+      'body': 'Body', 
+      'hands': 'Hands',
+      'eyes': 'Eyes',
+      'mouth': 'Mouth',
+      'appendages': 'Extras'
+    };
+    
+    const indicator = this.container.querySelector('.current-part');
+    indicator.textContent = `Editing: ${partNames[partId] || partId}`;
+    
+    // Show/hide head sub-parts if head is selected
+    const headSubpartsSection = this.container.querySelector('.head-subparts');
+    if (partId === 'head') {
+      headSubpartsSection.style.display = 'block';
+    } else if (!['eyes', 'mouth', 'appendages'].includes(partId)) {
+      headSubpartsSection.style.display = 'none';
+    }
+    
+    // Load part geometry into canvas
+    this.loadPartGeometry(partId);
+    
+    // Store current selection
+    this.selectedPart = partId;
+    
+    // Emit event for cross-window coordination
+    this.emitEvent('partSelected', { partId, timestamp: Date.now() });
+    
+    // Accessibility announcement
+    this.announceToScreenReader(`Now editing ${partNames[partId] || partId}`);
+  }
+  
+  /**
+   * Handle real-time synchronization with stage view
+   */
+  syncWithStage() {
+    if (!this.options.realTimeSync || !this.eventBus) return;
+    
+    // Prepare current character state
+    const characterState = {
+      id: this.characterData?.id,
+      parts: this.serializeCurrentParts(),
+      selectedPart: this.selectedPart,
+      timestamp: Date.now()
+    };
+    
+    // Emit sync event
+    this.emitEvent('characterStateChanged', characterState);
+  }
+  
+  /**
+   * Connect to event bus for cross-window communication
+   */
+  connectEventBus(eventBus) {
+    this.eventBus = eventBus;
+    
+    // Listen for stage updates
+    this.eventBus.on('stageCharacterSelected', (data) => {
+      if (data.characterId !== this.characterData?.id) {
+        this.loadCharacter(data.characterId);
+      }
+    });
+    
+    // Listen for expression changes from timeline
+    this.eventBus.on('expressionChanged', (data) => {
+      this.setActiveExpression(data.expressionName);
+    });
+  }
+  
+  /**
+   * Load character data for editing
+   */
+  loadCharacter(characterData) {
+    this.characterData = characterData;
+    
+    // Load all parts into memory
+    Object.keys(characterData.parts).forEach(partId => {
+      this.loadPartGeometry(partId);
+    });
+    
+    // Select default part (head)
+    this.selectPart('head');
+    
+    // Update UI state
+    this.updateUIForCharacter();
+  }
+  
+  /**
+   * Save current drawing state
+   */
+  saveCharacter() {
+    if (!this.characterData) return null;
+    
+    // Update character data with current canvas state
+    this.updateCharacterDataFromCanvas();
+    
+    // Emit save event
+    this.emitEvent('characterSaved', {
+      characterData: this.characterData,
+      timestamp: Date.now()
+    });
+    
+    return this.characterData;
+  }
+  
+  /**
+   * Generate visual preview for part library
+   */
+  generatePartPreview(partType) {
+    // Create simplified visual representation based on part type
+    const previewConfigs = {
+      'head': { shape: 'circle', icon: '👤' },
+      'body': { shape: 'trapezoid', icon: '🫱' },
+      'hands': { shape: 'circles', icon: '👏' },
+      'eyes': { shape: 'dots', icon: '👁️' },
+      'mouth': { shape: 'arc', icon: '👄' },
+      'appendages': { shape: 'star', icon: '🦄' }
+    };
+    
+    return previewConfigs[partType] || { shape: 'rectangle', icon: '❓' };
+  }
+  
+  /**
+   * Emit events through event bus
+   */
+  emitEvent(eventName, data) {
+    if (this.eventBus) {
+      this.eventBus.emit(eventName, data);
+    }
+  }
+  
+  /**
+   * Announce information to screen readers
+   */
+  announceToScreenReader(message) {
+    const liveRegion = this.container.querySelector('.sr-live-region');
+    if (liveRegion) {
+      liveRegion.textContent = message;
+    }
+  }
+  
+  /**
+   * Create ARIA live region for dynamic announcements
+   */
+  createAriaLiveRegion() {
+    const liveRegion = document.createElement('div');
+    liveRegion.className = 'sr-live-region';
+    liveRegion.setAttribute('aria-live', 'polite');
+    liveRegion.setAttribute('aria-atomic', 'true');
+    liveRegion.style.position = 'absolute';
+    liveRegion.style.left = '-10000px';
+    liveRegion.style.width = '1px';
+    liveRegion.style.height = '1px';
+    liveRegion.style.overflow = 'hidden';
+    
+    this.container.appendChild(liveRegion);
+  }
+}
+
+// Export for module use
+export { DrawingWindow };
+```
+
+## CSS Styles for Scratch-Style Interface
+
+```css
+/* Base drawing window styles */
+.drawing-window {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: #f8f9fa;
+  color: #2c3e50;
+}
+
+/* Header */
+.drawing-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px;
+  background: #4A90E2;
+  color: white;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.mode-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.header-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.control-btn {
+  background: rgba(255,255,255,0.2);
+  border: none;
+  border-radius: 4px;
+  padding: 8px 12px;
+  color: white;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.control-btn:hover {
+  background: rgba(255,255,255,0.3);
+}
+
+/* Main 3-panel layout */
+.drawing-main {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Left panel: Part library */
+.part-library-panel {
+  width: 200px;
+  background: white;
+  border-right: 1px solid #e0e0e0;
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-header {
+  padding: 12px 16px;
+  background: #f5f5f5;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.panel-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.part-library-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.part-category-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: #7f8c8d;
+  margin: 16px 0 8px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.part-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.part-library-item {
+  display: flex;
+  align-items: center;
+  padding: 8px;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: #f8f9fa;
+}
+
+.part-library-item:hover {
+  background: #e3f2fd;
+  border-color: #4A90E2;
+}
+
+.part-library-item.selected {
+  background: #4A90E2;
+  color: white;
+}
+
+.part-preview {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  margin-right: 8px;
+}
+
+.part-preview-canvas {
+  width: 100%;
+  height: 100%;
+  border-radius: 4px;
+}
+
+.part-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 18px;
+}
+
+.part-label {
+  flex: 1;
+}
+
+.part-name {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* Center: Drawing canvas */
+.drawing-canvas-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: white;
+}
+
+.canvas-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px;
+  background: #f5f5f5;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.selected-part-indicator {
+  font-size: 14px;
+  font-weight: 500;
+  color: #2c3e50;
+}
+
+.canvas-controls {
+  display: flex;
+  gap: 4px;
+}
+
+.canvas-btn {
+  background: white;
+  border: 1px solid #d0d0d0;
+  border-radius: 4px;
+  padding: 6px 8px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s;
+}
+
+.canvas-btn:hover {
+  background: #f0f0f0;
+  border-color: #4A90E2;
+}
+
+.canvas-container {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: 
+    linear-gradient(45deg, #f0f0f0 25%, transparent 25%),
+    linear-gradient(-45deg, #f0f0f0 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #f0f0f0 75%),
+    linear-gradient(-45deg, transparent 75%, #f0f0f0 75%);
+  background-size: 20px 20px;
+  background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+}
+
+.drawing-canvas {
+  display: block;
+  margin: auto;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.1);
+}
+
+/* Right panel: Style palette */
+.style-palette-panel {
+  width: 200px;
+  background: white;
+  border-left: 1px solid #e0e0e0;
+  display: flex;
+  flex-direction: column;
+}
+
+.style-palette-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.tool-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
+  margin-bottom: 16px;
+}
+
+.tool-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: #f8f9fa;
+  text-align: center;
+}
+
+.tool-item:hover {
+  background: #e3f2fd;
+  border-color: #4A90E2;
+}
+
+.tool-item.selected {
+  background: #4A90E2;
+  color: white;
+}
+
+.tool-icon {
+  font-size: 18px;
+  margin-bottom: 4px;
+}
+
+.tool-name {
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.color-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  margin-bottom: 16px;
+}
+
+.color-item {
+  width: 100%;
+  height: 32px;
+  border: 2px solid #d0d0d0;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.color-item:hover {
+  border-color: #4A90E2;
+  transform: scale(1.05);
+}
+
+.color-item.selected {
+  border-color: #4A90E2;
+  border-width: 3px;
+}
+
+.property-group {
+  margin-bottom: 12px;
+}
+
+.property-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  color: #2c3e50;
+  margin-bottom: 4px;
+}
+
+.property-input,
+.property-slider {
+  width: 100%;
+  padding: 4px 6px;
+  border: 1px solid #d0d0d0;
+  border-radius: 3px;
+  font-size: 12px;
+}
+
+.property-value {
+  font-size: 11px;
+  color: #7f8c8d;
+  margin-left: 4px;
+}
+
+/* Bottom: Timeline */
+.timeline-footer {
+  height: 80px;
+  background: #2c3e50;
+  color: white;
+  border-top: 1px solid #34495e;
+}
+
+.timeline-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.timeline-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px;
+  background: #34495e;
+}
+
+.timeline-title {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.timeline-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.timeline-btn {
+  background: rgba(255,255,255,0.1);
+  border: none;
+  border-radius: 3px;
+  padding: 4px 8px;
+  color: white;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.timeline-btn:hover {
+  background: rgba(255,255,255,0.2);
+}
+
+.timeline-track {
+  flex: 1;
+  padding: 8px 16px;
+  background: #2c3e50;
+}
+
+/* Accessibility enhancements */
+.high-contrast-mode {
+  --primary-color: #000000;
+  --secondary-color: #ffffff;
+  --accent-color: #ffff00;
+}
+
+.large-touch-targets .part-library-item,
+.large-touch-targets .tool-item,
+.large-touch-targets .color-item,
+.large-touch-targets .canvas-btn,
+.large-touch-targets .control-btn {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Focus indicators */
+.part-library-item:focus,
+.tool-item:focus,
+.color-item:focus,
+.canvas-btn:focus,
+.control-btn:focus {
+  outline: 2px solid #4A90E2;
+  outline-offset: 2px;
+}
+
+/* Screen reader only content */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+```
+
+:::

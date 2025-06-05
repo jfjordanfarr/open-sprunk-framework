@@ -1,0 +1,169 @@
+{unit}
+---
+id: "style-palette-manager-class"
+title: "Style Palette Manager Class"
+unit-type: "javascript-class-definition"
+source-ref: "../../../src/character/StylePaletteManager.js"
+status: "implemented"
+priority: "high"
+owner: "character-authoring-team"
+see-also:
+  - "[[drawing-window-interface]]"
+  - "[[event-bus-class]]"
+  - "[[part-library-manager-class]]"
+  - "[[character-authoring-ux-composition]]"
+---
+
+# Style Palette Manager Class
+
+The **StylePaletteManager** class handles the drawing tools, color palette, and style controls within the DrawingWindow interface. This extracted component manages the right panel of the character authoring system, providing comprehensive styling and drawing capabilities for character part creation.
+
+## Core Responsibilities
+
+- **Drawing Tool Management**: Provides selection, drawing, and shape creation tools
+- **Color Palette System**: Manages Sprunki-inspired color schemes and selection
+- **Property Controls**: Handles stroke width, opacity, and style properties
+- **Tool State Coordination**: Maintains current tool and style settings across the interface
+- **Fabric.js Integration**: Configures canvas tools and drawing modes
+
+## Implementation Contract
+
+```javascript
+export class StylePaletteManager {
+  constructor(container, eventBus) {
+    // Initialize with DOM container and event bus
+    this.container = container;
+    this.eventBus = eventBus;
+    this.currentTool = 'select';
+    this.currentColor = '#4A90E2';
+    this.selectedObject = null;
+  }
+
+  // Core lifecycle methods
+  init() {
+    this.createStylePalette();
+    this.setupEventListeners();
+  }
+
+  // Style palette creation and management
+  createStylePalette() {
+    // Creates drawing tools grid (select, pen, brush, shapes, etc.)
+    // Creates color palette with Sprunki-inspired colors
+    // Creates property controls (stroke width, opacity)
+  }
+
+  // Tool management
+  selectTool(toolId) {
+    // Updates current tool state
+    // Configures canvas for selected tool
+    // Emits tool change events
+  }
+
+  configureCanvasForTool(tool) {
+    // Sets up Fabric.js canvas for current tool
+    // Manages drawing modes (free drawing, shape creation)
+    // Handles tool-specific event listeners
+  }
+
+  // Color and style management
+  selectColor(color) {
+    // Updates current color selection
+    // Applies color to selected objects
+    // Updates UI indicators
+  }
+
+  updatePropertyControls() {
+    // Updates stroke width, opacity sliders
+    // Reflects current object properties
+    // Provides real-time style feedback
+  }
+
+  // Object property methods
+  updateSelectedObject(object) {
+    // Updates style properties of canvas objects
+    // Maintains property consistency
+    // Triggers canvas re-render
+  }
+
+  getActiveStyles() {
+    // Returns current style configuration
+    // Used for new object creation
+    // Maintains style consistency
+  }
+}
+```
+
+## Tool Categories
+
+**Drawing Tools:**
+- **Select Tool**: Object selection and transformation
+- **Pen Tool**: Precise freehand drawing paths
+- **Brush Tool**: Natural brush-style painting
+- **Shape Tools**: Circle and rectangle primitives
+- **Fill Tool**: Shape and region filling
+- **Eraser Tool**: Selective content removal
+
+**Style Controls:**
+- **Color Palette**: 12-color Sprunki-inspired scheme
+- **Stroke Width**: Variable line thickness (1-20px)
+- **Opacity**: Transparency control (0-100%)
+- **Fill/Stroke Toggle**: Shape styling options
+
+## Architecture Integration
+
+**EventBus Communication:**
+- Emits `tool:changed` events for canvas configuration
+- Emits `style:updated` events for property changes
+- Listens for `object:selected` events from canvas
+- Coordinates with PartLibraryManager for part-specific styling
+
+**Canvas Integration:**
+- Direct Fabric.js canvas manipulation
+- Tool-specific event listener management
+- Real-time drawing feedback and preview
+- Object property synchronization
+
+**UI State Management:**
+- Visual tool selection indicators
+- Property control value reflection
+- Responsive layout adaptation
+- Accessibility-focused interaction patterns
+
+## Dependencies
+
+- **EventBus**: For real-time communication across components
+- **Fabric.js**: For canvas tool configuration and drawing modes
+- **DOM Container**: Parent element provided by DrawingWindow
+- **CSS Classes**: Styling coordination with drawing-window.css
+
+## File Organization
+
+This class was extracted from the original 1000+ line DrawingWindow.js to improve:
+- **LLM Efficacy**: Reduced file size to 365 lines (optimal range)
+- **MDMD Compliance**: Dedicated unit specification for style management
+- **Code Maintainability**: Clear separation of drawing tool concerns
+- **Testing Isolation**: Independent testing of style palette functionality
+
+## Usage Example
+
+```javascript
+// Integration within DrawingWindow
+const stylePaletteManager = new StylePaletteManager(
+  this.container.querySelector('.style-palette-panel'),
+  this.eventBus
+);
+
+stylePaletteManager.init();
+
+// Event-driven tool coordination
+this.eventBus.on('tool:changed', (toolData) => {
+  canvas.configureTool(toolData);
+});
+
+this.eventBus.on('style:updated', (styleData) => {
+  canvas.applyStyles(styleData);
+});
+```
+
+This component demonstrates focused responsibility separation and enhanced maintainability through the MDMD extraction methodology, creating more manageable and LLM-friendly code organization.
+{/unit}

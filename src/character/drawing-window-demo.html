@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sprunki Character Drawing Window Demo</title>
+    <link rel="stylesheet" href="drawing-window.css">
+    <!-- Fabric.js for canvas functionality -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f8f9fa;
+        }
+        
+        #demo-container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        
+        .demo-header {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px;
+            border-radius: 6px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+        
+        .demo-controls {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        
+        .demo-btn {
+            background: #4A90E2;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .demo-btn:hover {
+            background: #357ABD;
+        }
+        
+        .demo-info {
+            font-size: 12px;
+            color: #666;
+            max-width: 300px;
+        }
+    </style>
+</head>
+<body>
+    <div id="demo-container">
+        <div class="demo-header">
+            <div class="demo-controls">
+                <button class="demo-btn" onclick="loadSampleCharacter()">Load Sample</button>
+                <button class="demo-btn" onclick="toggleHighContrast()">High Contrast</button>
+                <button class="demo-btn" onclick="toggleLargeTouchTargets()">Large Targets</button>
+            </div>
+            <div class="demo-info">
+                <strong>Sprunki Character Creator Demo</strong><br>
+                This demonstrates the Scratch-style drawing interface for creating Sprunki character parts.
+                Click parts in the left panel to edit them on the canvas.
+            </div>
+        </div>
+    </div>
+
+    <!-- Load the EventBus and DrawingWindow classes -->
+    <script type="module">
+        // Simple EventBus implementation for demo
+        class EventBus {
+            constructor() {
+                this.events = new Map();
+                this.debugMode = true;
+            }
+            
+            on(eventName, callback) {
+                if (!this.events.has(eventName)) {
+                    this.events.set(eventName, []);
+                }
+                this.events.get(eventName).push(callback);
+                
+                if (this.debugMode) {
+                    console.log(`[EventBus] Registered listener for: ${eventName}`);
+                }
+            }
+            
+            off(eventName, callback) {
+                const listeners = this.events.get(eventName);
+                if (listeners) {
+                    const index = listeners.indexOf(callback);
+                    if (index > -1) {
+                        listeners.splice(index, 1);
+                    }
+                }
+            }
+            
+            emit(eventName, ...args) {
+                if (this.debugMode) {
+                    console.log(`[EventBus] Emitting: ${eventName}`, args);
+                }
+                
+                const listeners = this.events.get(eventName);
+                if (listeners) {
+                    listeners.forEach(callback => {
+                        try {
+                            callback(...args);
+                        } catch (error) {
+                            console.error(`[EventBus] Error in listener for ${eventName}:`, error);
+                        }
+                    });
+                }
+            }
+        }
+        
+        // Load DrawingWindow class
+        const response = await fetch('DrawingWindow.js');
+        const drawingWindowCode = await response.text();
+        
+        // Create a script element to load the DrawingWindow class
+        const script = document.createElement('script');
+        script.textContent = drawingWindowCode;
+        document.head.appendChild(script);
+        
+        // Initialize the demo
+        let drawingWindow;
+        let eventBus;
+        
+        function initDemo() {
+            // Create event bus
+            eventBus = new EventBus();
+            
+            // Create sample character data
+            const sampleCharacterData = {
+                id: 'demo-character',
+                name: 'Demo Sprunki',
+                parts: {
+                    head: {
+                        geometry: null,
+                        position: { x: 400, y: 200 },
+                        transform: { position: { x: 400, y: 200 }, rotation: 0, scale: { x: 1, y: 1 } },
+                        eyes: {
+                            left: {
+                                geometry: null,
+                                position: { x: 370, y: 180 },
+                                expressionStates: {
+                                    default: { geometry: 'default-eye' },
+                                    wide: { geometry: 'wide-eye' }
+                                }
+                            },
+                            right: {
+                                geometry: null,
+                                position: { x: 430, y: 180 },
+                                expressionStates: {
+                                    default: { geometry: 'default-eye' },
+                                    wide: { geometry: 'wide-eye' }
+                                }
+                            }
+                        },
+                        mouth: {
+                            geometry: null,
+                            position: { x: 400, y: 230 },
+                            expressionStates: {
+                                default: { geometry: 'default-mouth' },
+                                open: { geometry: 'open-mouth' }
+                            }
+                        }
+                    },
+                    body: {
+                        geometry: null,
+                        position: { x: 400, y: 350 },
+                        transform: { position: { x: 400, y: 350 }, rotation: 0, scale: { x: 1, y: 1 } }
+                    },
+                    hands: {
+                        left: {
+                            geometry: null,
+                            position: { x: 300, y: 300 },
+                            transform: { position: { x: 300, y: 300 }, rotation: 0, scale: { x: 1, y: 1 } }
+                        },
+                        right: {
+                            geometry: null,
+                            position: { x: 500, y: 300 },
+                            transform: { position: { x: 500, y: 300 }, rotation: 0, scale: { x: 1, y: 1 } }
+                        }
+                    }
+                },
+                expressions: {
+                    idle: {
+                        eyes: { left: 'default', right: 'default' },
+                        mouth: 'default',
+                        duration: 0.3
+                    },
+                    singing: {
+                        eyes: { left: 'default', right: 'default' },
+                        mouth: 'open',
+                        duration: 0.2
+                    },
+                    surprised: {
+                        eyes: { left: 'wide', right: 'wide' },
+                        mouth: 'open',
+                        duration: 0.1
+                    }
+                }
+            };
+            
+            // Initialize DrawingWindow
+            drawingWindow = new DrawingWindow('demo-container', {
+                canvasWidth: 800,
+                canvasHeight: 600,
+                checkeredBackground: true,
+                realTimeSync: true,
+                accessibility: {
+                    highContrast: false,
+                    largeTouchTargets: false,
+                    auditoryFeedback: false
+                }
+            });
+            
+            // Connect systems
+            drawingWindow.setEventBus(eventBus);
+            drawingWindow.setCharacterData(sampleCharacterData);
+            
+            // Set up event listeners for demo
+            eventBus.on('part-selected', (data) => {
+                console.log('Part selected:', data.partId);
+            });
+            
+            eventBus.on('part-modified', (data) => {
+                console.log('Part modified:', data);
+            });
+            
+            eventBus.on('character-saved', (data) => {
+                console.log('Character saved:', data);
+                alert('Character saved! Check the console for data.');
+            });
+            
+            console.log('Demo initialized! DrawingWindow is ready.');
+        }
+        
+        // Global functions for demo controls
+        window.loadSampleCharacter = function() {
+            if (drawingWindow) {
+                console.log('Sample character already loaded!');
+                // Select the head part by default
+                drawingWindow.selectPart('head');
+            }
+        };
+        
+        window.toggleHighContrast = function() {
+            if (drawingWindow) {
+                const container = drawingWindow.container;
+                container.classList.toggle('high-contrast');
+                console.log('High contrast mode toggled');
+            }
+        };
+        
+        window.toggleLargeTouchTargets = function() {
+            if (drawingWindow) {
+                const container = drawingWindow.container;
+                container.classList.toggle('large-touch-targets');
+                console.log('Large touch targets toggled');
+            }
+        };
+        
+        // Initialize when page loads
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initDemo);
+        } else {
+            initDemo();
+        }
+    </script>
+</body>
+</html>
