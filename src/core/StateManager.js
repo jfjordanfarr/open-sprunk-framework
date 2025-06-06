@@ -7,6 +7,10 @@
  * @class StateManager
  * @description Central state management system for the Open Sprunk Framework.
  *              Provides reactive state updates, persistence, and event-driven state changes.
+ * 
+ * @typedef {import('../utils/types.js').StateSnapshot} StateSnapshot
+ * @typedef {import('../utils/types.js').SpunkiCharacter} SpunkiCharacter
+ * @typedef {import('../utils/types.js').EventPayload} EventPayload
  */
 export class StateManager {
     /**
@@ -68,15 +72,14 @@ export class StateManager {
         // Listen for save operations
         this.eventBus.on('project:saved', () => {
             this.markSaved();
-        });
-    }
+        });    }
 
     /**
      * Get a deep copy of the entire application state
-     * @returns {Object} Complete application state object (deep copied for safety)
+     * @returns {StateSnapshot} Complete application state object (deep copied for safety)
      * @example
-     * const fullState = stateManager.getState(); // Gets entire state
-     * // Note: Use get(key) for specific properties instead
+     * const state = stateManager.getState();
+     * console.log(state.activeView); // 'character'
      */
     getState() {
         return JSON.parse(JSON.stringify(this.state)); // Deep copy

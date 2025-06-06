@@ -1,0 +1,112 @@
+````mdmd
+{unit}
+id: "test-framework-class"
+title: "TestFramework Class"
+unit-type: "javascript-class-definition"
+status: "active"
+source-ref: "../../../../src/testing/TestFramework.js"
+see-also:
+  - "[[../../Concepts/testing-infrastructure-architecture]]"
+  - "[[../../../Definition/Requirements/testing-requirement]]"
+  - "[[../core/console-logger-class]]"
+  - "[[core-tests-class]]"
+  - "[[integration-tests-class]]"
+````
+
+# TestFramework Class
+
+## Purpose
+Lightweight testing framework specifically designed for vanilla JavaScript projects without Node.js dependencies. Provides browser-native test execution with visual results display.
+
+## Class Structure
+
+```javascript
+/**
+ * Browser-native testing framework for vanilla JavaScript applications
+ * Implements the core testing engine for [[../../Concepts/testing-infrastructure-architecture]]
+ */
+class TestFramework {
+  constructor() {
+    this.tests = new Map();
+    this.suites = new Map();
+    this.results = [];
+    this.isRunning = false;
+    this.currentSuite = null;
+  }
+
+  /**
+   * Register a test suite
+   * @param {string} suiteName - Name of test suite
+   * @param {function} testFunction - Test function to execute
+   */
+  describe(suiteName, testFunction) {
+    // Suite registration and execution
+  }
+
+  /**
+   * Register individual test within current suite
+   * @param {string} testName - Name of the test
+   * @param {function} testFunction - Test implementation
+   */
+  it(testName, testFunction) {
+    // Individual test registration
+  }
+
+  /**
+   * Execute all registered tests with visual feedback
+   * @returns {Promise<Object>} Test results summary
+   */
+  async runAll() {
+    // Complete test execution pipeline
+  }
+
+  /**
+   * Comprehensive assertion library
+   */
+  assert = {
+    equals: (actual, expected, message) => { /* assertion logic */ },
+    notEquals: (actual, expected, message) => { /* assertion logic */ },
+    isTrue: (value, message) => { /* assertion logic */ },
+    isFalse: (value, message) => { /* assertion logic */ },
+    exists: (value, message) => { /* assertion logic */ },
+    elementExists: (selector, message) => { /* DOM assertion */ },
+    eventFired: (eventName, timeout = 1000) => { /* async event assertion */ }
+  };
+}
+```
+
+## Key Features
+
+**Test Organization:**
+- Suite-based test organization with `describe()` blocks
+- Individual test cases with `it()` method
+- Hierarchical result reporting
+
+**Visual Interface:**
+- Professional test results display in browser
+- Real-time test execution feedback
+- Copy-to-clipboard functionality for test reports
+- Run button with proper state management
+
+**Browser Integration:**
+- No external dependencies or build tools required
+- Full DOM and event system testing capabilities
+- Async/await support for testing asynchronous operations
+- Integration with existing application infrastructure
+
+## Usage Pattern
+
+```javascript
+// Test registration pattern used by [[core-tests-class]] and [[integration-tests-class]]
+testFramework.describe('Component Tests', () => {
+  testFramework.it('should validate basic functionality', async () => {
+    const result = await someAsyncOperation();
+    testFramework.assert.exists(result, 'Operation should return result');
+    testFramework.assert.equals(result.status, 'success', 'Status should be success');
+  });
+});
+```
+
+This implementation fulfills the testing framework requirements defined in [[../../../Definition/Requirements/testing-requirement]] and serves as the foundation for the [[../../Concepts/testing-infrastructure-architecture]].
+
+````

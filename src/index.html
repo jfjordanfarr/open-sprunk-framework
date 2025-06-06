@@ -48,6 +48,27 @@
                     <span class="icon">⚙️</span>
                 </button>
             </div>
+            <!-- Settings Panel (hidden by default) -->
+            <div id="settings-panel" class="settings-panel" style="display:none; position:fixed; top:60px; right:20px; width:240px; background:#222; color:#fff; border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,0.2); z-index:20000; padding:20px 16px 16px 16px; flex-direction:column; gap:16px;">
+                <h3 style="margin:0 0 12px 0; font-size:1.1em; color:#4CAF50;">Settings</h3>
+                <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+                    <input type="checkbox" id="toggle-developer-mode">
+                    <span>Developer Mode</span>
+                </label>
+                <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+                    <input type="checkbox" id="toggle-debug-mode">
+                    <span>Debug Mode</span>
+                </label>
+                <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+                    <input type="checkbox" id="toggle-console-logger">
+                    <span>Show Console Logger</span>
+                </label>
+                <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+                    <input type="checkbox" id="toggle-tests-panel">
+                    <span>Show Tests Panel</span>
+                </label>
+                <button id="close-settings-panel" style="margin-top:10px; background:#f44336; color:#fff; border:none; border-radius:4px; padding:6px 12px; cursor:pointer;">Close</button>
+            </div>
         </header>
         
         <main id="app-main" class="app-main">

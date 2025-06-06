@@ -1,0 +1,104 @@
+```mdmd
+{composition}
+id: "testing-infrastructure-architecture"
+title: "Testing Infrastructure Architecture"
+composition-type: "software-module-definition"
+status: "active"
+version: "1.0"
+brief: "Browser-based testing framework architecture providing comprehensive quality assurance without Node.js dependencies."
+see-also:
+  - "[[../../Definition/Requirements/testing-requirement]]"
+  - "[[../../Definition/Requirements/client-side-architecture-requirement]]"
+  - "[[app-core-module]]"
+  - "[[../Implementations/testing/test-framework-class]]"
+  - "[[../Implementations/testing/core-tests-class]]"
+  - "[[../Implementations/testing/integration-tests-class]]"
+```
+
+# Testing Infrastructure Architecture
+
+## Overview
+
+The testing infrastructure provides a comprehensive, browser-native testing framework that fulfills the [[../../Definition/Requirements/testing-requirement]] while adhering to the [[../../Definition/Requirements/client-side-architecture-requirement]] constraint of no Node.js dependencies.
+
+## Architecture Components
+
+### Core Testing Framework
+The testing infrastructure centers around a lightweight, browser-native testing framework ([[../Implementations/testing/test-framework-class]]) that provides:
+
+- **Test Registration**: `describe()` and `it()` methods for organizing test suites
+- **Assertion Library**: Built-in assertions for common testing patterns
+- **Async Support**: Full support for Promise-based and async/await testing
+- **Visual Results**: Professional UI for test execution and result display
+- **Export Capabilities**: Copy-to-clipboard functionality for test reports
+
+### Test Implementation Strategy
+
+**Core System Tests** ([[../Implementations/testing/core-tests-class]]):
+- Validates fundamental system components (EventBus, StateManager, AppCore)
+- Tests critical user workflows (navigation, character creation, stage interaction)
+- Ensures state management integrity across application modules
+
+**Integration Tests** ([[../Implementations/testing/integration-tests-class]]):
+- Validates inter-module communication patterns
+- Tests development utilities (PathValidator, LLMContextHelper, TypeDefinitions)
+- Ensures proper integration of testing framework with application core
+
+### Development Integration
+
+The testing architecture integrates seamlessly with the main application through:
+
+```mermaid
+graph TD
+    A[AppCore] --> B[Development Mode Detection]
+    B --> C[Testing Framework Auto-Init]
+    C --> D[Core Tests Registration]
+    C --> E[Integration Tests Registration]
+    C --> F[Utility Validation]
+    
+    D --> G[Test Execution Engine]
+    E --> G
+    F --> G
+    
+    G --> H[Visual Results Display]
+    G --> I[Console Logging]
+    G --> J[Export Capabilities]
+    
+    style A fill:#f9f,stroke:#333,stroke-width:2px
+    style G fill:#9cf,stroke:#333,stroke-width:2px
+    style H fill:#9fc,stroke:#333,stroke-width:2px
+```
+
+## Quality Assurance Strategy
+
+**Reliability Measures:**
+- Deterministic test execution without timing dependencies
+- Comprehensive error handling and reporting
+- Stable assertion patterns that account for DOM manipulation timing
+
+**Developer Experience:**
+- One-click test execution with visual feedback
+- Clear failure messages with debugging context  
+- Professional test report formatting for documentation
+- Integration with existing ConsoleLogger for consistent output patterns
+
+**AI Assistant Support:**
+- Type definitions provide IntelliSense for test development
+- Path validation prevents common development errors
+- Context helpers provide comprehensive project information
+- Consistent naming patterns reduce hallucination errors
+
+## Implementation Dependencies
+
+This architecture composition depends on and coordinates the following implementation units:
+
+- [[../Implementations/testing/test-framework-class]] - Core testing engine
+- [[../Implementations/testing/core-tests-class]] - Primary test suite implementation  
+- [[../Implementations/testing/integration-tests-class]] - Integration validation tests
+- [[../Implementations/utils/jsdoc-type-definitions]] - Type support for testing
+- [[../Implementations/utils/path-validator]] - Development error prevention
+- [[../Implementations/utils/llm-context-helper]] - AI assistant integration
+
+The architecture ensures seamless integration with the broader [[app-core-module]] while maintaining the browser-only constraint essential to the project's [[../../Definition/Requirements/client-side-architecture-requirement]].
+
+```

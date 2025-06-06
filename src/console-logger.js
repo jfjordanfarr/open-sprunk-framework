@@ -128,6 +128,10 @@ class ConsoleLogger {
             panel.style.display = isVisible ? 'none' : 'block';
             toggleBtn.style.display = isVisible ? 'block' : 'none';
         };
+        
+        // Store reference for Developer Mode control
+        this.toggleButton = toggleBtn;
+        
         document.body.appendChild(toggleBtn);
 
         // Event handlers

@@ -1,0 +1,145 @@
+````mdmd
+{unit}
+id: "integration-tests-class"
+title: "IntegrationTests Class"
+unit-type: "javascript-class-definition"
+status: "active"
+source-ref: "../../../../src/testing/IntegrationTests.js"
+see-also:
+  - "[[../../Concepts/testing-infrastructure-architecture]]"
+  - "[[../../../Definition/Requirements/testing-requirement]]"
+  - "[[test-framework-class]]"
+  - "[[../utils/jsdoc-type-definitions]]"
+  - "[[../utils/path-validator]]"
+  - "[[../utils/llm-context-helper]]"
+````
+
+# IntegrationTests Class
+
+## Purpose
+Validates integration between newly developed testing utilities and the core application framework. Ensures proper functioning of development tools and AI assistant support features.
+
+## Class Structure
+
+```javascript
+/**
+ * Integration test suite for development utilities and testing infrastructure
+ * Validates PathValidator, LLMContextHelper, TypeDefinitions, and TestFramework integration
+ */
+class IntegrationTests {
+  constructor() {
+    this.testFramework = null;
+  }
+
+  /**
+   * Initialize integration tests and register with global test framework
+   */
+  async init() {
+    this.testFramework = window.testFramework;
+    this.registerTypeDefinitionTests();
+    this.registerPathValidatorTests();
+    this.registerLLMContextHelperTests();
+    this.registerTestFrameworkIntegrationTests();
+  }
+
+  /**
+   * Test JSDoc type definitions and constants
+   */
+  registerTypeDefinitionTests() {
+    // Tests for FILE_PATHS, SELECTORS, EVENTS constants
+    // Validation of type definition availability
+  }
+
+  /**
+   * Test path validation utilities
+   */
+  registerPathValidatorTests() {
+    // Tests for path validation, similarity algorithms
+    // Validation of development helper functions
+  }
+
+  /**
+   * Test LLM context helper functionality
+   */
+  registerLLMContextHelperTests() {
+    // Tests for context generation, project information
+    // Validation of AI assistant support features
+  }
+
+  /**
+   * Test TestFramework integration with application
+   */
+  registerTestFrameworkIntegrationTests() {
+    // Tests for framework initialization, UI integration
+    // Validation of test execution and reporting
+  }
+}
+```
+
+## Integration Test Scenarios
+
+**Development Utilities Integration:**
+- PathValidator: File path validation and smart suggestions
+- LLMContextHelper: Comprehensive project context generation
+- TypeDefinitions: Constant availability and IntelliSense support
+
+**Testing Framework Integration:**
+- TestFramework UI integration with main application
+- Copy functionality and result formatting
+- Development mode auto-initialization
+
+**Cross-Utility Coordination:**
+- Utilities working together in development mode
+- Consistent error handling and logging patterns
+- Global helper function availability
+
+## Test Implementation Patterns
+
+**Utility Validation:**
+```javascript
+// Example pattern for testing development utilities
+testFramework.describe('PathValidator Integration', () => {
+  testFramework.it('should validate known file paths correctly', async () => {
+    const validPath = FILE_PATHS.CORE.APP_CORE;
+    const result = PathValidator.validatePath(validPath);
+    
+    testFramework.assert.isTrue(result.isValid, 'Known path should be valid');
+    testFramework.assert.equals(result.similarity, 1.0, 'Exact match should have perfect similarity');
+  });
+
+  testFramework.it('should provide smart suggestions for similar paths', async () => {
+    const similarPath = 'src/core/AppCore.js'; // Close but not exact
+    const suggestions = PathValidator.suggestPaths(similarPath);
+    
+    testFramework.assert.exists(suggestions, 'Should provide suggestions');
+    testFramework.assert.isTrue(suggestions.length > 0, 'Should have at least one suggestion');
+  });
+});
+```
+
+**Context Helper Validation:**
+```javascript
+// Example pattern for testing LLM context functionality
+testFramework.describe('LLM Context Helper Integration', () => {
+  testFramework.it('should provide comprehensive project context', async () => {
+    const context = LLMContextHelper.getContext();
+    
+    testFramework.assert.exists(context.projectInfo, 'Should include project information');
+    testFramework.assert.exists(context.filePaths, 'Should include file paths');
+    testFramework.assert.exists(context.constants, 'Should include application constants');
+  });
+});
+```
+
+## Quality Validation Focus
+
+This test suite specifically validates the integration aspects of the testing infrastructure that support:
+
+- **AI Assistant Development**: Ensuring context helpers provide accurate information
+- **Error Prevention**: Validating path validation prevents common development mistakes
+- **Development Experience**: Confirming utilities enhance rather than interfere with workflow
+- **Framework Integration**: Ensuring testing tools work seamlessly with application core
+
+This implementation ensures reliable integration of development utilities as specified in [[../../../Definition/Requirements/testing-requirement]] and validates the integration aspects of the [[../../Concepts/testing-infrastructure-architecture]].
+
+````

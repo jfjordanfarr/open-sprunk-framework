@@ -1,0 +1,107 @@
+````mdmd
+{unit}
+id: "jsdoc-type-definitions"
+title: "JSDoc Type Definitions for LLM IntelliSense"
+unit-type: "javascript-type-definitions"
+status: "proposed"
+source-ref: "../../../src/utils/types.js"
+see-also:
+  - "[[app-core-class]]"
+  - "[[event-bus-class]]"
+  - "[[state-manager-class]]"
+````
+
+# JSDoc Type Definitions for LLM IntelliSense
+
+## Purpose
+Provide comprehensive type definitions and path constants to prevent LLM hallucinations and improve code intelligence.
+
+## Type Definitions
+
+```javascript
+/**
+ * @typedef {Object} SpunkiCharacter
+ * @property {string} id - Unique character identifier
+ * @property {string} name - Character display name
+ * @property {string} color - Hex color code (#rrggbb)
+ * @property {number} size - Character size (pixels)
+ * @property {string} shape - Character shape type ('humanoid', 'geometric')
+ * @property {Object} position - Character position {x: number, y: number}
+ * @property {number} rotation - Rotation in degrees
+ * @property {number} scale - Scale factor (1.0 = normal)
+ */
+
+/**
+ * @typedef {Object} EventPayload
+ * @property {string} type - Event type identifier
+ * @property {*} data - Event-specific data
+ * @property {number} timestamp - Event timestamp
+ * @property {string} source - Module that emitted the event
+ */
+
+/**
+ * @typedef {Object} StateSnapshot
+ * @property {string} currentProject - Active project ID
+ * @property {Object} projectData - Complete project data
+ * @property {string} activeView - Current editor view
+ * @property {boolean} unsavedChanges - Has unsaved changes
+ */
+
+/**
+ * File path constants to prevent LLM hallucinations
+ */
+export const FILE_PATHS = {
+  // Core modules
+  APP_CORE: './core/AppCore.js',
+  EVENT_BUS: './core/EventBus.js',
+  STATE_MANAGER: './core/StateManager.js',
+  
+  // Stage modules
+  PERFORMANCE_STAGE: './stage/PerformanceStage.js',
+  CHARACTER_RENDERER: './stage/CharacterRenderer.js',
+  BACKGROUND_MANAGER: './stage/BackgroundManager.js',
+  
+  // Character modules
+  DRAWING_WINDOW: './character/DrawingWindow.js',
+  DRAWING_CANVAS: './character/DrawingCanvas.js',
+  EXPRESSION_SYSTEM: './character/ExpressionSystem.js',
+  
+  // Animation modules
+  TIMELINE: './animation/Timeline.js',
+  ANIMATION_ENGINE: './character/AnimationEngine.js',
+  TEMPORAL_COORDINATOR: './animation/TemporalCoordinator.js',
+  
+  // Music modules
+  AUDIO_ENGINE: './music/AudioEngine.js',
+  
+  // Utility modules
+  CONSOLE_LOGGER: './console-logger.js'
+};
+
+/**
+ * CSS selector constants
+ */
+export const SELECTORS = {
+  // Main containers
+  APP_CONTAINER: '#app',
+  STAGE_CONTAINER: '#stage-canvas-container',
+  CHARACTER_EDITOR: '#character-editor',
+  
+  // Navigation
+  NAV_BUTTONS: '.nav-btn[data-mode]',
+  EDITOR_PANELS: '.editor-panel',
+  
+  // Stage controls
+  STAGE_PLAY: '#stage-play',
+  STAGE_PAUSE: '#stage-pause',
+  STAGE_STOP: '#stage-stop',
+  ADD_CHARACTER: '#add-character',
+  
+  // Character editor
+  DRAWING_CANVAS: '#drawing-canvas',
+  PART_LIBRARY: '.part-library-panel',
+  STYLE_PALETTE: '.style-palette-panel'
+};
+```
+
+````

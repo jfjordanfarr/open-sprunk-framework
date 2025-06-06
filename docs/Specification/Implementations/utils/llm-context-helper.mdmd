@@ -1,0 +1,200 @@
+{unit}
+---
+id: "llm-context-helper"
+title: "LLM Context Helper Utility"
+unit-type: "javascript-utility-definition"
+source-ref: "../../../src/utils/llmContextHelper.js"
+status: "implemented"
+see-also:
+  - "[[jsdoc-type-definitions]]"
+  - "[[path-validator-utility]]"
+  - "[[vanilla-test-framework]]"
+---
+
+# LLM Context Helper
+
+## Purpose
+The `LLMContextHelper` provides structured context information for AI assistants to better understand the Open Sprunk Framework codebase. It helps prevent common LLM hallucinations about file paths, module names, and API patterns by providing comprehensive project context.
+
+## Core Functionality
+
+```javascript
+/**
+ * LLM Context Helper
+ * Provides structured information to help AI assistants understand the codebase
+ * and prevent common hallucinations about file paths, module names, and APIs
+ */
+export class LLMContextHelper {
+    // Get comprehensive context for LLM consumption
+    static getFullContext(): ContextInfo
+    
+    // Get specific context sections
+    static getProjectInfo(): ProjectInfo
+    static getArchitectureInfo(): ArchitectureInfo
+    static getFilePathsInfo(): FilePathsInfo
+    static getConstantsInfo(): ConstantsInfo
+    
+    // Generate formatted context summaries
+    static generateContextSummary(sections): string
+    
+    // Validation and debugging
+    static validateAssumptions(assumptions): ValidationResults
+    static logContext(): void
+}
+```
+
+## Context Categories
+
+### Project Information
+- Framework name and type
+- Architecture patterns
+- Dependency information
+- Entry points and main files
+
+### Architecture Overview
+- Core module descriptions
+- Module categorization
+- Communication patterns
+- State management approach
+
+### File Paths and Validation
+- Categorized file paths from `FILE_PATHS`
+- Validation instructions
+- Common path mistakes
+- Correction suggestions
+
+### Constants and Conventions
+- Available constant definitions
+- Usage patterns
+- Naming conventions
+- Documentation standards
+
+## Usage Examples
+
+### Basic Context Retrieval
+```javascript
+import { LLMContextHelper } from './utils/llmContextHelper.js';
+
+// Get full context for LLM
+const context = LLMContextHelper.getFullContext();
+console.log(context.projectInfo.name); // "Open Sprunk Framework"
+
+// Get specific sections
+const architecture = LLMContextHelper.getArchitectureInfo();
+console.log(architecture.coreModules);
+```
+
+### Context Summary Generation
+```javascript
+// Generate markdown summary for specific sections
+const summary = LLMContextHelper.generateContextSummary([
+    'projectInfo', 
+    'filePaths', 
+    'constants'
+]);
+console.log(summary); // Formatted markdown string
+```
+
+### Assumption Validation
+```javascript
+// Validate LLM assumptions about the codebase
+const assumptions = {
+    filePath: 'src/core/EventBus.js',
+    eventName: 'state:changed',
+    selector: '#stage-canvas'
+};
+
+const validation = LLMContextHelper.validateAssumptions(assumptions);
+console.log(validation.valid);     // Valid assumptions
+console.log(validation.invalid);   // Invalid assumptions
+console.log(validation.corrections); // Suggested corrections
+```
+
+### Development Mode Integration
+```javascript
+// In browser console (development mode)
+showContext();                    // Logs full context to console
+getContext();                     // Returns context object
+validateAssumptions({...});       // Validates LLM assumptions
+```
+
+## Context Structure
+
+### Project Info
+- Name: "Open Sprunk Framework"
+- Type: "Vanilla JavaScript Creative Game Framework"
+- Architecture: "Client-side, event-driven, modular"
+- Dependencies: None (pure vanilla JS)
+- Testing: Custom browser-based framework
+
+### Architecture Patterns
+- **Event-driven**: Communication through EventBus
+- **Centralized State**: StateManager for global state
+- **Modular Design**: Independent, communicating modules
+- **Canvas Rendering**: Manual render loops for performance
+
+### Common Patterns
+- Event emission: `eventBus.emit('event:name', data)`
+- State management: `stateManager.set('path.to.prop', value)`
+- Module registration: `appCore.registerModule(name, instance)`
+- Error handling: Try/catch with user notifications
+
+## LLM Assistance Features
+
+### Hallucination Prevention
+- File path validation against known structure
+- Event name verification against constants
+- Module name consistency checking
+- API pattern validation
+
+### Contextual Corrections
+- Suggests similar file paths for typos
+- Provides correct event names
+- Offers alternative selectors
+- Recommends proper module patterns
+
+### Development Support
+- Comprehensive troubleshooting guide
+- Common issue resolution
+- Debugging tool references
+- Code pattern examples
+
+## Integration Points
+
+### Testing Framework
+- Provides context for test development
+- Validates test assumptions
+- Guides test structure decisions
+
+### Path Validator
+- Works with PathValidator for file validation
+- Provides broader context for path corrections
+- Enhances error messages with context
+
+### Development Workflow
+- IDE integration for context-aware assistance
+- Build-time validation support
+- Documentation generation capabilities
+
+## Troubleshooting Integration
+
+### Common Issues Addressed
+- "Module not found" errors
+- Event listener problems
+- State update failures
+- Canvas rendering issues
+- Test execution problems
+
+### Debug Information
+- Console logging patterns
+- State inspection methods
+- Event tracking capabilities
+- Path validation tools
+- Test result interpretation
+
+## Performance Considerations
+- Static methods for minimal overhead
+- Lazy loading of context data
+- Efficient object serialization
+- Minimal runtime impact in production
+{/unit}

@@ -1,0 +1,130 @@
+{unit}
+---
+id: "path-validator-utility"
+title: "Path Validator Utility"
+unit-type: "javascript-utility-definition"
+source-ref: "../../../src/utils/pathValidator.js"
+status: "implemented"
+see-also:
+  - "[[jsdoc-type-definitions]]"
+  - "[[llm-context-helper]]"
+---
+
+# Path Validator Utility
+
+## Purpose
+The `PathValidator` utility provides development-time validation for file paths to prevent common LLM hallucinations and path-related errors. It validates paths against the project's known file structure and provides intelligent suggestions for corrections.
+
+## Core Functionality
+
+```javascript
+/**
+ * Path validation and autocomplete utilities
+ * Helps prevent common path-related errors and provides development-time validation
+ */
+export class PathValidator {
+    // Validate that a file path exists in the project structure
+    static validatePath(filePath): boolean
+    
+    // Get suggestions for similar paths when validation fails  
+    static getSuggestions(filePath): string[]
+    
+    // Validate and provide comprehensive feedback
+    static validateWithFeedback(filePath): ValidationResult
+    
+    // Development helpers
+    static logAvailablePaths(): void
+    static validateBatch(paths): BatchValidationResult
+}
+```
+
+## Key Features
+
+### Path Validation
+- Validates file paths against `FILE_PATHS` constants
+- Normalizes path separators for cross-platform compatibility
+- Provides boolean validation results
+
+### Intelligent Suggestions
+- Uses Levenshtein distance algorithm for similarity calculation
+- Ranks suggestions by similarity score
+- Returns top 5 most similar paths
+
+### Development Integration
+- Global window methods in development mode (`window.validatePath`, `window.suggestPaths`)
+- Console logging helpers for debugging
+- Batch validation for multiple paths
+
+## Usage Examples
+
+### Basic Validation
+```javascript
+import { PathValidator } from './utils/pathValidator.js';
+
+// Validate a single path
+const isValid = PathValidator.validatePath('src/core/AppCore.js');
+console.log(isValid); // true
+
+// Get suggestions for invalid path
+const suggestions = PathValidator.getSuggestions('src/core/AppCor.js');
+console.log(suggestions); // ['src/core/AppCore.js', ...]
+```
+
+### Comprehensive Feedback
+```javascript
+const result = PathValidator.validateWithFeedback('src/coe/EventBus.js');
+console.log(result);
+// {
+//   isValid: false,
+//   message: "❌ Path not found: src/coe/EventBus.js",
+//   suggestions: ["src/core/EventBus.js", ...]
+// }
+```
+
+### Development Mode
+```javascript
+// In browser console (development mode)
+validatePath('src/core/StateManager.js');  // true
+suggestPaths('src/cor/App.js');            // suggestions array
+showPaths();                               // logs all available paths
+```
+
+## Integration Points
+
+### LLM Context Enhancement
+- Provides path validation for AI assistants
+- Reduces hallucinations about file locations
+- Offers contextual corrections
+
+### Development Workflow
+- IDE integration potential for path completion
+- Build-time validation capabilities
+- Error prevention during development
+
+## Implementation Details
+
+### Similarity Algorithm
+Uses Levenshtein distance calculation with normalized scoring:
+- Handles case variations
+- Accounts for path separator differences
+- Weighted by string length for relevance
+
+### Performance Considerations
+- Static methods for minimal memory overhead
+- Efficient string comparison algorithms
+- Lazy loading of path constants
+
+## Error Prevention
+
+### Common LLM Mistakes Addressed
+- Incorrect case in file names
+- Missing file extensions
+- Wrong directory structure assumptions
+- Node.js path patterns in browser environment
+
+### Validation Patterns
+- Path existence verification
+- Extension consistency checking
+- Directory structure compliance
+- Cross-platform path normalization
+{/unit}

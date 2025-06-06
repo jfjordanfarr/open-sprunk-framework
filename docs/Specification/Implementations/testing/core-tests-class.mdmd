@@ -1,0 +1,139 @@
+````mdmd
+{unit}
+id: "core-tests-class"
+title: "CoreTests Class"
+unit-type: "javascript-class-definition"
+status: "active"
+source-ref: "../../../../src/testing/CoreTests.js"
+see-also:
+  - "[[../../Concepts/testing-infrastructure-architecture]]"
+  - "[[../../../Definition/Requirements/testing-requirement]]"
+  - "[[test-framework-class]]"
+  - "[[../core/app-core-class]]"
+  - "[[../core/event-bus-class]]"
+  - "[[../core/state-manager-class]]"
+````
+
+# CoreTests Class
+
+## Purpose
+Comprehensive test suite for core application functionality. Validates fundamental system components and critical user workflows to ensure system reliability.
+
+## Class Structure
+
+```javascript
+/**
+ * Core functionality test suite for Open Sprunk Framework
+ * Tests fundamental components: EventBus, StateManager, AppCore, and user interactions
+ */
+class CoreTests {
+  constructor(testFramework) {
+    this.testFramework = testFramework;
+    this.appCore = null;
+  }
+
+  /**
+   * Initialize core tests and register with test framework
+   */
+  async init() {
+    this.appCore = window.spunkiApp?.appCore;
+    this.registerEventBusTests();
+    this.registerStateManagerTests();
+    this.registerAppCoreTests();
+    this.registerNavigationTests();
+    this.registerCharacterCreatorTests();
+  }
+
+  /**
+   * Test EventBus communication patterns
+   */
+  registerEventBusTests() {
+    // Tests for event emission, subscription, and data flow
+  }
+
+  /**
+   * Test StateManager functionality
+   */
+  registerStateManagerTests() {
+    // Tests for state getting, setting, persistence, and validation
+  }
+
+  /**
+   * Test AppCore orchestration
+   */
+  registerAppCoreTests() {
+    // Tests for module initialization, lifecycle management
+  }
+
+  /**
+   * Test UI navigation system
+   */
+  registerNavigationTests() {
+    // Tests for tab switching, view transitions, URL handling
+  }
+
+  /**
+   * Test character creation workflow
+   */
+  registerCharacterCreatorTests() {
+    // Tests for character editor launch, UI interactions
+  }
+}
+```
+
+## Test Coverage Areas
+
+**System Component Tests:**
+- EventBus: Event emission, subscription, payload handling
+- StateManager: Data persistence, retrieval, validation
+- AppCore: Module coordination, initialization sequence
+
+**User Interaction Tests:**
+- Navigation: Tab switching, view transitions
+- Character Creation: Editor launch, UI responsiveness
+- Stage Interaction: Mouse events, selection handling
+
+**Integration Scenarios:**
+- Cross-module communication via EventBus
+- State persistence across navigation
+- UI consistency after various operations
+
+## Test Execution Strategy
+
+**Synchronous Tests:**
+- Component instantiation and basic method calls
+- State validation and data structure integrity
+- UI element existence and accessibility
+
+**Asynchronous Tests:**
+- Event-driven workflows with proper wait conditions
+- Navigation timing and DOM updates
+- Character editor initialization sequences
+
+## Quality Assurance Patterns
+
+```javascript
+// Example test pattern used throughout CoreTests
+testFramework.describe('EventBus Core Functionality', () => {
+  testFramework.it('should emit and receive events correctly', async () => {
+    const eventBus = new EventBus();
+    let eventReceived = false;
+    let eventData = null;
+    
+    eventBus.on('test:event', (data) => {
+      eventReceived = true;
+      eventData = data;
+    });
+    
+    const testPayload = { message: 'test data' };
+    eventBus.emit('test:event', testPayload);
+    
+    testFramework.assert.isTrue(eventReceived, 'Event should be received');
+    testFramework.assert.equals(eventData.message, 'test data', 'Event data should match');
+  });
+});
+```
+
+This implementation provides comprehensive validation of core system functionality as required by [[../../../Definition/Requirements/testing-requirement]] and serves as the primary test suite within the [[../../Concepts/testing-infrastructure-architecture]].
+
+````

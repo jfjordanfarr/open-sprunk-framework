@@ -12,12 +12,21 @@ import { AppCore } from './core/AppCore.js';
 import { PerformanceStage } from './stage/PerformanceStage.js';
 import { DrawingWindow } from './character/DrawingWindow.js';
 import { AnimationTimelineEditor } from './animation/AnimationTimelineEditor.js';
+// Import testing framework for development
+import { TestFramework } from './testing/TestFramework.js';
+import { CoreTests } from './testing/CoreTests.js';
+import { IntegrationTests } from './testing/IntegrationTests.js';
+// Import development utilities
+import { PathValidator } from './utils/pathValidator.js';
+import { LLMContextHelper } from './utils/llmContextHelper.js';
 
 class SpunkiApp {
     constructor() {
         this.appCore = null;
         this.editors = {};
-        this.currentView = 'stage';
+        this.developmentMode = this.isDevelopmentMode();
+        this.developerModeEnabled = false; // New: Developer Mode state
+        console.log(`🎵 Development mode: ${this.developmentMode ? 'ON' : 'OFF'}`);
     }
 
     async init() {
@@ -27,6 +36,11 @@ class SpunkiApp {
             // Initialize core application
             this.appCore = new AppCore();
             await this.appCore.init();
+
+            // Initialize testing framework in development mode
+            if (this.developmentMode) {
+                await this.initializeTestFramework();
+            }
 
             // Initialize Performance Stage first (foundation for unified authoring)
             this.editors.stage = await this.createPerformanceStage();
@@ -48,6 +62,7 @@ class SpunkiApp {
             this.setupNavigation();
             this.setupProjectControls();
             this.setupUnifiedAuthoringControls();
+            this.setupDeveloperMode(); // New: Setup Developer Mode controls
 
             // Set up global event listeners
             this.setupGlobalEventListeners();
@@ -361,6 +376,166 @@ class SpunkiApp {
         eventBus.emit('test:data-loaded');
     } // End of addTestData
 
+    setupDeveloperMode() {
+        // Remove floating gear logic (no-op)
+        // Setup unified settings panel logic
+        const settingsBtn = document.getElementById('settings');
+        const settingsPanel = document.getElementById('settings-panel');
+        const closeSettingsBtn = document.getElementById('close-settings-panel');
+        
+        // Show/hide settings panel
+        if (settingsBtn && settingsPanel) {
+            settingsBtn.addEventListener('click', () => {
+                settingsPanel.style.display = settingsPanel.style.display === 'none' ? 'flex' : 'none';
+            });
+        }
+        if (closeSettingsBtn && settingsPanel) {
+            closeSettingsBtn.addEventListener('click', () => {
+                settingsPanel.style.display = 'none';
+            });
+        }
+        // Wire up toggles
+        const devModeToggle = document.getElementById('toggle-developer-mode');
+        const debugModeToggle = document.getElementById('toggle-debug-mode');
+        const consoleLoggerToggle = document.getElementById('toggle-console-logger');
+        const testsPanelToggle = document.getElementById('toggle-tests-panel');
+        // Restore toggle states from localStorage
+        devModeToggle.checked = localStorage.getItem('sprunki-developer-mode') === 'true';
+        debugModeToggle.checked = localStorage.getItem('sprunki-debug-mode') === 'true';
+        consoleLoggerToggle.checked = localStorage.getItem('sprunki-console-logger') === 'true';
+        testsPanelToggle.checked = localStorage.getItem('sprunki-tests-panel') === 'true';
+        // Developer Mode
+        devModeToggle.addEventListener('change', (e) => {
+            this.setDeveloperMode(e.target.checked);
+        });
+        // Debug Mode
+        debugModeToggle.addEventListener('change', (e) => {
+            this.setDebugMode(e.target.checked);
+        });
+        // Console Logger
+        consoleLoggerToggle.addEventListener('change', (e) => {
+            this.toggleConsoleLogger(e.target.checked);
+            localStorage.setItem('sprunki-console-logger', e.target.checked ? 'true' : 'false');
+        });
+        // Tests Panel
+        testsPanelToggle.addEventListener('change', (e) => {
+            this.toggleTestsButton(e.target.checked);
+            localStorage.setItem('sprunki-tests-panel', e.target.checked ? 'true' : 'false');
+        });
+        // Initial state
+        this.setDeveloperMode(devModeToggle.checked);
+        this.setDebugMode(debugModeToggle.checked);
+        this.toggleConsoleLogger(consoleLoggerToggle.checked);
+        this.toggleTestsButton(testsPanelToggle.checked);
+    }
+
+    toggleDeveloperMode() {
+        this.setDeveloperMode(!this.developerModeEnabled);
+    }
+
+    setDeveloperMode(enabled) {
+        this.developerModeEnabled = enabled;
+        
+        // Update toggle button appearance
+        this.updateDeveloperModeToggle(enabled);
+        
+        // Show/hide developer tools
+        this.toggleDeveloperTools(enabled);
+        
+        console.log(`⚙️ Developer Mode: ${enabled ? 'ENABLED' : 'DISABLED'}`);
+        
+        // Store preference in localStorage
+        localStorage.setItem('sprunki-developer-mode', enabled ? 'true' : 'false');
+    }
+    
+    updateDeveloperModeToggle(enabled) {
+        const toggle = document.getElementById('developer-mode-toggle');
+        if (toggle) {
+            if (enabled) {
+                toggle.classList.add('active');
+                toggle.style.background = '#4CAF50';
+                toggle.title = 'Developer Mode: ON (click to hide developer tools)';
+            } else {
+                toggle.classList.remove('active');
+                toggle.style.background = '';
+                toggle.title = 'Developer Mode: OFF (click to show developer tools)';
+            }
+        }
+    }
+    
+    toggleDeveloperTools(enabled) {
+        // Show/hide Console Logger button
+        this.toggleConsoleLogger(enabled);
+        
+        // Show/hide Tests button
+        this.toggleTestsButton(enabled);
+        
+        // Show/hide debug checkbox
+        this.toggleDebugCheckbox(enabled);
+    }
+    
+    toggleConsoleLogger(enabled) {
+        // Try to access through global reference first
+        if (window.consoleLogger && window.consoleLogger.toggleButton) {
+            window.consoleLogger.toggleButton.style.display = enabled ? 'block' : 'none';
+            return;
+        }
+        
+        // Fallback: find by text content
+        const allButtons = document.querySelectorAll('button');
+        for (const btn of allButtons) {
+            if (btn.textContent.includes('📋 Console') && btn.style.position === 'fixed') {
+                btn.style.display = enabled ? 'block' : 'none';
+                break;
+            }
+        }
+    }
+    
+    toggleTestsButton(enabled) {
+        // Try to access through TestFramework reference
+        if (this.testFramework && this.testFramework.toggleButton) {
+            this.testFramework.toggleButton.style.display = enabled ? 'block' : 'none';
+            return;
+        }
+        
+        // Fallback: find by text content
+        const allButtons = document.querySelectorAll('button');
+        for (const btn of allButtons) {
+            if (btn.textContent.includes('🧪 Tests') && btn.style.position === 'fixed') {
+                btn.style.display = enabled ? 'block' : 'none';
+                break;
+            }
+        }
+    }
+    
+    toggleDebugCheckbox(enabled) {
+        const debugCheckbox = document.getElementById('debug-mode');
+        if (debugCheckbox) {
+            const debugLabel = debugCheckbox.parentElement;
+            if (debugLabel) {
+                debugLabel.style.display = enabled ? 'inline-block' : 'none';
+            }
+        }
+    }
+
+    setDebugMode(enabled) {
+        // Set debug mode on the EventBus
+        if (this.appCore) {
+            this.appCore.getEventBus().setDebugMode(enabled);
+        }
+        
+        // Update debug checkbox state
+        const debugCheckbox = document.getElementById('debug-mode');
+        if (debugCheckbox) {
+            debugCheckbox.checked = enabled;
+        }
+        
+        console.log(`🐛 Debug Mode: ${enabled ? 'ENABLED' : 'DISABLED'}`);
+        
+        // Store preference in localStorage
+        localStorage.setItem('sprunki-debug-mode', enabled ? 'true' : 'false');
+    }
+
     addStageControls() {
         const stageContainer = document.getElementById('stage-controls');
         if (!stageContainer) return;
@@ -662,6 +837,48 @@ class SpunkiApp {
                 </div>
             `;
         }
+    }
+
+    async initializeTestFramework() {
+        console.log('🧪 Initializing Test Framework...');
+        
+        // Initialize development utilities
+        if (this.developmentMode) {
+            console.log('🔍 Development mode detected - initializing utilities...');
+            PathValidator.logAvailablePaths();
+            LLMContextHelper.logContext();
+        }
+
+        // Create and configure test framework instance
+        this.testFramework = new TestFramework();
+        
+        // Initialize core tests
+        const coreTests = new CoreTests(this.testFramework);
+        await coreTests.init();
+        
+        // Initialize integration tests
+        const integrationTests = new IntegrationTests();
+        await integrationTests.init();
+        
+        // Run all tests
+        const results = await this.testFramework.runAll();
+        
+        console.log('🧪 Test Framework initialized and tests completed:', results);
+    }
+
+    isDevelopmentMode() {
+        // Check for development indicators
+        return (
+            // URL contains localhost or development indicators
+            window.location.hostname === 'localhost' ||
+            window.location.hostname === '127.0.0.1' ||
+            window.location.port !== '' ||
+            // URL parameters to force development mode
+            new URLSearchParams(window.location.search).has('dev') ||
+            new URLSearchParams(window.location.search).has('test') ||
+            // Console flag for development
+            window.SPRUNKI_DEV_MODE === true
+        );
     }
 }
 
